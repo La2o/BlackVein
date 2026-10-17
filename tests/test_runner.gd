@@ -1,0 +1,443 @@
+extends Node
+## Automated gameplay checks. Run from the project folder with:
+##   godot --headless --path . res://tests/test_runner.tscn
+## It plays through movement, combat, powers, vehicles, events and saving,
+## prints PASS/FAIL for each check, and quits with exit code 0 if all pass.
+## Add "-- shots=<folder>" (without --headless) to also save screenshots.
+
+const MAIN := preload("res://scenes/main.tscn")
+
+var main: Node3D
+var player: Player
+var results: Array[String] = []
+var failures := 0
+var shots_dir := ""
+
+
+func _ready() -> void:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("shots="):
+			shots_dir = a.substr(6)
+	Game.delete_save()
+	Game.reset_state()
+	main = MAIN.instantiate()
+	add_child(main)
+	await _wait(0.5)
+	player = Game.player
+	await _run_all()
+	print("\n==== RESULTS ====")
+	for r in results:
+		print(r)
+	print("%d checks, %d failed" % [results.size(), failures])
+	Game.delete_save()
+	get_tree().quit(1 if failures > 0 else 0)
+
+
+func check(name: String, ok: bool, detail := "") -> void:
+	var line := ("PASS  " if ok else "FAIL  ") + name + ("  (" + detail + ")" if detail != "" else "")
+	results.append(line)
+	print(line)
+	if not ok:
+		failures += 1
+
+
+func _wait(seconds: float) -> void:
+	var t := 0.0
+	while t < seconds:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+
+
+func _release_all() -> void:
+	for a in ["sprint", "move_forward", "move_back", "move_left", "move_right", "jump", "attack", "special", "grab",
+			"consume", "dash", "tether", "focus", "decoy", "devastator_spikes", "devastator_tendrils", "cycle_defense"]:
+		Input.action_release(a)
+
+
+func _tap(action: String) -> void:
+	Input.action_press(action)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	Input.action_release(action)
+	await get_tree().physics_frame
+
+
+func _shot(name: String) -> void:
+	if shots_dir == "":
+		return
+	await RenderingServer.frame_post_draw
+	var img := get_viewport().get_texture().get_image()
+	img.save_png(shots_dir.path_join(name + ".png"))
+
+
+func _teleport(p: Vector3, yaw := 0.0) -> void:
+	player.respawn(p)
+	player.yaw = yaw
+	player.invuln_timer = 0.0
+	await _wait(0.1)
+
+
+func _clear_units() -> void:
+	for n in main.get_node("Units").get_children():
+		n.queue_free()
+	await get_tree().process_frame
+
+
+func _give_all_skills() -> void:
+	Game.level = 30
+	for id in Game.SKILLS:
+		Game.skills[id] = Game.SKILLS[id][5]
+	player.apply_upgrades()
+
+
+func _run_all() -> void:
+	# ---------------- boot
+	check("city built", Game.city.buildings.size() > 100, "%d buildings" % Game.city.buildings.size())
+	check("navigation ready", Game.city.nav_ready)
+	var path := Game.city.nav_path(Game.city.spawn_point, Game.city.spawn_point + Vector3(120, 0, 60))
+	check("nav path around blocks", path.size() > 2, "%d points" % path.size())
+	await _wait(1.5)
+	check("player landed at spawn", player.state == Player.State.GROUND, "state %s" % Player.STATE_NAMES[player.state])
+	await _shot("01_spawn")
+	# keep the director quiet during scripted checks
+	Game.director.set_process(false)
+	Game.military.set_process(false)
+	await _clear_units()
+
+	# ---------------- wall run up a building
+	var target := {}
+	var start := Vector3.ZERO
+	var best := INF
+	for b in Game.city.buildings:
+		var a: AABB = b["aabb"]
+		if a.size.y < 25.0 or a.size.y > 60.0 or absf(a.get_center().x) > 200.0 or absf(a.get_center().z) > 200.0:
+			continue
+		var s0 := Vector3(a.position.x - 5.0, 1.2, a.get_center().z)
+		if Game.city.is_inside_building(s0, 1.0):
+			continue
+		var hit := Game.raycast(s0, s0 + Vector3(8, 0, 0), Game.LAYER_WORLD)
+		if hit.is_empty() or absf(float(hit["position"].x) - a.position.x) > 0.2:
+			continue
+		var d := a.get_center().distance_to(Game.city.spawn_point)
+		if d < best:
+			best = d
+			target = b
+			start = s0
+	var aabb: AABB = target["aabb"]
+	await _teleport(start, -PI * 0.5)   # yaw -90 deg looks toward +X
+	await _wait(0.4)
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	var max_y := 0.0
+	var saw_wall := false
+	var t := 0.0
+	while t < 6.0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		max_y = maxf(max_y, player.global_position.y)
+		if player.state == Player.State.WALL:
+			saw_wall = true
+			if t > 1.0 and t < 1.1:
+				await _shot("02_wallrun")
+	_release_all()
+	await _wait(1.0)
+	var roof: float = target["height"]
+	check("wall run starts", saw_wall)
+	check("climbed to the roof", max_y > roof - 1.0, "max %.1f roof %.1f" % [max_y, roof])
+	check("standing on the roof", absf(player.global_position.y - (roof + 0.9)) < 3.5 and player.state == Player.State.GROUND,
+		"y %.1f state %s" % [player.global_position.y, Player.STATE_NAMES[player.state]])
+	await _shot("03_roof")
+
+	# ---------------- super jump
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.8)
+	var y0 := player.global_position.y
+	Input.action_press("jump")
+	await _wait(0.75)
+	Input.action_release("jump")
+	max_y = 0.0
+	t = 0.0
+	while t < 2.5:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		max_y = maxf(max_y, player.global_position.y)
+	check("charged super jump is high", max_y - y0 > 20.0, "%.1f m" % (max_y - y0))
+	await _wait(1.5)
+
+	# ---------------- tap jump is small
+	y0 = player.global_position.y
+	await _tap("jump")
+	max_y = 0.0
+	t = 0.0
+	while t < 1.0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		max_y = maxf(max_y, player.global_position.y)
+	check("tap jump is a normal hop", max_y - y0 > 1.0 and max_y - y0 < 5.0, "%.1f m" % (max_y - y0))
+	await _wait(0.8)
+
+	# ---------------- glide is locked until unlocked
+	await _teleport(Game.city.spawn_point + Vector3(0, 60, 0))
+	await _tap("jump")
+	Input.action_press("jump")
+	await _wait(1.2)
+	check("glide locked at level 1", player.state != Player.State.GLIDE)
+	_release_all()
+	_give_all_skills()
+	await _teleport(Game.city.spawn_point + Vector3(0, 60, 0))
+	await _tap("jump")
+	Input.action_press("jump")
+	await _wait(1.5)
+	check("glide works after unlocking", player.state == Player.State.GLIDE and player.velocity.y > -6.0,
+		"state %s vy %.1f" % [Player.STATE_NAMES[player.state], player.velocity.y])
+	await _shot("04_glide")
+	_release_all()
+
+	# ---------------- heavy landing shoves cars
+	await _clear_units()
+	var car: Node3D = Game.nearest_in_group("cars", Game.city.spawn_point, 60.0)
+	var car_pos := car.global_position
+	await _teleport(car_pos + Vector3(4, 45, 0))
+	await _wait(3.0)
+	check("heavy landing sends cars flying", car.global_position.distance_to(car_pos) > 1.0,
+		"moved %.1f m" % car.global_position.distance_to(car_pos))
+
+	# ---------------- fighting soldiers raises the alert and gives XP
+	await _clear_units()
+	await _wait(1.5)
+	Game.set_alert(Game.Alert.HIDDEN)
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.5)
+	var xp_before := Game.total_xp
+	var soldier: Node3D = Game.military.spawn_npc("soldier", player.global_position + Vector3(0, 0, -2.2))
+	await _wait(0.3)
+	for k in 12:
+		if not is_instance_valid(soldier) or not soldier.is_alive():
+			break
+		player.yaw = atan2(-(soldier.global_position - player.global_position).x, -(soldier.global_position - player.global_position).z)
+		await _tap("attack")
+		await _wait(0.35)
+	check("punching kills a soldier", not is_instance_valid(soldier) or not soldier.is_alive())
+	check("attacking the military raises the alert", Game.alert_level == Game.Alert.ALERT)
+	check("kills give XP", Game.total_xp > xp_before, "%d XP" % (Game.total_xp - xp_before))
+
+	# ---------------- consume steals a disguise
+	await _clear_units()
+	player.powers.violence_timer = 0.0
+	player.conspicuous_timer = 0.0
+	var civ: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(0, 0, -1.5))
+	await _wait(0.1)
+	player.health = 30.0
+	await _tap("consume")
+	await _wait(1.3)
+	check("consume finishes", not is_instance_valid(civ))
+	check("consume heals", player.health > 45.0, "hp %.0f" % player.health)
+	check("consume gives a disguise", player.disguise == "civilian")
+	await _wait(0.5)
+
+	# ---------------- arm forms and specials
+	for f in 6:
+		player.powers.set_form(f)
+		await _wait(0.1)
+		check("form %s equips" % PlayerPowers.FORM_NAMES[f], player.powers.form == f)
+		var dummy: Node3D = Game.military.spawn_npc("infected", player.global_position + Vector3(0, 0, -2.0))
+		player.yaw = 0.0
+		await _wait(0.2)
+		var hp0: float = dummy.hp
+		await _tap("attack")
+		await _wait(0.6)
+		check("form %s hits" % PlayerPowers.FORM_NAMES[f], not is_instance_valid(dummy) or dummy.hp < hp0)
+		player.biomass = player.max_biomass
+		await _tap("special")
+		await _wait(0.9)
+		if is_instance_valid(dummy):
+			dummy.queue_free()
+	await _shot("05_forms")
+	player.powers.set_form(0)
+
+	# ---------------- grab and throw a car
+	await _clear_units()
+	car = Game.nearest_in_group("cars", player.global_position, 200.0, func(n): return not n.wrecked)
+	await _teleport(car.global_position + Vector3(3.0, 1.0, 0))
+	await _wait(0.6)
+	await _tap("grab")
+	await _wait(0.3)
+	check("grab a car", player.powers.held == car, str(player.powers.held))
+	await _tap("grab")
+	await _wait(0.1)
+	check("throw the car", (car as RigidBody3D).linear_velocity.length() > 12.0, "%.1f m/s" % (car as RigidBody3D).linear_velocity.length())
+	await _wait(1.5)
+
+	# ---------------- devastators
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.5)
+	var victims: Array = []
+	for k in 6:
+		var a := k * TAU / 6.0
+		victims.append(Game.military.spawn_npc("infected", player.global_position + Vector3(cos(a), 0, sin(a)) * 7.0))
+	await _wait(0.2)
+	player.biomass = player.max_biomass
+	await _tap("devastator_spikes")
+	await _wait(1.6)
+	var dead := victims.filter(func(v): return not is_instance_valid(v) or not v.is_alive()).size()
+	check("groundspike devastator kills a crowd", dead >= 5, "%d/6" % dead)
+	await _shot("06_devastator")
+	await _wait(1.0)
+	victims.clear()
+	for k in 6:
+		var a := k * TAU / 6.0
+		victims.append(Game.military.spawn_npc("soldier", player.global_position + Vector3(cos(a), 0, sin(a)) * 14.0))
+	await _wait(0.4)
+	player.biomass = player.max_biomass
+	await _tap("devastator_tendrils")
+	await _wait(1.6)
+	dead = victims.filter(func(v): return not is_instance_valid(v) or not v.is_alive()).size()
+	check("tendril barrage kills a squad", dead >= 5, "%d/6" % dead)
+
+	# ---------------- tether
+	await _clear_units()
+	await _teleport(start, -PI * 0.5)
+	await _wait(0.5)
+	player.pitch = 0.35
+	await _wait(0.1)
+	var before_pos := player.global_position
+	await _tap("tether")
+	await _wait(0.8)
+	check("tether zips toward the aim point", player.global_position.distance_to(before_pos) > 3.0 or player.state == Player.State.TETHER,
+		"moved %.1f" % player.global_position.distance_to(before_pos))
+	player.pitch = -0.15
+	await _wait(1.5)
+
+	# ---------------- decoy and focus
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.4)
+	player.biomass = player.max_biomass
+	await _tap("decoy")
+	await _wait(0.2)
+	check("decoy spawns", get_tree().get_nodes_in_group("decoys").size() > 0)
+	await _tap("focus")
+	await _wait(0.2)
+	check("focus slows time", Engine.time_scale < 0.5, "time scale %.2f" % Engine.time_scale)
+	await _tap("focus")
+	await _wait(0.2)
+	check("focus turns off", Engine.time_scale > 0.9)
+	await _wait(9.0)
+
+	# ---------------- tank hijack
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	var cell: Vector2i = Game.city.nearest_intersection(Game.city.spawn_point)
+	var tank: Node3D = Game.military.spawn_ground_vehicle("tank", Game.city.intersection_pos(cell) + Vector3(0, 0, -25), 0.0, {"tag": "test"})
+	await _wait(0.5)
+	await _teleport(tank.global_position + Vector3(4, 1, 0))
+	await _wait(0.4)
+	await _tap("grab")
+	await _wait(0.3)
+	check("hijack a tank", player.state == Player.State.PILOT and player.vehicle == tank)
+	Input.action_press("move_forward")
+	await _wait(1.5)
+	Input.action_release("move_forward")
+	var shells_before := main.get_node("Units").get_child_count()
+	await _tap("attack")
+	await _wait(0.1)
+	check("tank drives and fires", (tank as CharacterBody3D).velocity.length() > 1.0 or main.get_node("Units").get_child_count() > shells_before)
+	await _shot("07_tank")
+	await _tap("grab")
+	await _wait(0.5)
+	check("jump out of the tank", player.state != Player.State.PILOT)
+	await _wait(1.5)
+
+	# ---------------- helicopter hijack
+	var heli: Node3D = Game.military.spawn_helicopter(Game.city.spawn_point + Vector3(0, 40, 0), {"tag": "test"})
+	await _wait(0.3)
+	await _teleport(heli.global_position + Vector3(4, 0, 0))
+	await _tap("grab")
+	await _wait(0.3)
+	check("hijack a gunship", player.state == Player.State.PILOT and player.vehicle == heli)
+	var hy := heli.global_position.y
+	Input.action_press("jump")
+	await _wait(1.0)
+	Input.action_release("jump")
+	check("fly the gunship up", heli.global_position.y > hy + 3.0, "%.1f -> %.1f" % [hy, heli.global_position.y])
+	await _shot("08_heli")
+	await _tap("grab")
+	await _wait(0.3)
+	check("bail out of the gunship", player.state != Player.State.PILOT)
+	await _wait(6.0)
+	check("abandoned gunship crashes", not is_instance_valid(heli))
+
+	# ---------------- military AI shoots when hunted
+	await _clear_units()
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.5)
+	Game.raise_alert(player.global_position, "test")
+	var hp_start := player.health
+	for k in 4:
+		Game.military.spawn_npc("soldier", player.global_position + Vector3(randf_range(-5, 5), 0, -20))
+	await _wait(5.0)
+	check("soldiers shoot a hunted player", player.health < hp_start or player.is_dead(), "hp %.0f -> %.0f" % [hp_start, player.health])
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	player.heal(999)
+
+	# ---------------- infected attack civilians
+	var c2: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(30, 0, 0))
+	var z2: Node3D = Game.military.spawn_npc("infected", player.global_position + Vector3(33, 0, 0))
+	await _wait(5.0)
+	check("infected attack civilians", not is_instance_valid(c2) or not c2.is_alive() or c2.hp < c2.max_hp)
+	await _clear_units()
+
+	# ---------------- world events
+	Game.director.set_process(true)
+	Game.military.set_process(true)
+	for type in Game.director.EVENT_TYPES:
+		Game.director.active_events.clear()
+		Game.director.start_random_event(type)
+		await _wait(1.0)
+		var e_ok: bool = Game.director.active_events.size() > 0 or type == "airstrike"
+		check("event %s starts" % type, e_ok)
+		await _wait(2.0)
+	await _shot("09_events")
+	Game.director.active_events.clear()
+	await _clear_units()
+
+	# ---------------- day and night
+	Game.daynight.hour = 23.0
+	await _wait(0.3)
+	check("night time", Game.daynight.is_night())
+	await _shot("10_night")
+	Game.daynight.hour = 13.0
+
+	# ---------------- levels and skills
+	if player.is_dead():
+		await _wait(5.0)
+	player.heal(9999)
+	Game.reset_state()
+	player.apply_upgrades()
+	Game.add_xp(5000, "test")
+	check("XP levels you up", Game.level > 5, "level %d" % Game.level)
+	check("levels give skill points", Game.skill_points >= Game.level - 1, "%d points" % Game.skill_points)
+	check("claws can be unlocked", Game.unlock_skill("claws"))
+	check("tendrils need groundspike first", Game.skill_block_reason("tendrils") != "")
+
+	# ---------------- save and load
+	var lvl := Game.level
+	Game.save_game()
+	check("save file written", Game.has_save())
+	Game.level = 1
+	Game.skills = {}
+	Game.load_game()
+	check("save file restores level", Game.level == lvl, "level %d" % Game.level)
+	check("save file restores skills", Game.has_skill("claws"))
+
+	# ---------------- free play stress test
+	Game.director._event_timer = 1.0
+	await _teleport(Game.city.spawn_point)
+	Game.raise_alert(player.global_position, "stress")
+	Game.heat = 5.0
+	Game.level = 30
+	player.invuln_timer = 999.0
+	await _wait(25.0)
+	var units := main.get_node("Units").get_child_count()
+	check("free play keeps running", units > 10, "%d units, fps %d" % [units, Engine.get_frames_per_second()])
+	await _shot("11_chaos")

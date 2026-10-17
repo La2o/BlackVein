@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  play-through:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot 4.5
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5-stable/Godot_v4.5-stable_linux.x86_64.zip
+          unzip -q Godot_v4.5-stable_linux.x86_64.zip
+          mv Godot_v4.5-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Import project
+        run: ./godot --headless --path . --import || true
+
+      - name: Run automated play-through
+        run: ./godot --headless --path . res://tests/test_runner.tscn

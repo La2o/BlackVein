@@ -1,0 +1,68 @@
+# Notes for Claude (and any developer) working on BLACKVEIN
+
+Read this first in every new session. It's the fastest way to get back up to speed.
+
+## The owner
+
+- Doesn't want to write code. Claude builds everything; the owner plays and gives feedback.
+- Plays on PC in Godot 4.5, sometimes with a controller. Every new action needs a controller binding.
+- Wants Prototype-style mechanics plus original ideas, world events, progression and grind.
+- Likes being told what changed in plain words (keep CHANGELOG.md updated).
+
+## Engine & rules
+
+- Godot **4.5**, GDScript only, Forward+ renderer (must also work in Compatibility).
+- **No external assets.** Meshes are primitives built in code, sounds come from
+  `tools/make_sounds.py`. Keep it that way so the repo stays small and self-contained.
+- Static typing: `:=` fails on values typed as Variant (e.g. results of methods on untyped
+  nodes, Dictionary lookups). Use explicit types: `var x: Vector3 = d["pos"]`.
+- `Game.player` is typed `Player`, `Game.city` is typed `City` — use them for typed access.
+- Collision layers are constants in `scripts/game.gd` (`Game.LAYER_*`). Use them, never raw numbers.
+- Anything damageable implements `take_hit(info: Dictionary)` where info comes from
+  `Game.hit_info(damage, force, source, kind)`. kinds: melee, slash, blade, slam, impact, bullet, explosion.
+- Rewards go through `Game.add_xp(amount, reason)`. New powers go in `Game.SKILLS` and must be
+  gated with `Game.has_skill(id)`.
+- Input actions are created in `scripts/controls.gd` (keyboard + controller). Add new ones there
+  and to the HUD key table (`hud.gd` KEYS) and `docs/CONTROLS.md`.
+
+## How to verify changes (do this every time)
+
+Godot binary isn't installed system-wide in the cloud workspace; download the Linux build
+(4.5-stable from the godotengine/godot GitHub releases) into the scratchpad.
+
+```
+godot --headless --path . --import                       # re-import after adding files
+godot --headless --path . --quit-after 600                # quick boot check, look for SCRIPT ERROR
+godot --headless --path . res://tests/test_runner.tscn    # full play-through, must end "0 failed"
+```
+
+Screenshots (slow, software rendering):
+```
+xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_compatibility \
+  --resolution 1280x720 res://tests/test_runner.tscn -- shots=/some/folder
+```
+
+When adding a feature, add a check to `tests/test_runner.gd`.
+
+## Where things live
+
+See `docs/ARCHITECTURE.md` for the full map. Short version:
+
+| Want to change... | File |
+|---|---|
+| Movement feel (speeds, jumps, wall run) | `scripts/player.gd` exports |
+| Attacks, forms, powers, consume, grab | `scripts/player_powers.gd` |
+| People and their AI | `scripts/npc.gd` |
+| Tanks / trucks, helicopters | `scripts/ground_vehicle.gd`, `scripts/helicopter.gd` |
+| Military escalation | `scripts/military.gd` + alert logic in `scripts/game.gd` |
+| World events, population | `scripts/director.gd` |
+| XP, levels, skill tree, saving | `scripts/game.gd` |
+| UI, menus, minimap | `scripts/hud.gd` |
+| City layout | `scripts/city.gd` |
+
+## Release checklist
+
+1. Tests pass (0 failed).
+2. CHANGELOG.md has a new entry.
+3. Bump `config/version` in project.godot if it's a release.
+4. Zip the folder without `.godot/` (the `.gitignore` already excludes it).
