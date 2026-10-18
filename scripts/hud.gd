@@ -47,6 +47,9 @@ var big_map: Control
 var death_panel: Control
 var title_card: Control
 var settings_panel: PanelContainer
+var rebind_panel: PanelContainer
+var _rebind_buttons := {}
+var _rebinding := ""
 var combo_label: Label
 var fps_label: Label
 var boss_box: VBoxContainer
@@ -568,6 +571,7 @@ func _build_settings() -> void:
 	_check_row(v, "Invert look up/down", Settings.invert_y, func(b): Settings.invert_y = b)
 	_slider_row(v, "Field of view", 55.0, 100.0, Settings.fov, func(x): Settings.fov = x)
 	_slider_row(v, "Volume", 0.0, 1.0, Settings.volume, func(x): Settings.volume = x)
+	_slider_row(v, "Music", 0.0, 1.0, Settings.music_volume, func(x): Settings.music_volume = x)
 	_slider_row(v, "Camera shake", 0.0, 1.5, Settings.camera_shake, func(x): Settings.camera_shake = x)
 	_check_row(v, "Controller rumble", Settings.rumble, func(b): Settings.rumble = b)
 	_check_row(v, "Show FPS", Settings.show_fps, func(b): Settings.show_fps = b)
@@ -586,7 +590,68 @@ func _build_settings() -> void:
 		Settings.save_settings())
 	row.add_child(opt)
 	v.add_child(row)
+	v.add_child(_menu_button("Change keys", func():
+		settings_panel.visible = false
+		_open_rebind()))
 	v.add_child(_menu_button("Back", func(): close_settings()))
+	_build_rebind()
+
+
+func _build_rebind() -> void:
+	rebind_panel = PanelContainer.new()
+	rebind_panel.add_theme_stylebox_override("panel", _panel_style(0.95))
+	rebind_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rebind_panel.offset_left = 200
+	rebind_panel.offset_right = -200
+	rebind_panel.offset_top = 40
+	rebind_panel.offset_bottom = -40
+	rebind_panel.visible = false
+	root.add_child(rebind_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 6)
+	rebind_panel.add_child(v)
+	v.add_child(_label("KEYS", 30, Color(1, 0.3, 0.25), 6))
+	v.add_child(_label("Click an action, then press the new key or mouse button. Esc cancels. Controller buttons stay as they are.", 14, Color(0.85, 0.85, 0.85), 3))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.follow_focus = true
+	v.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 20)
+	scroll.add_child(grid)
+	for pair in Settings.REBINDABLE:
+		var action: String = pair[0]
+		var l := _label(pair[1], 17)
+		l.custom_minimum_size = Vector2(280, 0)
+		grid.add_child(l)
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(220, 36)
+		b.add_theme_font_size_override("font_size", 16)
+		b.pressed.connect(func():
+			_rebinding = action
+			b.text = "Press a key...")
+		grid.add_child(b)
+		_rebind_buttons[action] = b
+	v.add_child(_menu_button("Reset to defaults", func():
+		Settings.reset_bindings()
+		_refresh_rebind()))
+	v.add_child(_menu_button("Back", func():
+		rebind_panel.visible = false
+		_rebinding = ""
+		open_settings()))
+
+
+func _refresh_rebind() -> void:
+	for action in _rebind_buttons:
+		(_rebind_buttons[action] as Button).text = Settings.key_name(action)
+
+
+func _open_rebind() -> void:
+	rebind_panel.visible = true
+	_refresh_rebind()
+	(_rebind_buttons[Settings.REBINDABLE[0][0]] as Button).grab_focus()
 
 
 func _slider_row(parent: Control, text: String, lo: float, hi: float, value: float, setter: Callable) -> void:
@@ -676,6 +741,15 @@ func close_evolve() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _rebinding != "" and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton):
+		get_viewport().set_input_as_handled()
+		if event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_ESCAPE:
+			_rebinding = ""
+		else:
+			Settings.bind(_rebinding, event)
+			_rebinding = ""
+		_refresh_rebind()
+		return
 	if event is InputEventJoypadButton or (event is InputEventJoypadMotion and absf(event.axis_value) > 0.5):
 		using_pad = true
 	elif event is InputEventKey or event is InputEventMouseButton:
@@ -684,7 +758,10 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
-		if settings_panel.visible:
+		if rebind_panel.visible:
+			rebind_panel.visible = false
+			open_settings()
+		elif settings_panel.visible:
 			close_settings()
 		elif evolve_menu.visible:
 			close_evolve()
@@ -834,8 +911,20 @@ func _update_alert() -> void:
 	suspicion_bar.value = Game.suspicion * 100.0
 
 
+const KEY_ACTIONS := {
+	"attack": "attack", "special": "special", "grab": "grab", "consume": "consume", "jump": "jump", "dash": "dash",
+	"tether": "tether", "focus": "focus", "thermal": "thermal", "decoy": "decoy", "defense": "cycle_defense",
+	"spikes": "devastator_spikes", "tendrils": "devastator_tendrils", "artillery": "artillery",
+	"evolve": "evolve_menu", "sprint": "sprint",
+}
+
+
 func _k(action: String) -> String:
-	return KEYS[action][1 if using_pad else 0]
+	if using_pad:
+		return KEYS[action][1]
+	if KEY_ACTIONS.has(action):
+		return Settings.key_name(KEY_ACTIONS[action])
+	return KEYS[action][0]
 
 
 func _update_powers_text() -> void:

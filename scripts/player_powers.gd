@@ -591,9 +591,7 @@ func _whip_grab() -> void:
 		return
 	if target and target.has_method("yank_to"):
 		target.yank_to(player)
-		get_tree().create_timer(0.35, false).timeout.connect(func():
-			if is_instance_valid(target) and held == null and target.global_position.distance_to(player.global_position) < 5.0:
-				_grab(target))
+		get_tree().create_timer(0.35, false).timeout.connect(_grab_if_close.bind(target))
 		return
 	if target == null and aim["collider"] != null:
 		player.start_tether(end)
@@ -669,6 +667,11 @@ func _hijack(v: Node3D) -> void:
 	Game.fx.sound("tendril", player.global_position, 0.0)
 	var key := "RB" if Input.get_connected_joypads().size() > 0 else "E"
 	Game.say("Hijacked! Press %s to jump out" % key, Color(1, 0.6, 0.4))
+
+
+func _grab_if_close(target: Node3D) -> void:
+	if is_instance_valid(target) and held == null and target.global_position.distance_to(player.global_position) < 5.0:
+		_grab(target)
 
 
 func _grab(target: Node3D) -> void:

@@ -326,14 +326,17 @@ func on_thrown(vel: Vector3, by: Node) -> void:
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_PROPS | Game.LAYER_VEHICLE
 	if by is CollisionObject3D:
 		add_collision_exception_with(by)
-		get_tree().create_timer(0.3, false).timeout.connect(func():
-			if is_instance_valid(self) and is_instance_valid(by):
-				remove_collision_exception_with(by))
+		get_tree().create_timer(0.3, false).timeout.connect(_end_exception.bind(by))
 	velocity = vel
 	_thrower = by
 	_airborne_time = 0.0
 	state = S.LAUNCHED if hp > 0.0 else S.DEAD
 	global_basis = Basis()
+
+
+func _end_exception(by: Node) -> void:
+	if is_instance_valid(by):
+		remove_collision_exception_with(by)
 
 
 func on_consume_start(_by: Node) -> void:
@@ -481,7 +484,8 @@ func _dead_physics(delta: float) -> void:
 	model.animate(delta, 0.0, "dead")
 	if _dead_time > 1.5 and collision_layer != 0:
 		collision_layer = 0
-	if _dead_time > 30.0 or global_position.y < -40.0:
+	var limit := 30.0 if Game.npc_count < 90 else 10.0
+	if _dead_time > limit or global_position.y < -40.0:
 		queue_free()
 
 
@@ -882,11 +886,14 @@ func _melee(t: Node3D) -> void:
 	elif kind == "leviathan":
 		dmg = 40.0
 		force = _face_dir * 30.0 + Vector3.UP * 12.0
-	get_tree().create_timer(0.15, false).timeout.connect(func():
-		if is_instance_valid(t) and is_instance_valid(self) and is_alive() and t.global_position.distance_to(global_position) < 2.6 * scale_factor:
-			t.take_hit(Game.hit_info(dmg, force, self, "melee"))
-			Game.fx.splat(t.global_position + Vector3.UP * 0.4, _face_dir, Color(0.5, 0.02, 0.02), 6)
-			Game.fx.sound("punch" if kind == "infected" else "slash", t.global_position, -4.0))
+	get_tree().create_timer(0.15, false).timeout.connect(_melee_hit.bind(t, dmg, force))
+
+
+func _melee_hit(t: Node3D, dmg: float, force: Vector3) -> void:
+	if is_instance_valid(t) and is_alive() and t.global_position.distance_to(global_position) < 2.6 * scale_factor:
+		t.take_hit(Game.hit_info(dmg, force, self, "melee"))
+		Game.fx.splat(t.global_position + Vector3.UP * 0.4, _face_dir, Color(0.5, 0.02, 0.02), 6)
+		Game.fx.sound("punch" if kind == "infected" else "slash", t.global_position, -4.0)
 
 
 func _boss_moves(delta: float, dist: float) -> void:
@@ -901,29 +908,36 @@ func _boss_moves(delta: float, dist: float) -> void:
 		model.swing(true, 2, 0.5)
 		model.swing(false, 2, 0.5)
 		Game.fx.sound("roar", global_position, 4.0, 0.1)
-		get_tree().create_timer(0.55, false).timeout.connect(func():
-			if not is_instance_valid(self) or not is_alive():
-				return
-			var feet := global_position + Vector3.DOWN * 0.9 * scale_factor
-			Game.damage_area(feet + Vector3.UP, 14.0, 45.0, 26.0, self, "slam", Game.LAYER_PLAYER | Game.LAYER_PROPS | Game.LAYER_NPC)
-			Game.fx.shockwave(feet, 16.0, Color(1, 0.3, 0.15, 0.8), 0.5)
-			Game.fx.debris(feet, 24)
-			Game.fx.sound("land", feet, 8.0)
-			for k in 10:
-				var a := k * TAU / 10.0
-				Game.fx.spike(feet + Vector3(cos(a), 0, sin(a)) * 9.0, 5.0, 0.05, 0.6)
-			if Game.player:
-				Game.player.add_trauma(clampf(1.0 - Game.player.global_position.distance_to(feet) / 40.0, 0.0, 0.8)))
+		get_tree().create_timer(0.55, false).timeout.connect(_pound_impact)
 	if _adds_cooldown <= 0.0:
-		_adds_cooldown = 18.0
-		for k in 4:
-			var n := CharacterBody3D.new()
-			n.set_script(load("res://scripts/npc.gd"))
-			get_parent().add_child(n)
-			var a := randf() * TAU
-			n.global_position = global_position + Vector3(cos(a), 0, sin(a)) * 6.0 + Vector3.UP * 0.5
-			n.setup("hunter" if k == 0 and enraged else "infected", {"tag": event_tag})
-		Game.feed("The Leviathan calls its brood", Color(1, 0.4, 0.2))
+		_spawn_brood(enraged)
+
+
+func _pound_impact() -> void:
+	if not is_alive():
+		return
+	var feet := global_position + Vector3.DOWN * 0.9 * scale_factor
+	Game.damage_area(feet + Vector3.UP, 14.0, 45.0, 26.0, self, "slam", Game.LAYER_PLAYER | Game.LAYER_PROPS | Game.LAYER_NPC)
+	Game.fx.shockwave(feet, 16.0, Color(1, 0.3, 0.15, 0.8), 0.5)
+	Game.fx.debris(feet, 24)
+	Game.fx.sound("land", feet, 8.0)
+	for k in 10:
+		var a := k * TAU / 10.0
+		Game.fx.spike(feet + Vector3(cos(a), 0, sin(a)) * 9.0, 5.0, 0.05, 0.6)
+	if Game.player:
+		Game.player.add_trauma(clampf(1.0 - Game.player.global_position.distance_to(feet) / 40.0, 0.0, 0.8))
+
+
+func _spawn_brood(enraged: bool) -> void:
+	_adds_cooldown = 18.0
+	for k in 4:
+		var n := CharacterBody3D.new()
+		n.set_script(load("res://scripts/npc.gd"))
+		get_parent().add_child(n)
+		var a := randf() * TAU
+		n.global_position = global_position + Vector3(cos(a), 0, sin(a)) * 6.0 + Vector3.UP * 0.5
+		n.setup("hunter" if k == 0 and enraged else "infected", {"tag": event_tag})
+	Game.feed("The Leviathan calls its brood", Color(1, 0.4, 0.2))
 
 
 func _leap_at(tpos: Vector3) -> void:

@@ -68,6 +68,7 @@ var sprinting := false
 var charging := false
 var charge := 0.0
 var double_jump_ready := true
+var flaps_left := 0
 var dash_ready := true
 var air_press := false
 var wall_normal := Vector3.ZERO
@@ -368,6 +369,13 @@ func _double_jump() -> void:
 
 
 func _state_glide(delta: float) -> void:
+	if Input.is_action_just_pressed("jump") and flaps_left > 0:
+		flaps_left -= 1
+		velocity.y = 14.0
+		model.scale = Vector3(1.3, 0.8, 1.3)
+		Game.fx.burst_ring(global_position, Color(0.8, 0.1, 0.06, 0.6), 3.0)
+		Game.fx.sound("whoosh", global_position, 0.0)
+		return
 	if not Input.is_action_pressed("jump"):
 		state = State.AIR
 		return
@@ -441,6 +449,7 @@ func _wall_ahead(dir: Vector3) -> Vector3:
 
 func _enter_wall(n: Vector3) -> void:
 	state = State.WALL
+	flaps_left = Game.skill_rank("wings")
 	Game.stat_add("wall_runs")
 	wall_normal = n
 	charging = false
@@ -784,6 +793,7 @@ func _check_landing() -> void:
 		double_jump_ready = true
 		dash_ready = true
 		air_press = false
+		flaps_left = Game.skill_rank("wings")
 		if was_dive:
 			_heavy_landing(maxf(impact, 60.0), true)
 		elif impact > heavy_landing_speed:
@@ -826,7 +836,8 @@ func _update_visual(delta: float) -> void:
 	var target_offset := Vector3.ZERO
 	var mode := "idle"
 	if state == State.WALL:
-		target_basis = Basis.looking_at(wall_dir, wall_normal)
+		var up_v := wall_normal if absf(wall_dir.dot(wall_normal)) < 0.95 else Vector3.UP
+		target_basis = Basis.looking_at(wall_dir, up_v)
 		target_offset = wall_normal * 0.45
 		mode = "run"
 	else:
@@ -874,6 +885,7 @@ func _update_visual(delta: float) -> void:
 		scale_target = Vector3(1.0 + 0.12 * charge, 1.0 - 0.15 * charge, 1.0 + 0.12 * charge)
 	model.scale = model.scale.lerp(scale_target, 1.0 - exp(-10.0 * delta))
 	var anim_speed := hspeed if state != State.WALL else velocity.length()
+	model.wings_visible = Game.has_skill("wings")
 	model.animate(delta, anim_speed, mode)
 
 

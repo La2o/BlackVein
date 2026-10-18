@@ -13,6 +13,7 @@ var _children: Array[Node3D] = []
 var _blobs: Array[MeshInstance3D] = []
 var _t := 0.0
 var _hum: AudioStreamPlayer3D
+var _zone_mat: ShaderMaterial
 
 
 func setup(extra := {}) -> void:
@@ -62,6 +63,17 @@ func setup(extra := {}) -> void:
 	light.omni_range = 16.0
 	light.position = Vector3(0, 3, 0)
 	add_child(light)
+	# infected ground spreading around the hive
+	var zone := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(70, 70)
+	zone.mesh = plane
+	_zone_mat = ShaderMaterial.new()
+	_zone_mat.shader = preload("res://shaders/infection.gdshader")
+	zone.material_override = _zone_mat
+	zone.position = Vector3(0, 0.2, 0)
+	zone.rotation.y = randf() * TAU
+	add_child(zone)
 	add_to_group("hives")
 	_hum = Game.fx.make_loop_player("hive")
 	_hum.volume_db = -6.0
@@ -98,6 +110,8 @@ func _destroy(src: Node) -> void:
 
 func _physics_process(delta: float) -> void:
 	_t += delta
+	if _zone_mat:
+		_zone_mat.set_shader_parameter("pulse", _t)
 	for k in _blobs.size():
 		var b := _blobs[k]
 		var s := 1.0 + sin(_t * 2.5 + k * 1.3) * 0.06

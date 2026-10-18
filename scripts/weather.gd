@@ -45,10 +45,7 @@ func setup(env: Environment) -> void:
 	add_child(_rain)
 	_rain_sound = AudioStreamPlayer.new()
 	if ResourceLoader.exists("res://sfx/rain.wav"):
-		var s: AudioStreamWAV = (load("res://sfx/rain.wav") as AudioStreamWAV).duplicate()
-		s.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		s.loop_end = s.data.size() / 2
-		_rain_sound.stream = s
+		_rain_sound.stream = load("res://sfx/rain.wav")   # loops via its .import settings
 	_rain_sound.volume_db = -60.0
 	add_child(_rain_sound)
 

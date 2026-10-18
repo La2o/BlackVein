@@ -81,10 +81,7 @@ func sound_ui(sound_name: String, volume_db := -4.0) -> void:
 func make_loop_player(sound_name: String) -> AudioStreamPlayer3D:
 	var p := AudioStreamPlayer3D.new()
 	if _sounds.has(sound_name):
-		var stream: AudioStreamWAV = (_sounds[sound_name] as AudioStreamWAV).duplicate()
-		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		stream.loop_end = stream.data.size() / 2
-		p.stream = stream
+		p.stream = _sounds[sound_name]   # looping is set in the .import file
 	p.unit_size = 20.0
 	p.max_distance = 300.0
 	p.autoplay = true
@@ -94,9 +91,8 @@ func make_loop_player(sound_name: String) -> AudioStreamPlayer3D:
 # ------------------------------------------------------------------ helpers
 
 func _auto_free(node: Node, after: float) -> void:
-	get_tree().create_timer(after, false).timeout.connect(func():
-		if is_instance_valid(node):
-			node.queue_free())
+	# connecting to the node's own method means the timer forgets it if it's freed early
+	get_tree().create_timer(after, false).timeout.connect(node.queue_free)
 
 
 func _unshaded(color: Color, additive := false) -> StandardMaterial3D:
@@ -350,9 +346,7 @@ func smoke_column(pos: Vector3, color: Color, duration: float) -> CPUParticles3D
 	add_child(p)
 	p.global_position = pos
 	p.emitting = true
-	get_tree().create_timer(duration, false).timeout.connect(func():
-		if is_instance_valid(p):
-			p.emitting = false)
+	get_tree().create_timer(duration, false).timeout.connect(p.set.bind("emitting", false))
 	_auto_free(p, duration + 3.2)
 	return p
 

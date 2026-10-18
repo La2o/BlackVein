@@ -19,6 +19,8 @@ var _form_parts: Array[MeshInstance3D] = []
 var _defense_parts: Array[MeshInstance3D] = []
 var _whip_links: Array[MeshInstance3D] = []
 var _t := 0.0
+var _wings: Array[MeshInstance3D] = []
+var wings_visible := false
 
 
 func build(new_outfit: Dictionary = {}) -> void:
@@ -131,9 +133,31 @@ func _apply_defense() -> void:
 			_add(_defense_parts, torso, box(Vector3(0.04, 0.4, 0.02)), glow, Vector3(0, 0.1, -0.33))
 
 
+func _ensure_wings() -> void:
+	if not _wings.is_empty() and is_instance_valid(_wings[0]):
+		return
+	_wings.clear()
+	var membrane := mat(Color(0.3, 0.03, 0.03), 0.6, 0.0, 0.4)
+	for side in [-1.0, 1.0]:
+		for k in 4:
+			var w := MeshInstance3D.new()
+			w.mesh = box(Vector3(1.3 - k * 0.2, 0.03, 0.18))
+			w.material_override = membrane
+			w.position = Vector3(side * (0.75 - k * 0.05), 0.4 - k * 0.12, 0.2)
+			w.rotation = Vector3(0, side * (0.25 + k * 0.2), side * -0.15)
+			torso.add_child(w)
+			_wings.append(w)
+
+
 func animate(delta: float, speed: float, mode: String) -> void:
 	super(delta, speed, mode)
 	_t += delta
+	var show := wings_visible and mode == "glide"
+	if show or not _wings.is_empty():
+		_ensure_wings()
+		for w in _wings:
+			if is_instance_valid(w):
+				w.visible = show
 	if defense == Defense.SHIELD and mode in ["idle", "walk", "run", "air"] and swing_timer <= 0.0:
 		var k := 1.0 - exp(-16.0 * delta)
 		arm_l.rotation = arm_l.rotation.lerp(Vector3(1.5, 0.35, 0.15), k)

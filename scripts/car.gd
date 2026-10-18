@@ -220,9 +220,12 @@ func on_thrown(velocity: Vector3, by: Node) -> void:
 	_thrown_timer = 4.0
 	# don't immediately collide with the thrower
 	add_collision_exception_with(by)
-	get_tree().create_timer(0.4).timeout.connect(func():
-		if is_instance_valid(self) and is_instance_valid(by):
-			remove_collision_exception_with(by))
+	get_tree().create_timer(0.4).timeout.connect(_end_exception.bind(by))
+
+
+func _end_exception(by: Node) -> void:
+	if is_instance_valid(by):
+		remove_collision_exception_with(by)
 
 
 func hold_offset() -> Vector3:

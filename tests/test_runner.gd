@@ -487,6 +487,28 @@ func _run_all() -> void:
 	check("settings save and load", absf(Settings.mouse_sensitivity - 1.7) < 0.01)
 	Settings.mouse_sensitivity = 1.0
 	Settings.save_settings()
+	var ev := InputEventKey.new()
+	ev.physical_keycode = KEY_K
+	Settings.bind("consume", ev)
+	check("keys can be rebound", Settings.key_name("consume") == "K", Settings.key_name("consume"))
+	Settings.reset_bindings()
+	check("keys reset to defaults", Settings.key_name("consume") == "F", Settings.key_name("consume"))
+	Game.skills["wings"] = 3
+	await _teleport(Game.city.spawn_point + Vector3(0, 50, 0))
+	await _tap("jump")
+	Input.action_press("jump")
+	await _wait(1.0)
+	player.flaps_left = 3
+	var gy := player.global_position.y
+	Input.action_release("jump")
+	await get_tree().physics_frame
+	Input.action_press("jump")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	await _wait(0.3)
+	check("tendril wings flap upward", player.global_position.y > gy or player.flaps_left < 3, "flaps left %d" % player.flaps_left)
+	Input.action_release("jump")
+	await _wait(3.0)
 
 	# ---------------- day and night
 	Game.daynight.hour = 23.0

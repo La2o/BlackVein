@@ -39,6 +39,8 @@ func is_alive() -> bool:
 
 
 func take_hit(info: Dictionary) -> void:
+	if _popped:
+		return
 	hp -= float(info["damage"])
 	if hp <= 0.0:
 		_pop()
@@ -61,9 +63,13 @@ func _physics_process(delta: float) -> void:
 	model.animate(delta, 10.0, "run")
 
 
+var _popped := false
+
+
 func _pop() -> void:
-	if not is_inside_tree():
+	if _popped or not is_inside_tree():
 		return
+	_popped = true
 	Game.explode(global_position, 7.0, 60.0, Game.player, 18.0)
 	Game.fx.splat(global_position, Vector3.UP, Color(0.6, 0.05, 0.05), 30)
 	queue_free()

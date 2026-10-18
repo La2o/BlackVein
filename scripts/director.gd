@@ -77,6 +77,8 @@ func _maintain_population() -> void:
 	var want_civs := 42
 	if Game.daynight and Game.daynight.is_night():
 		want_civs = 24
+	if Game.military.crowded():
+		want_civs = mini(want_civs, civs)
 	for k in mini(4, want_civs - civs):
 		var pos: Vector3 = Game.city.random_sidewalk_point(ppos, 32.0, 125.0)
 		# don't pop people into existence right in front of the camera
@@ -114,6 +116,8 @@ func _maintain_population() -> void:
 	var want_inf := 3
 	if Game.daynight and Game.daynight.is_night():
 		want_inf = 14
+	if Game.military.crowded():
+		want_inf = 0
 	for k in mini(3, want_inf - inf):
 		var pos: Vector3 = Game.city.random_street_point(ppos, 80.0, 140.0)
 		Game.military.spawn_npc("infected", pos)

@@ -20,6 +20,10 @@ func _ready() -> void:
 	Game.military = self
 
 
+func crowded() -> bool:
+	return Game.npc_count > Game.NPC_CAP
+
+
 func spawn_npc(kind: String, pos: Vector3, extra := {}) -> CharacterBody3D:
 	var n := CharacterBody3D.new()
 	n.set_script(NPC)
@@ -148,7 +152,7 @@ func _maintain() -> void:
 		wanted = 10 + int(heat * 4.0)
 	elif Game.alert_level == Game.Alert.SEARCHING:
 		wanted = 12
-	if soldiers < wanted:
+	if soldiers < wanted and not crowded():
 		var squad := mini(4, wanted - soldiers)
 		var min_d := 70.0 if hunted else 60.0
 		var base: Vector3 = Game.city.random_street_point(focus, min_d, 120.0)

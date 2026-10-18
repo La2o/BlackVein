@@ -76,6 +76,7 @@ const SKILLS := {
 	"glide": ["Glide", "Hold jump in the air to glide", "Movement", 1, 2, 1, ""],
 	"air_dash": ["Air Dash", "Dash in mid-air", "Movement", 1, 2, 1, ""],
 	"tether": ["Tether", "Zip to any surface, yank enemies to you, latch onto helicopters", "Movement", 2, 4, 1, ""],
+	"wings": ["Tendril Wings", "While gliding, press jump to flap upward. More flaps per rank", "Movement", 2, 15, 3, "glide"],
 	"agility": ["Agility", "+10% sprint and wall-run speed per rank", "Movement", 1, 1, 5, ""],
 	"leap": ["Leap", "Higher super jumps and longer glides per rank", "Movement", 1, 1, 5, ""],
 	"claws": ["Claws", "Lightning-fast slashes. Special: Spike Line", "Forms", 1, 2, 1, ""],
@@ -104,6 +105,8 @@ var combo := 0
 var combo_timer := 0.0
 var best_combo := 0
 var boss: Node3D = null          # set while a boss fight is running (HUD shows its health)
+var npc_count := 0               # updated every second; spawners back off when the city is crowded
+const NPC_CAP := 130
 var hit_stop_timer := 0.0
 var focus_active := false
 var rng := RandomNumberGenerator.new()
@@ -152,6 +155,7 @@ func _process(delta: float) -> void:
 	if _goal_timer <= 0.0:
 		_goal_timer = 0.5
 		_check_goal()
+		npc_count = get_tree().get_nodes_in_group("npcs").size()
 	if combo > 0:
 		combo_timer -= real_delta
 		if combo_timer <= 0.0:
