@@ -166,6 +166,8 @@ func can_hijack(by: Node) -> bool:
 
 func hijack(by: Node) -> void:
 	pilot = by
+	if by == Game.player:
+		Game.stat_add("tanks")
 	abandoned = false
 	remove_from_group("military")
 	add_to_group("player_vehicle")
@@ -224,6 +226,8 @@ func _destroy(src: Node) -> void:
 		on_pilot_exit()
 		p.exit_vehicle(Vector3(0, 18, 0))
 	if src == Game.player or (src and is_instance_valid(src) and src.has_method("is_player_controlled") and src.is_player_controlled()):
+		if kind != "truck":
+			Game.stat_add("tanks")
 		var rewards := {"tank": 80, "truck": 35, "juggernaut": 900}
 		var names := {"tank": "Tank", "truck": "Truck", "juggernaut": "JUGGERNAUT"}
 		Game.add_xp(rewards[kind], "%s destroyed" % names[kind])

@@ -16,6 +16,7 @@ only hold the node skeleton.
 | Name | File | Job |
 |---|---|---|
 | `Controls` | `scripts/controls.gd` | Creates every input action (keyboard, mouse, controller). |
+| `Settings` | `scripts/settings.gd` | Player settings saved to user://settings.cfg. |
 | `Game` | `scripts/game.gd` | Shared state and helpers: references to major systems, collision layers, alert/heat system, XP/levels/skills, save/load, damage helpers (`hit_info`, `damage_area`, `explode`), raycasts, time scale (hit-stop, focus). |
 
 ## Systems (children of Main)
@@ -28,6 +29,7 @@ only hold the node skeleton.
 | Military | `military.gd` | Keeps patrols near the player, escalates with heat, spawn helpers for everyone. |
 | Director | `director.gd` | Civilian/infected population and the world event system. |
 | DayNight | `daynight.gd` | Sun, sky, fog, window and lamp glow. |
+| Weather | `weather.gd` | Rain, fog and clear skies. |
 | HUD | `hud.gd` | All UI and menus; runs while paused. |
 
 ## The player
@@ -54,6 +56,13 @@ only hold the node skeleton.
 - `hive.gd` — infection hives that spawn infected.
 - `pickup.gd` — dropped guns and supply caches.
 - `decoy.gd` — the Biomass Decoy clone.
+- `traffic.gd` — driving civilian cars; they swap themselves for `car.gd` physics cars when hit.
+
+## Saved data
+
+`user://blackvein_save.json` holds level, XP, skill points, skills, flags, stats, goal progress,
+kills, play time, time of day and the player's position/health/biomass/form.
+`user://settings.cfg` holds settings.
 
 ## Talking between systems
 

@@ -2,6 +2,44 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.2.0] — 2026-10-18 — Bosses, base raids and a living city
+
+### New
+- **Two bosses** (appear from level 10 and 12):
+  - **The Leviathan** — a colossal infected with ground-pound shockwaves, rooftop leaps,
+    an enraged phase, and broods of infected it calls in.
+  - **Juggernaut** — the military's prototype super-tank with triple-shell volleys and a
+    machine gun. Weaken it below 25% and you can hijack it.
+  - Boss health bar at the top of the screen.
+- **Military base** in the north-west of the city: walls, watchtowers, barracks, a helipad with a
+  parked gunship, a parked tank, a garrison and a **base commander**. Walking in without a
+  military disguise gets you noticed.
+- **Artillery Strike** (new skill, R / hold LB + RB): consume the base commander for the codes,
+  then call in barrages wherever you aim while disguised as a soldier.
+- **Civilian traffic** drives the streets, brakes for people, floors it when there's danger,
+  and turns into a throwable physics car the moment you hit it (or grab it).
+- **Weather**: rain storms and thick fog roll in every few minutes. Soldiers can't see as far
+  in bad weather.
+- **Combo meter** with style ranks (D → C → B → A → S → SAVAGE); long combos pay bonus XP.
+- **Starter goals** on screen that teach the game and pay XP (12 goals, from your first wall run
+  to defeating a boss).
+- **Settings menu**: mouse sensitivity, controller look speed, invert Y, field of view, volume,
+  camera shake, rumble, FPS counter, graphics quality (Low / Medium / High).
+- **Stats** on the pause screen: kills, consumes, events, best combo, play time.
+
+### Improved
+- Nights are readable now: moonlit ambient light, pools of light under street lamps, softer windows.
+- Explosions use additive fire instead of solid balls.
+- Camera sits a little higher and farther back so you can see past your character.
+- Square minimap (the round frame used to cut off the corners).
+- People no longer pop into existence right in front of the camera.
+- Vaulting onto rooftops overshoots less.
+- Hunters and the Leviathan have spines and claws.
+
+### Tests
+- 85 automated checks (was 65), now covering bosses, traffic, the base, artillery, weather,
+  combos, goals and settings.
+
 ## [0.1.0] — 2026-10-18 — First playable build
 
 ### Movement

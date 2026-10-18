@@ -47,6 +47,25 @@ var level := 1
 var skill_points := 1
 var skills := {}            # skill id -> rank
 var flags := {}             # story/unlock flags, e.g. "artillery_codes"
+var stats := {}             # counters: consumes, wall_runs, events, tanks, bosses...
+var goal_index := 0
+var _goal_timer := 0.0
+
+## Starter goals that teach the game and pay XP. [stat or check, target, text, xp]
+const GOALS := [
+	["wall_runs", 1, "Sprint into a building to run up it", 40],
+	["super_jumps", 1, "Hold jump to charge a super jump", 40],
+	["consumes", 1, "Consume someone (F / LB)", 60],
+	["level", 2, "Reach level 2", 50],
+	["skills", 1, "Unlock a skill in the Skills menu (Tab / Back)", 60],
+	["events", 1, "Complete a world event (follow the compass markers)", 120],
+	["military_kills", 10, "Take down 10 soldiers", 120],
+	["tanks", 1, "Destroy or hijack a tank", 150],
+	["flag:artillery_codes", 1, "Raid the military base and consume its commander", 250],
+	["level", 10, "Reach level 10", 300],
+	["bosses", 1, "Defeat a boss (they appear from level 10)", 500],
+	["level", 25, "Reach level 25", 800],
+]
 var play_time := 0.0
 var autosave_timer := 45.0
 const MAX_LEVEL := 50
@@ -113,6 +132,8 @@ func reset_state() -> void:
 	skill_points = 1
 	skills = {}
 	flags = {}
+	stats = {}
+	goal_index = 0
 	play_time = 0.0
 	best_combo = 0
 	kills = {"military": 0, "infected": 0, "civilian": 0}
@@ -127,6 +148,10 @@ func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
 	play_time += real_delta
+	_goal_timer -= real_delta
+	if _goal_timer <= 0.0:
+		_goal_timer = 0.5
+		_check_goal()
 	if combo > 0:
 		combo_timer -= real_delta
 		if combo_timer <= 0.0:
@@ -166,6 +191,51 @@ func say(text: String, color := Color.WHITE) -> void:
 
 func feed(text: String, color := Color(1, 0.85, 0.6)) -> void:
 	event_feed.emit(text, color)
+
+
+# ---------------------------------------------------------------- stats and goals
+
+func stat_add(key: String, amount := 1) -> void:
+	stats[key] = int(stats.get(key, 0)) + amount
+
+
+func stat(key: String) -> int:
+	return int(stats.get(key, 0))
+
+
+func _goal_progress(g: Array) -> int:
+	var key: String = g[0]
+	if key == "level":
+		return level
+	if key == "skills":
+		return skills.size()
+	if key == "military_kills":
+		return int(kills.get("military", 0))
+	if key.begins_with("flag:"):
+		return 1 if flags.get(key.substr(5), false) else 0
+	return stat(key)
+
+
+func current_goal_text() -> String:
+	if goal_index >= GOALS.size():
+		return ""
+	var g: Array = GOALS[goal_index]
+	var target: int = g[1]
+	var prog := mini(_goal_progress(g), target)
+	var count := "  (%d/%d)" % [prog, target] if target > 1 and g[0] != "level" else ""
+	return "%s%s  ·  +%d XP" % [g[2], count, int(g[3])]
+
+
+func _check_goal() -> void:
+	if goal_index >= GOALS.size() or player == null:
+		return
+	var g: Array = GOALS[goal_index]
+	if _goal_progress(g) >= int(g[1]):
+		goal_index += 1
+		feed("Goal complete: " + str(g[2]), Color(1, 0.9, 0.5))
+		add_xp(int(g[3]), "Goal")
+		if fx:
+			fx.sound_ui("pickup", 0.0)
 
 
 # ---------------------------------------------------------------- combos
@@ -289,6 +359,7 @@ func save_game(announce := false) -> void:
 		"version": 1,
 		"level": level, "xp": xp, "total_xp": total_xp, "skill_points": skill_points,
 		"skills": skills, "kills": kills, "play_time": play_time, "flags": flags, "best_combo": best_combo,
+		"stats": stats, "goal_index": goal_index,
 		"hour": daynight.hour if daynight else 16.0,
 		"player": {
 			"pos": [player.global_position.x, player.global_position.y, player.global_position.z],
@@ -331,6 +402,8 @@ func load_game() -> bool:
 		kills[k] = int(saved_kills[k])
 	play_time = float(d.get("play_time", 0.0))
 	flags = d.get("flags", {})
+	stats = d.get("stats", {})
+	goal_index = int(d.get("goal_index", 0))
 	best_combo = int(d.get("best_combo", 0))
 	if daynight:
 		daynight.hour = float(d.get("hour", 16.0))

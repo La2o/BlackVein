@@ -43,6 +43,7 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_comp
 ```
 
 When adding a feature, add a check to `tests/test_runner.gd`.
+For a quick visual check of specific scenes use `tests/screenshots.tscn` (edit it to set up what you want to see).
 
 ## Where things live
 
@@ -58,7 +59,11 @@ See `docs/ARCHITECTURE.md` for the full map. Short version:
 | World events, population | `scripts/director.gd` |
 | XP, levels, skill tree, saving | `scripts/game.gd` |
 | UI, menus, minimap | `scripts/hud.gd` |
-| City layout | `scripts/city.gd` |
+| City layout, military base | `scripts/city.gd` |
+| Traffic | `scripts/traffic.gd` |
+| Weather | `scripts/weather.gd` |
+| Settings | `scripts/settings.gd` (autoload) |
+| Goals, combos, stats | `scripts/game.gd` |
 
 ## Release checklist
 

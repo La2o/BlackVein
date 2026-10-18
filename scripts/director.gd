@@ -173,6 +173,10 @@ func _new_event(type: String, pos: Vector3, duration: float, desc: String) -> Di
 
 func _end_event(e: Dictionary, success: bool, reward := 0, text := "") -> void:
 	active_events.erase(e)
+	if success:
+		Game.stat_add("events")
+		if e["type"] in ["leviathan", "juggernaut"]:
+			Game.stat_add("bosses")
 	if success and reward > 0:
 		Game.add_ep(reward, text if text != "" else e["name"] + " complete")
 	elif text != "":

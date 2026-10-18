@@ -440,7 +440,7 @@ func _run_all() -> void:
 	Game.military.set_process(true)
 	Game.set_alert(Game.Alert.HIDDEN)
 	var base_center: Vector3 = Game.city.base_points["center"]
-	await _teleport(Game.city.base_points["gate"] + Vector3(60, 0, 0), PI * 0.5)
+	await _teleport(Game.city.base_points["gate"] + Vector3(130, 0, 0), PI * 0.5)
 	await _wait(8.0)
 	var garrison := get_tree().get_nodes_in_group("military").filter(func(u): return str(u.get("event_tag")) == "base")
 	check("military base is garrisoned", garrison.size() >= 4, "%d units" % garrison.size())
@@ -506,6 +506,14 @@ func _run_all() -> void:
 	check("levels give skill points", Game.skill_points >= Game.level - 1, "%d points" % Game.skill_points)
 	check("claws can be unlocked", Game.unlock_skill("claws"))
 	check("tendrils need groundspike first", Game.skill_block_reason("tendrils") != "")
+
+	# ---------------- starter goals
+	var gi := Game.goal_index
+	Game.goal_index = 0
+	Game.stat_add("wall_runs")
+	await _wait(0.8)
+	check("goals complete and advance", Game.goal_index >= 1, "goal %d" % Game.goal_index)
+	Game.goal_index = maxi(gi, Game.goal_index)
 
 	# ---------------- save and load
 	var lvl := Game.level

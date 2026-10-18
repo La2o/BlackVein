@@ -34,6 +34,7 @@ and controller names depending on what you used last.
 | Consume | F | LB |
 | Groundspike | G | Hold LB + press X |
 | Tendril Barrage | T | Hold LB + press Y |
+| Artillery strike (needs a military disguise) | R | Hold LB + press RB |
 | Focus (slow motion) | Z | L3 (click left stick) |
 | Thermal vision | V | R3 (click right stick) |
 | Biomass Decoy | B | D-pad down |

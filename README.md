@@ -45,6 +45,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Focus (slow motion) | Z | L3 |
 | Thermal vision | V | R3 |
 | Biomass decoy | B | D-pad down |
+| Artillery strike (in military disguise) | R | Hold LB + RB |
 | Groundspike devastator | G | Hold LB + X |
 | Tendril Barrage devastator | T | Hold LB + Y |
 | Skills menu | Tab | Back / View |
@@ -72,8 +73,12 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md)
   (more soldiers, tanks, gunships, airstrikes).
 - **World events:** infection outbreaks with hives, armored convoys, hunter packs, street battles,
   supply drops, strike teams, bombing runs, high-value targets with secret memories, gunship patrols.
+- **Bosses:** the Leviathan and the Juggernaut super-tank.
+- **Military base** to raid in disguise, with a commander whose memories unlock artillery strikes.
+- **Traffic and weather:** cars that drive (and crash), rain storms and fog.
+- **Combo meter**, starter goals, a stats screen and a settings menu.
 - **Progression:** XP from kills, consumes and events → levels → skill points → a skill tree
-  of 22 powers and upgrades. Start weak, grind, get monstrous.
+  of 23 powers and upgrades. Start weak, grind, get monstrous.
 - **Save files:** automatic saves every 45 seconds, on level up, and when you quit.
 
 ## Project layout
@@ -84,7 +89,7 @@ scenes/             main.tscn (the game) and player.tscn
 scripts/            all game code (one file per system, see docs/ARCHITECTURE.md)
 shaders/            buildings, roads, screen effects
 sfx/                generated sound effects (rebuild with tools/make_sounds.py)
-tests/              automated play-through test (65+ checks)
+tests/              automated play-through test (85+ checks)
 tools/              helper scripts
 docs/               architecture, controls, roadmap
 ```

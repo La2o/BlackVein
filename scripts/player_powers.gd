@@ -778,6 +778,7 @@ func _finish_consume() -> void:
 	consuming = null
 	_clear_consume_lines()
 	var info: Dictionary = target.on_consumed(player)
+	Game.stat_add("consumes")
 	var kind: String = info.get("kind", "civilian")
 	var heal_amt := player.max_health * 0.35
 	var bio := 30.0

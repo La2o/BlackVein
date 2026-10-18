@@ -4,12 +4,15 @@ Ideas for what to build next, roughly in priority order. Tick them off and move 
 CHANGELOG.md when done.
 
 ## Next up
-- [ ] Boss events: a giant "Leviathan" hunter and a military super-tank.
-- [ ] Civilian traffic: cars that drive the streets and crash when hit.
-- [ ] Military bases you can infiltrate in disguise (gated areas with checkpoints).
-- [ ] Combo counter and style rating that adds bonus XP.
-- [ ] Weather: rain and fog banks.
-- [ ] Settings menu: mouse sensitivity, invert Y, volume, graphics quality.
+- [x] Boss events: a giant "Leviathan" hunter and a military super-tank. (0.2.0)
+- [x] Civilian traffic: cars that drive the streets and crash when hit. (0.2.0)
+- [x] A military base you can infiltrate in disguise. (0.2.0)
+- [x] Combo counter and style rating that adds bonus XP. (0.2.0)
+- [x] Weather: rain and fog banks. (0.2.0)
+- [x] Settings menu: mouse sensitivity, invert Y, volume, graphics quality. (0.2.0)
+- [ ] More bases spread around a bigger map.
+- [ ] Infected zones that visibly spread and can be cleansed.
+- [ ] Key rebinding in the settings menu.
 
 ## Later
 - [ ] Story missions built from the High-Value Target memories.

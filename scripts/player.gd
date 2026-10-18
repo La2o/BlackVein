@@ -309,6 +309,7 @@ func _ground_jump() -> void:
 	dash_ready = true
 	model.scale = Vector3(0.75, 1.35, 0.75)
 	if c > 0.6:
+		Game.stat_add("super_jumps")
 		trauma = minf(1.0, trauma + 0.25)
 		conspicuous_timer = 2.0
 		Game.fx.shockwave(global_position + Vector3.DOWN * 0.9, 4.0, Color(1, 0.9, 0.8, 0.6), 0.3)
@@ -440,6 +441,7 @@ func _wall_ahead(dir: Vector3) -> Vector3:
 
 func _enter_wall(n: Vector3) -> void:
 	state = State.WALL
+	Game.stat_add("wall_runs")
 	wall_normal = n
 	charging = false
 	double_jump_ready = true

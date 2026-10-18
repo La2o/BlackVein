@@ -26,6 +26,8 @@ var biomass_bar: ProgressBar
 var xp_bar: ProgressBar
 var ep_label: Label
 var status_label: Label
+var goal_label: Label
+var stats_label: Label
 var form_label: Label
 var ability_label: Label
 var prompt_label: Label
@@ -178,6 +180,8 @@ func _build_status() -> void:
 	box.add_child(xp_bar)
 	status_label = _label("", 14, Color(0.85, 0.85, 0.85))
 	box.add_child(status_label)
+	goal_label = _label("", 15, Color(1, 0.9, 0.55))
+	box.add_child(goal_label)
 
 
 func _build_center() -> void:
@@ -357,6 +361,9 @@ func _build_pause() -> void:
 	var t := _label("BLACKVEIN", 40, Color(1, 0.25, 0.2), 6)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
+	stats_label = _label("", 14, Color(0.85, 0.85, 0.85), 3)
+	stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(stats_label)
 	v.add_child(_menu_button("Resume", func(): toggle_pause(false)))
 	v.add_child(_menu_button("Skills", func():
 		pause_menu.visible = false
@@ -633,13 +640,18 @@ func close_settings() -> void:
 
 func toggle_pause(on: bool) -> void:
 	pause_menu.visible = on
+	if on:
+		var mins := int(Game.play_time / 60.0)
+		stats_label.text = "Level %d  ·  %d XP total  ·  played %dh %02dm\nSoldiers %d  ·  Infected %d  ·  Consumed %d  ·  Events %d  ·  Best combo x%d" % [
+			Game.level, Game.total_xp, mins / 60, mins % 60, int(Game.kills.get("military", 0)), int(Game.kills.get("infected", 0)),
+			Game.stat("consumes"), Game.stat("events"), Game.best_combo]
 	if not on:
 		help_panel.visible = false
 		big_map.visible = false
 	get_tree().paused = on or evolve_menu.visible
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if get_tree().paused else Input.MOUSE_MODE_CAPTURED
 	if on:
-		(pause_menu.get_child(0).get_child(1) as Button).grab_focus()
+		(pause_menu.get_child(0).get_child(2) as Button).grab_focus()
 
 
 func open_evolve() -> void:
@@ -803,6 +815,8 @@ func _update_bars(delta: float) -> void:
 	var time_text: String = Game.daynight.time_text() if Game.daynight else ""
 	var loc: String = Game.city.street_name_at(player.global_position) if Game.city else ""
 	status_label.text = "%s   ·   %s   ·   %s" % [disguise_text, loc, time_text]
+	var goal := Game.current_goal_text()
+	goal_label.text = ("GOAL: " + goal) if goal != "" else ""
 
 
 func _update_alert() -> void:
