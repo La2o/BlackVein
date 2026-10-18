@@ -643,6 +643,11 @@ func _dead_physics(delta: float) -> void:
 		queue_free()
 
 
+## Whoever threw this person may be gone by the time they land (killed, despawned).
+func _thrower_or_null() -> Node:
+	return _thrower if is_instance_valid(_thrower) else null
+
+
 func _launched_physics(delta: float) -> void:
 	_airborne_time += delta
 	velocity.y -= 30.0 * delta
@@ -659,8 +664,8 @@ func _launched_physics(delta: float) -> void:
 		for n in get_tree().get_nodes_in_group("npcs"):
 			var o := n as Node3D
 			if o != self and o.has_method("take_hit") and o.global_position.distance_squared_to(global_position) < 2.0 and o.call("is_alive"):
-				o.take_hit(Game.hit_info(pre.length() * 1.2, pre * 0.6, _thrower, "impact"))
-				take_hit(Game.hit_info(pre.length() * 0.5, Vector3.ZERO, _thrower, "impact"))
+				o.take_hit(Game.hit_info(pre.length() * 1.2, pre * 0.6, _thrower_or_null(), "impact"))
+				take_hit(Game.hit_info(pre.length() * 0.5, Vector3.ZERO, _thrower_or_null(), "impact"))
 				velocity *= 0.6
 				break
 	if get_slide_collision_count() > 0:
@@ -669,7 +674,7 @@ func _launched_physics(delta: float) -> void:
 			var n := c.get_normal()
 			if absf(n.y) < 0.5 and pre.length() > 14.0:
 				var dmg := (pre.length() - 14.0) * 3.0
-				take_hit(Game.hit_info(dmg, Vector3.ZERO, _thrower, "impact"))
+				take_hit(Game.hit_info(dmg, Vector3.ZERO, _thrower_or_null(), "impact"))
 				Game.fx.splat(global_position, n, Color(0.5, 0.02, 0.02), 10)
 				velocity = velocity.bounce(n) * 0.3
 				break
@@ -679,7 +684,7 @@ func _launched_physics(delta: float) -> void:
 			_land_from_leap()
 			return
 		if impact > 12.0 and hp > 0.0:
-			take_hit(Game.hit_info((impact - 12.0) * 2.5, Vector3.ZERO, _thrower, "impact"))
+			take_hit(Game.hit_info((impact - 12.0) * 2.5, Vector3.ZERO, _thrower_or_null(), "impact"))
 		if state == S.DEAD:
 			return
 		model.basis = Basis().scaled(Vector3.ONE * scale_factor)

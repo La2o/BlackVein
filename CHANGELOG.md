@@ -25,6 +25,9 @@ All notable changes to BLACKVEIN. Newest first.
 - Fewer pedestrians in farmland, industry and the suburbs; traffic lights only in town.
 - Research labs are always in downtown or midtown buildings.
 
+### Fixed
+- A person thrown by someone who died before they landed caused script errors.
+
 ## [0.10.0] — 2026-10-18 — Real people
 
 ### New
