@@ -138,6 +138,14 @@ def main():
     save("evolve", ev, 0.5)
     n = noise(0.3)
     save("zap", sweep(200, 1800, 0.3) * env(len(n), 0.005, 0.15) * 0.6 + hp(n, 4000) * env(len(n), 0.002, 0.08) * 0.3, 0.5)
+    # rain loop: 3 seconds of soft filtered noise with random droplets
+    n = noise(3.0)
+    rain = bp(n, 800, 6000) * 0.5 + lp(noise(3.0), 400) * 0.3
+    drops = np.zeros(len(n))
+    for k in range(120):
+        i = rng.integers(0, len(n) - 400)
+        drops[i:i + 400] += hp(noise(400 / SR), 3000) * env(400, 0.001, 0.01) * rng.uniform(0.2, 0.8)
+    save("rain", rain + drops, 0.5)
     print("sounds written to", os.path.abspath(OUT))
 
 

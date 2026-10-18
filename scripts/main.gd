@@ -8,6 +8,7 @@ extends Node3D
 @onready var military: Node = $Military
 @onready var director: Node = $Director
 @onready var daynight: Node = $DayNight
+@onready var weather: Node = $Weather
 @onready var sun: DirectionalLight3D = $Sun
 @onready var world_env: WorldEnvironment = $WorldEnvironment
 
@@ -26,6 +27,8 @@ func _ready() -> void:
 	city.build()
 	player.set_spawn(city.spawn_point, city.spawn_yaw)
 	daynight.setup(sun, world_env.environment)
+	weather.setup(world_env.environment)
+	Settings.apply()
 	hud.player = player
 	if Game.has_save():
 		Game.load_game()

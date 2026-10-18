@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/military.gd" id="6_military"]
 [ext_resource type="Script" path="res://scripts/director.gd" id="7_director"]
 [ext_resource type="Script" path="res://scripts/daynight.gd" id="8_daynight"]
+[ext_resource type="Script" path="res://scripts/weather.gd" id="9_weather"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 sky_top_color = Color(0.3, 0.45, 0.65, 1)
@@ -66,6 +67,9 @@ script = ExtResource("7_director")
 
 [node name="DayNight" type="Node" parent="."]
 script = ExtResource("8_daynight")
+
+[node name="Weather" type="Node" parent="."]
+script = ExtResource("9_weather")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("4_hud")

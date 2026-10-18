@@ -7,6 +7,7 @@ extends Node
 const PICKUP := preload("res://scripts/pickup.gd")
 const HIVE := preload("res://scripts/hive.gd")
 const PROJECTILE := preload("res://scripts/projectile.gd")
+const TRAFFIC := preload("res://scripts/traffic.gd")
 
 const EVENT_TYPES := {
 	"outbreak": {"name": "Infection Outbreak", "weight": 3.0, "color": Color(1, 0.25, 0.2)},
@@ -18,6 +19,8 @@ const EVENT_TYPES := {
 	"airstrike": {"name": "Bombing Run", "weight": 1.2, "color": Color(1, 0.3, 0.3)},
 	"target": {"name": "High-Value Target", "weight": 1.5, "color": Color(0.8, 0.6, 1)},
 	"gunship": {"name": "Gunship Patrol", "weight": 1.2, "color": Color(0.6, 0.8, 1)},
+	"leviathan": {"name": "BOSS: The Leviathan", "weight": 0.7, "color": Color(1, 0.3, 0.1)},
+	"juggernaut": {"name": "BOSS: Juggernaut", "weight": 0.7, "color": Color(0.9, 0.9, 0.95)},
 }
 
 var active_events: Array[Dictionary] = []
@@ -75,7 +78,12 @@ func _maintain_population() -> void:
 	if Game.daynight and Game.daynight.is_night():
 		want_civs = 24
 	for k in mini(4, want_civs - civs):
-		var pos: Vector3 = Game.city.random_sidewalk_point(ppos, 50.0, 125.0)
+		var pos: Vector3 = Game.city.random_sidewalk_point(ppos, 32.0, 125.0)
+		# don't pop people into existence right in front of the camera
+		var cam_fwd: Vector3 = p.aim_direction()
+		var to_pos := (pos - ppos)
+		if to_pos.length() < 70.0 and Vector3(cam_fwd.x, 0, cam_fwd.z).normalized().dot(Vector3(to_pos.x, 0, to_pos.z).normalized()) > 0.25:
+			continue
 		Game.military.spawn_npc("scientist" if randf() < 0.02 else "civilian", pos)
 	var inf := 0
 	for c in get_tree().get_nodes_in_group("infected"):
@@ -85,6 +93,24 @@ func _maintain_population() -> void:
 			n.queue_free()
 		elif d < 140.0:
 			inf += 1
+	var cars := 0
+	for c in get_tree().get_nodes_in_group("traffic"):
+		if (c as Node3D).global_position.distance_to(ppos) < 160.0:
+			cars += 1
+	var want_cars := 4 if Game.is_hunted() else 14
+	if cars < want_cars:
+		var cell: Vector2i = Game.city.nearest_intersection(Game.city.random_street_point(ppos, 70.0, 150.0))
+		var dirs := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+		var nxt: Vector2i = cell + dirs[randi() % 4]
+		nxt = Vector2i(clampi(nxt.x, 0, Game.city.blocks), clampi(nxt.y, 0, Game.city.blocks))
+		if nxt != cell:
+			var t := CharacterBody3D.new()
+			t.set_script(TRAFFIC)
+			units_parent.add_child(t)
+			var start: Vector3 = Game.city.intersection_pos(cell)
+			var dir := (Game.city.intersection_pos(nxt) - start).normalized()
+			t.global_position = start + dir * 9.0 + dir.cross(Vector3.UP) * 3.0 + Vector3.UP * 0.2
+			t.setup(cell, nxt)
 	var want_inf := 3
 	if Game.daynight and Game.daynight.is_night():
 		want_inf = 14
@@ -105,6 +131,12 @@ func start_random_event(forced := "") -> void:
 		if t == "strike_team" and Game.level < 8:
 			continue
 		if t in ["hunters", "gunship"] and Game.level < 3:
+			continue
+		if t == "leviathan" and Game.level < 10:
+			continue
+		if t == "juggernaut" and Game.level < 12:
+			continue
+		if t in ["leviathan", "juggernaut"] and (active_types.has("leviathan") or active_types.has("juggernaut")):
 			continue
 		options.append(t)
 		weights.append(EVENT_TYPES[t]["weight"])
@@ -187,6 +219,15 @@ func _update_event(e: Dictionary, delta: float) -> void:
 				e["timer"] = 180.0
 			else:
 				e["pos"] = hives[0].global_position
+		"leviathan", "juggernaut":
+			var boss = e["data"].get("boss")
+			if not is_instance_valid(boss) or not boss.is_alive():
+				Game.boss = null
+				_end_event(e, true, 400, "Boss defeated")
+				Game.fx.sound_ui("evolve", 2.0)
+			else:
+				e["pos"] = boss.global_position
+				Game.boss = boss
 		"convoy", "hunters", "strike_team":
 			if alive.is_empty():
 				var rewards := {"convoy": 220, "hunters": 260, "strike_team": 320}
@@ -383,6 +424,27 @@ func _start_target() -> void:
 	e["units"].append(sci)
 	for k in 4:
 		e["units"].append(Game.military.spawn_npc("elite" if k == 0 else "soldier", pos + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3)), {"tag": e["tag"]}))
+
+
+func _start_leviathan() -> void:
+	var pos := _event_pos(110.0, 170.0)
+	var e := _new_event("leviathan", pos, 999.0, "A colossal infected is tearing through the city. It's coming for you.")
+	var boss: Node3D = Game.military.spawn_npc("leviathan", pos, {"tag": e["tag"]})
+	boss.global_position += Vector3.UP * 2.5
+	e["data"]["boss"] = boss
+	e["units"].append(boss)
+	Game.boss = boss
+	Game.fx.sound("roar", pos, 10.0, 0.05)
+
+
+func _start_juggernaut() -> void:
+	var cell: Vector2i = Game.city.nearest_intersection(_event_pos(120.0, 180.0))
+	var pos: Vector3 = Game.city.intersection_pos(cell)
+	var e := _new_event("juggernaut", pos, 999.0, "The military deployed its prototype super-tank to hunt you down.")
+	var boss: Node3D = Game.military.spawn_ground_vehicle("juggernaut", pos, randf() * TAU, {"tag": "hunt_boss" + e["tag"]})
+	e["data"]["boss"] = boss
+	e["units"].append(boss)
+	Game.boss = boss
 
 
 func _start_gunship() -> void:

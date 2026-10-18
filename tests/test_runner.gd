@@ -135,6 +135,8 @@ func _run_all() -> void:
 		await get_tree().physics_frame
 		t += get_physics_process_delta_time()
 		max_y = maxf(max_y, player.global_position.y)
+		if player.state == Player.State.GROUND and saw_wall and player.global_position.y > float(target["height"]) - 2.0:
+			break
 		if player.state == Player.State.WALL:
 			saw_wall = true
 			if t > 1.0 and t < 1.1:
@@ -400,6 +402,91 @@ func _run_all() -> void:
 	await _shot("09_events")
 	Game.director.active_events.clear()
 	await _clear_units()
+
+	# ---------------- bosses
+	Game.level = 20
+	for boss_type in ["leviathan", "juggernaut"]:
+		Game.director.active_events.clear()
+		Game.director.start_random_event(boss_type)
+		await _wait(1.0)
+		var be: Array = Game.director.active_events.filter(func(e): return e["type"] == boss_type)
+		check("boss %s spawns" % boss_type, be.size() == 1 and is_instance_valid(be[0]["data"].get("boss")))
+		if be.size() == 1:
+			var boss = be[0]["data"]["boss"]
+			boss.take_hit(Game.hit_info(99999.0, Vector3.ZERO, player, "explosion"))
+			await _wait(1.0)
+			check("boss %s can be defeated" % boss_type, Game.director.active_events.filter(func(e): return e["type"] == boss_type).is_empty())
+	await _clear_units()
+	Game.director.active_events.clear()
+
+	# ---------------- traffic
+	Game.director._maintain_population()
+	for k in 6:
+		Game.director._maintain_population()
+		await _wait(0.2)
+	var traffic := get_tree().get_nodes_in_group("traffic")
+	check("traffic spawns", traffic.size() > 0, "%d cars" % traffic.size())
+	if traffic.size() > 0:
+		var tc: Node3D = traffic[0]
+		var tp := tc.global_position
+		await _wait(2.0)
+		check("traffic drives", not is_instance_valid(tc) or tc.global_position.distance_to(tp) > 2.0)
+		if is_instance_valid(tc):
+			tc.take_hit(Game.hit_info(10.0, Vector3(0, 5, 10), player, "melee"))
+			await _wait(0.2)
+			check("hit traffic turns into a physics car", not is_instance_valid(tc))
+
+	# ---------------- military base
+	Game.military.set_process(true)
+	Game.set_alert(Game.Alert.HIDDEN)
+	var base_center: Vector3 = Game.city.base_points["center"]
+	await _teleport(Game.city.base_points["gate"] + Vector3(60, 0, 0), PI * 0.5)
+	await _wait(8.0)
+	var garrison := get_tree().get_nodes_in_group("military").filter(func(u): return str(u.get("event_tag")) == "base")
+	check("military base is garrisoned", garrison.size() >= 4, "%d units" % garrison.size())
+	var commander = null
+	for u in garrison:
+		if u.get("kind") == "commander":
+			commander = u
+	check("base has a commander", commander != null)
+	var heli_parked := get_tree().get_nodes_in_group("helicopters").any(func(h): return h.get("parked") == true)
+	check("gunship parked on the helipad", heli_parked)
+	if commander:
+		player.global_position = commander.global_position + Vector3(1.2, 0.3, 0)
+		await get_tree().physics_frame
+		await _tap("consume")
+		await _wait(1.3)
+		check("consuming the commander gives artillery codes", Game.flags.get("artillery_codes", false))
+		check("commander gives a soldier disguise", player.disguise == "commander", player.disguise)
+		Game.level = 20
+		Game.skill_points = 5
+		Game.skills.erase("artillery")
+		check("artillery skill unlocks", Game.unlock_skill("artillery"))
+		await _tap("artillery")
+		await _wait(0.2)
+		check("artillery can be called", player.powers.artillery_cooldown > 0.0)
+	await _wait(5.0)
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+
+	# ---------------- combo, weather, settings
+	Game.combo = 0
+	for k in 10:
+		Game.register_hit()
+	check("combo counts hits", Game.combo == 10 and Game.combo_rank() == "C", "x%d %s" % [Game.combo, Game.combo_rank()])
+	var wx: Node = Game.get_meta("weather")
+	wx.set_weather(1)
+	await _wait(1.0)
+	check("rain starts", wx._rain.emitting)
+	await _shot("12_rain")
+	wx.set_weather(0)
+	Settings.mouse_sensitivity = 1.7
+	Settings.save_settings()
+	Settings.mouse_sensitivity = 1.0
+	Settings.load_settings()
+	check("settings save and load", absf(Settings.mouse_sensitivity - 1.7) < 0.01)
+	Settings.mouse_sensitivity = 1.0
+	Settings.save_settings()
 
 	# ---------------- day and night
 	Game.daynight.hour = 23.0

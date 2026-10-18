@@ -48,7 +48,7 @@ void fragment() {
 			rough = 0.12;
 			metal = 0.4;
 			if (h < lit_chance) {
-				emit = lit_color * (0.15 + night * 2.2) * (0.6 + fract(h * 91.0) * 0.6);
+				emit = lit_color * (0.1 + night * 1.3) * (0.6 + fract(h * 91.0) * 0.6);
 			}
 		} else {
 			float band = step(0.93, f.y);

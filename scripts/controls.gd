@@ -29,6 +29,7 @@ func _ready() -> void:
 	_add("decoy", [_k(KEY_B), _jb(JOY_BUTTON_DPAD_DOWN)])
 	_add("devastator_spikes", [_k(KEY_G)])
 	_add("devastator_tendrils", [_k(KEY_T)])
+	_add("artillery", [_k(KEY_R)])   # controller: hold LB + press RB
 	_add("cycle_defense", [_k(KEY_X), _jb(JOY_BUTTON_DPAD_UP)])
 	_add("form_next", [_mbw(MOUSE_BUTTON_WHEEL_DOWN), _jb(JOY_BUTTON_DPAD_RIGHT)])
 	_add("form_prev", [_mbw(MOUSE_BUTTON_WHEEL_UP), _jb(JOY_BUTTON_DPAD_LEFT)])

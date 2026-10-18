@@ -10,7 +10,7 @@ const KEYS := {
 	"attack": ["LMB", "X"], "special": ["RMB", "Y"], "grab": ["E", "RB"], "consume": ["F", "LB"],
 	"jump": ["Space", "A"], "dash": ["Q", "B"], "tether": ["C", "LT"], "focus": ["Z", "L3"],
 	"thermal": ["V", "R3"], "decoy": ["B", "D-pad Down"], "defense": ["X", "D-pad Up"],
-	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "forms": ["1-6 / Wheel", "D-pad L/R"],
+	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-6 / Wheel", "D-pad L/R"],
 	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"],
 }
 
@@ -44,6 +44,12 @@ var evolve_menu: PanelContainer
 var big_map: Control
 var death_panel: Control
 var title_card: Control
+var settings_panel: PanelContainer
+var combo_label: Label
+var fps_label: Label
+var boss_box: VBoxContainer
+var boss_bar: ProgressBar
+var boss_label: Label
 var _notify_timer := 0.0
 var _damage := 0.0
 var _thermal := 0.0
@@ -76,6 +82,8 @@ func _ready() -> void:
 	_build_big_map()
 	_build_death()
 	_build_title()
+	_build_settings()
+	_build_extras()
 	Game.notify.connect(_on_notify)
 	Game.event_feed.connect(_on_feed)
 	Game.alert_changed.connect(_on_alert_changed)
@@ -309,6 +317,7 @@ E grab a person or car, press again to throw · hijack tanks and gunships · pic
 F consume someone: heal, gain biomass and steal their disguise   |   [color=#9fd0ff]LB[/color]
 G Groundspike devastator (50 biomass)   |   [color=#9fd0ff]hold LB + X[/color]
 T Tendril Barrage devastator (80 biomass)   |   [color=#9fd0ff]hold LB + Y[/color]
+R Artillery strike (needs a military disguise)   |   [color=#9fd0ff]hold LB + RB[/color]
 
 [b]NEW POWERS[/b]
 C Tether: zip to any surface, yank enemies, latch onto helicopters   |   [color=#9fd0ff]LT[/color]
@@ -357,6 +366,9 @@ func _build_pause() -> void:
 		help_panel.visible = not help_panel.visible))
 	v.add_child(_menu_button("Map", func():
 		big_map.visible = not big_map.visible))
+	v.add_child(_menu_button("Settings", func():
+		pause_menu.visible = false
+		open_settings()))
 	var new_btn := _menu_button("New game (erase save)", func(): pass)
 	new_btn.pressed.connect(func():
 		if new_btn.text.begins_with("Sure"):
@@ -507,6 +519,116 @@ func _build_title() -> void:
 	title_card.add_child(h)
 
 
+func _build_extras() -> void:
+	combo_label = _label("", 30, Color(1, 0.8, 0.3), 7)
+	combo_label.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	combo_label.position = Vector2(-330, -40)
+	combo_label.size = Vector2(300, 80)
+	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	root.add_child(combo_label)
+	fps_label = _label("", 14, Color(0.7, 1, 0.7))
+	fps_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	fps_label.position = Vector2(-110, -30)
+	root.add_child(fps_label)
+	boss_box = VBoxContainer.new()
+	boss_box.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	boss_box.position = Vector2(-300, 66)
+	boss_box.custom_minimum_size = Vector2(600, 0)
+	boss_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	boss_box.visible = false
+	root.add_child(boss_box)
+	boss_label = _label("", 20, Color(1, 0.4, 0.3), 6)
+	boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	boss_box.add_child(boss_label)
+	boss_bar = _bar(Color(0.8, 0.1, 0.1), 600, 14)
+	boss_box.add_child(boss_bar)
+
+
+func _build_settings() -> void:
+	settings_panel = PanelContainer.new()
+	settings_panel.add_theme_stylebox_override("panel", _panel_style(0.94))
+	settings_panel.set_anchors_preset(Control.PRESET_CENTER)
+	settings_panel.position = Vector2(-330, -300)
+	settings_panel.custom_minimum_size = Vector2(660, 0)
+	settings_panel.visible = false
+	root.add_child(settings_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	settings_panel.add_child(v)
+	v.add_child(_label("SETTINGS", 34, Color(1, 0.3, 0.25), 6))
+	_slider_row(v, "Mouse sensitivity", 0.2, 3.0, Settings.mouse_sensitivity, func(x): Settings.mouse_sensitivity = x)
+	_slider_row(v, "Controller look speed", 0.3, 2.5, Settings.stick_sensitivity, func(x): Settings.stick_sensitivity = x)
+	_check_row(v, "Invert look up/down", Settings.invert_y, func(b): Settings.invert_y = b)
+	_slider_row(v, "Field of view", 55.0, 100.0, Settings.fov, func(x): Settings.fov = x)
+	_slider_row(v, "Volume", 0.0, 1.0, Settings.volume, func(x): Settings.volume = x)
+	_slider_row(v, "Camera shake", 0.0, 1.5, Settings.camera_shake, func(x): Settings.camera_shake = x)
+	_check_row(v, "Controller rumble", Settings.rumble, func(b): Settings.rumble = b)
+	_check_row(v, "Show FPS", Settings.show_fps, func(b): Settings.show_fps = b)
+	var row := HBoxContainer.new()
+	var l := _label("Graphics quality", 18)
+	l.custom_minimum_size = Vector2(260, 0)
+	row.add_child(l)
+	var opt := OptionButton.new()
+	for q in ["Low (fast)", "Medium", "High"]:
+		opt.add_item(q)
+	opt.selected = Settings.quality
+	opt.custom_minimum_size = Vector2(300, 40)
+	opt.item_selected.connect(func(i):
+		Settings.quality = i
+		Settings.apply()
+		Settings.save_settings())
+	row.add_child(opt)
+	v.add_child(row)
+	v.add_child(_menu_button("Back", func(): close_settings()))
+
+
+func _slider_row(parent: Control, text: String, lo: float, hi: float, value: float, setter: Callable) -> void:
+	var row := HBoxContainer.new()
+	var l := _label(text, 18)
+	l.custom_minimum_size = Vector2(260, 0)
+	row.add_child(l)
+	var sl := HSlider.new()
+	sl.min_value = lo
+	sl.max_value = hi
+	sl.step = (hi - lo) / 100.0
+	sl.value = value
+	sl.custom_minimum_size = Vector2(300, 32)
+	var val := _label("%.2f" % value, 16, Color(0.9, 0.9, 0.9))
+	sl.value_changed.connect(func(x):
+		setter.call(x)
+		val.text = "%.2f" % x if hi <= 5.0 else "%d" % int(x)
+		Settings.apply()
+		Settings.save_settings())
+	row.add_child(sl)
+	row.add_child(val)
+	parent.add_child(row)
+
+
+func _check_row(parent: Control, text: String, value: bool, setter: Callable) -> void:
+	var cb := CheckButton.new()
+	cb.text = text
+	cb.button_pressed = value
+	cb.add_theme_font_size_override("font_size", 18)
+	cb.toggled.connect(func(b):
+		setter.call(b)
+		Settings.apply()
+		Settings.save_settings())
+	parent.add_child(cb)
+
+
+func open_settings() -> void:
+	settings_panel.visible = true
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var first := settings_panel.get_child(0).get_child(1).get_child(1) as Control
+	first.grab_focus()
+
+
+func close_settings() -> void:
+	settings_panel.visible = false
+	toggle_pause(true)
+
+
 # ------------------------------------------------------------------ menus
 
 func toggle_pause(on: bool) -> void:
@@ -550,7 +672,9 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("pause"):
-		if evolve_menu.visible:
+		if settings_panel.visible:
+			close_settings()
+		elif evolve_menu.visible:
 			close_evolve()
 		elif help_panel.visible and not pause_menu.visible:
 			help_panel.visible = false
@@ -637,10 +761,31 @@ func _process(delta: float) -> void:
 	_update_screen_fx(real)
 	charge_bar.visible = player.charging
 	charge_bar.value = player.charge * 100.0
+	_update_combo_and_boss()
 	compass.queue_redraw()
 	minimap.queue_redraw()
 	if big_map.visible:
 		big_map.queue_redraw()
+
+
+func _update_combo_and_boss() -> void:
+	if Game.combo >= 3:
+		combo_label.text = "x%d\n%s" % [Game.combo, Game.combo_rank()]
+		combo_label.modulate.a = clampf(Game.combo_timer, 0.0, 1.0)
+		var hot := clampf(Game.combo / 40.0, 0.0, 1.0)
+		combo_label.add_theme_color_override("font_color", Color(1, 0.85 - hot * 0.6, 0.3 - hot * 0.2))
+	else:
+		combo_label.text = ""
+	fps_label.visible = Settings.show_fps
+	if Settings.show_fps:
+		fps_label.text = "%d FPS" % Engine.get_frames_per_second()
+	var b := Game.boss
+	if b and is_instance_valid(b) and b.has_method("is_alive") and b.is_alive():
+		boss_box.visible = true
+		boss_label.text = str(b.get("boss_name"))
+		boss_bar.value = float(b.get("hp")) / maxf(float(b.get("max_hp")), 1.0) * 100.0
+	else:
+		boss_box.visible = false
 
 
 func _update_bars(delta: float) -> void:
@@ -709,6 +854,8 @@ func _update_powers_text() -> void:
 		line2.append("%s spikes" % _k("spikes"))
 	if Game.has_skill("tendrils"):
 		line2.append("%s tendrils" % _k("tendrils"))
+	if Game.has_skill("artillery"):
+		line2.append("%s artillery%s" % [_k("artillery"), "" if pw.artillery_cooldown <= 0.0 else " %ds" % int(ceil(pw.artillery_cooldown))])
 	if line2.is_empty():
 		line2.append("Earn XP to unlock more powers  (%s skills)" % _k("evolve"))
 	ability_label.text = "   ".join(parts) + "\n" + "   ".join(line2)

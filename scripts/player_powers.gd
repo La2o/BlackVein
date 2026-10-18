@@ -50,6 +50,7 @@ var consume_lines: Array[MeshInstance3D] = []
 var devastating := ""
 var devastate_timer := 0.0
 var pending_hijack: Node3D = null
+var artillery_cooldown := 0.0
 var _right_hand := true
 
 
@@ -203,6 +204,7 @@ func _physics_process(delta: float) -> void:
 	tether_cooldown = maxf(0.0, tether_cooldown - delta)
 	decoy_cooldown = maxf(0.0, decoy_cooldown - delta)
 	devastator_cooldown = maxf(0.0, devastator_cooldown - delta)
+	artillery_cooldown = maxf(0.0, artillery_cooldown - delta)
 	violence_timer = maxf(0.0, violence_timer - delta)
 	fire_cooldown = maxf(0.0, fire_cooldown - delta)
 	attack_buffer = maxf(0.0, attack_buffer - delta)
@@ -254,9 +256,11 @@ func _physics_process(delta: float) -> void:
 			_start_devastator("tendrils")
 			return
 		Game.locked_message("tendrils")
-	if Input.is_action_just_pressed("consume"):
+	if Input.is_action_just_pressed("artillery") or (mod and Input.is_action_just_pressed("grab")):
+		_call_artillery()
+	elif Input.is_action_just_pressed("consume"):
 		_try_consume()
-	if Input.is_action_just_pressed("grab"):
+	if Input.is_action_just_pressed("grab") and not mod:
 		_grab_pressed()
 	if Input.is_action_just_pressed("cycle_defense"):
 		_cycle_defense()
@@ -649,6 +653,9 @@ func _grab_pressed() -> void:
 		_grab(npc)
 		return
 	var car := Game.nearest_in_group("cars", pos, 4.5, func(n): return n.can_be_grabbed())
+	var moving := Game.nearest_in_group("traffic", pos, 4.5)
+	if moving and (car == null or moving.global_position.distance_to(pos) < car.global_position.distance_to(pos)):
+		car = moving.convert_to_physics()
 	if car:
 		_grab(car)
 
@@ -781,6 +788,11 @@ func _finish_consume() -> void:
 		"elite":
 			ep = 50
 			bio = 50.0
+		"commander":
+			ep = 250
+			bio = 100.0
+			if not Game.flags.get("artillery_codes", false):
+				Game.flags["artillery_codes"] = true
 		"scientist":
 			ep = 300 if str(info.get("tag", "")) != "" else 40
 			bio = 100.0
@@ -890,6 +902,29 @@ func _spawn_decoy() -> void:
 	Game.say("Decoy released", Color(1, 0.6, 0.5))
 	Game.fx.burst_ring(player.global_position, Color(1, 0.2, 0.1, 0.6), 3.0)
 	Game.fx.sound("consume", player.global_position, 0.0)
+
+
+# ------------------------------------------------------------------ artillery
+
+func _call_artillery() -> void:
+	if not Game.has_skill("artillery"):
+		Game.locked_message("artillery")
+		return
+	if not str(player.disguise) in ["soldier", "rocket_soldier", "elite", "commander"]:
+		Game.say("You need a military disguise to call artillery", Color(1, 0.6, 0.5))
+		return
+	if artillery_cooldown > 0.0:
+		Game.say("Artillery ready in %d s" % int(ceil(artillery_cooldown)), Color(1, 0.7, 0.5))
+		return
+	var aim: Dictionary = player.aim_point(300.0, Game.LAYER_WORLD)
+	var target: Vector3 = aim["position"]
+	artillery_cooldown = 30.0
+	Game.say("Artillery inbound", Color(1, 0.8, 0.4))
+	Game.fx.smoke_column(target, Color(1.0, 0.15, 0.1, 0.8), 6.0)
+	Game.fx.sound_ui("alert", -6.0)
+	get_tree().create_timer(4.0, false).timeout.connect(func():
+		if Game.director:
+			Game.director._drop_bombs(target))
 
 
 # ------------------------------------------------------------------ devastators
@@ -1056,5 +1091,7 @@ func _update_weapon() -> void:
 # ------------------------------------------------------------------ controller rumble
 
 func rumble(weak: float, strong: float, duration: float) -> void:
+	if not Settings.rumble:
+		return
 	for id in Input.get_connected_joypads():
 		Input.start_joy_vibration(id, clampf(weak, 0, 1), clampf(strong, 0, 1), duration)

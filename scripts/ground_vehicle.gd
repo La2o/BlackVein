@@ -17,6 +17,9 @@ var abandoned := false
 var event_tag := ""
 var route: Array[Vector2i] = []    # convoy route (optional)
 var deployed := false
+var boss_name := ""
+var _mg_timer := 2.0
+var _mg_burst := 0
 
 var _cell := Vector2i.ZERO
 var _prev_cell := Vector2i(-99, -99)
@@ -42,6 +45,10 @@ func setup(k: String, extra := {}) -> void:
 	if kind == "tank":
 		hp = 700.0
 		speed = 9.0
+	elif kind == "juggernaut":
+		hp = 3600.0
+		speed = 7.0
+		boss_name = "JUGGERNAUT"
 	else:
 		hp = 260.0
 		speed = 13.0
@@ -52,14 +59,16 @@ func setup(k: String, extra := {}) -> void:
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
 	box.size = Vector3(3.4, 2.4, 6.4) if kind == "tank" else Vector3(2.6, 2.8, 7.0)
+	if kind == "juggernaut":
+		box.size = Vector3(5.6, 4.0, 10.4)
 	shape.shape = box
-	shape.position = Vector3(0, 1.2 if kind == "tank" else 1.4, 0)
+	shape.position = Vector3(0, box.size.y * 0.5, 0)
 	add_child(shape)
 	_build_model()
 	add_to_group("vehicles")
 	add_to_group("military")
 	add_to_group("military_vehicles")
-	if kind == "tank":
+	if kind == "tank" or kind == "juggernaut":
 		add_to_group("hijackable")
 	heading = rotation.y
 	rotation = Vector3.ZERO
@@ -81,7 +90,11 @@ func _build_model() -> void:
 	var body := Node3D.new()
 	body.name = "Body"
 	add_child(body)
-	if kind == "tank":
+	if kind == "juggernaut":
+		olive.albedo_color = Color(0.12, 0.12, 0.13)
+		olive.metallic = 0.5
+		body.scale = Vector3.ONE * 1.65
+	if kind == "tank" or kind == "juggernaut":
 		_box(body, Vector3(3.2, 1.0, 6.0), Vector3(0, 1.0, 0), olive)
 		_box(body, Vector3(0.7, 0.9, 6.4), Vector3(-1.55, 0.5, 0), dark)
 		_box(body, Vector3(0.7, 0.9, 6.4), Vector3(1.55, 0.5, 0), dark)
@@ -146,7 +159,9 @@ func camera_distance() -> float:
 
 
 func can_hijack(by: Node) -> bool:
-	return kind == "tank" and not destroyed and pilot == null and (by as Node3D).global_position.distance_to(global_position) < 9.0
+	if kind == "juggernaut" and hp > max_hp * 0.25:
+		return false
+	return kind != "truck" and not destroyed and pilot == null and (by as Node3D).global_position.distance_to(global_position) < 9.0 + (4.0 if kind == "juggernaut" else 0.0)
 
 
 func hijack(by: Node) -> void:
@@ -176,6 +191,8 @@ func take_hit(info: Dictionary) -> void:
 		Game.raise_alert(Game.player.global_position, "You attacked a military vehicle")
 		Game.add_heat(0.1)
 	hp -= dmg
+	if src == Game.player and dmg > 1.0:
+		Game.register_hit()
 	Game.fx.debris(global_position + Vector3.UP * 2.0, 3, Color(0.3, 0.32, 0.22))
 	if kind == "truck" and not deployed:
 		_deploy_soldiers()
@@ -207,7 +224,9 @@ func _destroy(src: Node) -> void:
 		on_pilot_exit()
 		p.exit_vehicle(Vector3(0, 18, 0))
 	if src == Game.player or (src and is_instance_valid(src) and src.has_method("is_player_controlled") and src.is_player_controlled()):
-		Game.add_xp(80 if kind == "tank" else 35, "%s destroyed" % ("Tank" if kind == "tank" else "Truck"))
+		var rewards := {"tank": 80, "truck": 35, "juggernaut": 900}
+		var names := {"tank": "Tank", "truck": "Truck", "juggernaut": "JUGGERNAUT"}
+		Game.add_xp(rewards[kind], "%s destroyed" % names[kind])
 		Game.add_heat(0.4)
 	get_tree().call_group("event_listeners", "on_unit_removed", self, "destroyed")
 	_wreck_timer = 45.0
@@ -261,7 +280,13 @@ func _think() -> void:
 			Game.report_sighting(pp, p.is_conspicuous(), global_position, 0.4)
 			if Game.is_hunted():
 				_target = p.vehicle if p.vehicle else p
-	if _target == null and kind == "tank":
+	if kind == "juggernaut" and p and not p.is_dead():
+		var dj := global_position.distance_to(p.global_position)
+		if dj < 170.0:
+			_target = p.vehicle if p.vehicle else p
+			if not Game.is_hunted() and _sees_player:
+				Game.raise_alert(p.global_position, "The Juggernaut has found you")
+	if _target == null and kind != "truck":
 		var h := Game.nearest_in_group("hunters", global_position, 80.0)
 		if h == null:
 			h = Game.nearest_in_group("infected", global_position, 50.0)
@@ -275,12 +300,25 @@ func _drive_ai(delta: float) -> void:
 	var stop := false
 	if _target and is_instance_valid(_target):
 		var d := global_position.distance_to(_target.global_position)
-		if kind == "tank" and d < 55.0:
+		if kind != "truck" and d < (40.0 if kind == "juggernaut" else 55.0):
 			stop = true
 		_aim_turret(_target.global_position, delta)
 		if kind == "tank" and _fire_timer <= 0.0 and d < 110.0:
 			_fire_shell(_target.global_position + Vector3.UP * 0.5, _target)
 			_fire_timer = randf_range(3.2, 4.5)
+		elif kind == "juggernaut" and d < 140.0 and can_see_point(_target.global_position + Vector3.UP):
+			if _fire_timer <= 0.0:
+				for k in 3:
+					var spread := Vector3(randf_range(-4, 4), 0, randf_range(-4, 4)) * (k * 0.8)
+					_fire_shell(_target.global_position + Vector3.UP * 0.5 + spread, _target)
+				_fire_timer = 4.5 if hp > max_hp * 0.4 else 3.0
+			_mg_timer -= delta
+			if _mg_timer <= 0.0:
+				if _mg_burst <= 0:
+					_mg_burst = 12
+				_machine_gun(_target.global_position)
+				_mg_burst -= 1
+				_mg_timer = 0.09 if _mg_burst > 0 else 1.8
 	elif _turret:
 		_turret.rotation.y = lerp_angle(_turret.rotation.y, 0.0, delta)
 	if kind == "truck" and deployed:
@@ -344,7 +382,7 @@ func _aim_turret(at: Vector3, delta: float) -> void:
 func _fire_shell(at: Vector3, homing: Node3D = null) -> void:
 	if _barrel == null:
 		return
-	var muzzle: Vector3 = _barrel.global_position + (-_barrel.global_transform.basis.z) * 3.8
+	var muzzle: Vector3 = _barrel.global_position + (-_barrel.global_transform.basis.z).normalized() * (3.8 if kind != "juggernaut" else 6.3)
 	var dir := (at - muzzle).normalized()
 	var p := Node3D.new()
 	p.set_script(PROJECTILE)
@@ -358,6 +396,21 @@ func _fire_shell(at: Vector3, homing: Node3D = null) -> void:
 	elif Game.player and Game.player.global_position.distance_to(global_position) < 60.0:
 		Game.player.add_trauma(0.15)
 	Game.panic_at(global_position, 50.0)
+
+
+func _machine_gun(at: Vector3) -> void:
+	var muzzle := global_position + Vector3.UP * 4.2
+	var dir := (at + Vector3.UP * randf_range(-0.3, 0.6) - muzzle).normalized()
+	dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.04).normalized()
+	var hit := Game.raycast(muzzle, muzzle + dir * 150.0, Game.LAYER_WORLD | Game.LAYER_PLAYER | Game.LAYER_NPC | Game.LAYER_PROPS, [get_rid()])
+	var end := muzzle + dir * 150.0
+	if not hit.is_empty():
+		end = hit["position"]
+		var c := hit["collider"] as Node
+		if c and c.has_method("take_hit") and not c.is_in_group("military"):
+			c.take_hit(Game.hit_info(4.0, dir * 2.0, self, "bullet"))
+	Game.fx.tracer(muzzle, end, Color(1.0, 0.85, 0.4), 0.07)
+	Game.fx.sound("gunshot", muzzle, -2.0, 0.1)
 
 
 func _drive_piloted(delta: float) -> void:

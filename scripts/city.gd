@@ -18,11 +18,15 @@ const CAR_SCRIPT := preload("res://scripts/car.gd")
 var period := 60.0
 var x0 := 0.0
 var z0 := 0.0
+var base_cell := Vector2i(1, 6)
+var base_rect := Rect2()          # the military base, in x/z
+var base_points := {}             # named spots inside the base
 var spawn_point := Vector3.ZERO
 var spawn_yaw := 0.0
 var buildings: Array[Dictionary] = []   # {aabb: AABB, height: float}
 var building_mats: Array[ShaderMaterial] = []
 var lamp_mat: StandardMaterial3D
+var pool_mat: ShaderMaterial
 var road_mat: ShaderMaterial
 var nav_region: NavigationRegion3D
 var nav_ready := false
@@ -54,7 +58,10 @@ func build() -> void:
 			if i < 0 or j < 0 or i >= blocks or j >= blocks:
 				_build_backdrop_block(bx, bz)
 			else:
-				_build_block(i, j, bx, bz, i == mid and j == mid - 1)
+				if Vector2i(i, j) == base_cell:
+					_build_base(bx, bz)
+				else:
+					_build_block(i, j, bx, bz, i == mid and j == mid - 1)
 	_build_street_lamps()
 	_build_trees()
 	spawn_point = Vector3(street_x(mid), 1.2, street_z(mid))
@@ -102,6 +109,8 @@ func set_night(amount: float) -> void:
 	for m in building_mats:
 		m.set_shader_parameter("night", amount)
 	lamp_mat.emission_energy_multiplier = lerpf(0.2, 6.0, amount)
+	if pool_mat:
+		pool_mat.set_shader_parameter("strength", amount * 0.55)
 
 
 # ------------------------------------------------------------------ geometry helpers
@@ -287,6 +296,80 @@ func _rooftop_props(parent: Node, aabb: AABB, top: float, landmark: bool) -> voi
 		parent.add_child(tip)
 
 
+func _build_base(bx: float, bz: float) -> void:
+	var base := Node3D.new()
+	base.name = "MilitaryBase"
+	add_child(base)
+	base_rect = Rect2(bx, bz, block_size, block_size)
+	var concrete := StandardMaterial3D.new()
+	concrete.albedo_color = Color(0.4, 0.41, 0.38)
+	concrete.roughness = 0.95
+	var green := StandardMaterial3D.new()
+	green.albedo_color = Color(0.26, 0.3, 0.2)
+	green.roughness = 0.85
+	var stripes := StandardMaterial3D.new()
+	stripes.albedo_color = Color(0.85, 0.7, 0.1)
+	_add_box(Vector3(block_size, 0.15, block_size), Vector3(bx + block_size * 0.5, 0.075, bz + block_size * 0.5), concrete, Game.LAYER_WORLD, base, true)
+	var h := 4.0
+	var t := 0.6
+	var c := Vector3(bx + block_size * 0.5, 0, bz + block_size * 0.5)
+	# perimeter walls with a gate on the east side
+	_add_box(Vector3(block_size, h, t), Vector3(c.x, h * 0.5, bz + 0.3), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(block_size, h, t), Vector3(c.x, h * 0.5, bz + block_size - 0.3), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(t, h, block_size), Vector3(bx + 0.3, h * 0.5, c.z), green, Game.LAYER_WORLD, base, true)
+	var gate := 10.0
+	var seg := (block_size - gate) * 0.5
+	_add_box(Vector3(t, h, seg), Vector3(bx + block_size - 0.3, h * 0.5, bz + seg * 0.5), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(t, h, seg), Vector3(bx + block_size - 0.3, h * 0.5, bz + block_size - seg * 0.5), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(0.3, 0.3, gate), Vector3(bx + block_size - 0.3, 2.2, c.z), stripes, 0, base)
+	# barracks and a command building
+	_add_box(Vector3(14, 4.5, 7), Vector3(bx + 10, 2.25, bz + 8), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(14, 4.5, 7), Vector3(bx + 10, 2.25, bz + block_size - 8), green, Game.LAYER_WORLD, base, true)
+	_add_box(Vector3(8, 7.0, 8), Vector3(bx + 8, 3.5, c.z), concrete, Game.LAYER_WORLD, base, true)
+	# watchtowers in the corners
+	for corner in [Vector2(3, 3), Vector2(block_size - 3, 3), Vector2(3, block_size - 3), Vector2(block_size - 3, block_size - 3)]:
+		var p := Vector3(bx + corner.x, 0, bz + corner.y)
+		for o in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+			_add_box(Vector3(0.25, 9, 0.25), p + Vector3(o.x * 1.3, 4.5, o.y * 1.3), green, Game.LAYER_WORLD, base)
+		_add_box(Vector3(3.6, 0.4, 3.6), p + Vector3(0, 9.2, 0), green, Game.LAYER_WORLD, base)
+		_add_box(Vector3(3.6, 1.0, 0.15), p + Vector3(0, 9.9, 1.75), green, Game.LAYER_WORLD, base)
+	# helipad
+	var pad := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 6.0
+	cm.bottom_radius = 6.0
+	cm.height = 0.05
+	pad.mesh = cm
+	pad.material_override = stripes
+	pad.position = Vector3(c.x + 8, 0.18, c.z)
+	base.add_child(pad)
+	# sandbag lines
+	for k in 4:
+		_add_box(Vector3(5, 1.1, 1.2), Vector3(bx + 26 + (k % 2) * 6, 0.7, bz + 14 + k * 5), green, Game.LAYER_WORLD, base, true)
+	base_points = {
+		"center": c + Vector3(4, 0.3, 0),
+		"helipad": Vector3(c.x + 8, 0.3, c.z),
+		"command": Vector3(bx + 14, 0.3, c.z),
+		"gate": Vector3(bx + block_size + 3, 0.3, c.z),
+		"tank": Vector3(bx + 24, 0.3, bz + block_size - 10),
+	}
+	buildings.append({"aabb": AABB(Vector3(bx + 3, 0, bz + 4.5), Vector3(14, 4.5, 7)), "height": 4.5})
+	buildings.append({"aabb": AABB(Vector3(bx + 3, 0, bz + block_size - 11.5), Vector3(14, 4.5, 7)), "height": 4.5})
+	buildings.append({"aabb": AABB(Vector3(bx + 4, 0, c.z - 4), Vector3(8, 7, 8)), "height": 7.0})
+
+
+func in_base(p: Vector3) -> bool:
+	return base_rect.has_point(Vector2(p.x, p.z))
+
+
+func random_base_point() -> Vector3:
+	for k in 20:
+		var p := Vector3(randf_range(base_rect.position.x + 4, base_rect.end.x - 4), 0.3, randf_range(base_rect.position.y + 4, base_rect.end.y - 4))
+		if not is_inside_building(p, 1.0):
+			return p
+	return base_points.get("center", spawn_point)
+
+
 func _build_backdrop_block(bx: float, bz: float) -> void:
 	var h := maxf(14.0, roundf(rng.randf_range(20.0, 75.0) / 3.5) * 3.5)
 	var w := block_size - rng.randf_range(4.0, 10.0)
@@ -325,6 +408,26 @@ func _build_street_lamps() -> void:
 				bulbs.append(Transform3D(Basis(), p + Vector3(0, 3.4, 0) + out))
 	_multimesh(pole_mesh, poles)
 	_multimesh(bulb_mesh, bulbs)
+	# fake pools of light under the lamps (fade in at night)
+	var pool := PlaneMesh.new()
+	pool.size = Vector2(9, 9)
+	pool_mat = ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = """shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+uniform float strength = 0.0;
+void fragment() {
+	float d = length(UV - 0.5) * 2.0;
+	float a = smoothstep(1.0, 0.0, d);
+	ALBEDO = vec3(1.0, 0.72, 0.4) * a * a * strength;
+}
+"""
+	pool_mat.shader = sh
+	pool.material = pool_mat
+	var pools: Array[Transform3D] = []
+	for b in bulbs:
+		pools.append(Transform3D(Basis(), Vector3(b.origin.x, 0.17, b.origin.z)))
+	_multimesh(pool, pools)
 
 
 func _build_trees() -> void:
@@ -421,12 +524,16 @@ func _spawn_car(parent: Node, pos: Vector3, along_x: bool) -> RigidBody3D:
 	return car
 
 
-func spawn_car_at(pos: Vector3, yaw: float) -> RigidBody3D:
+func spawn_car_at(pos: Vector3, yaw: float, color := -1) -> RigidBody3D:
 	var parent := get_node_or_null("Cars")
 	if parent == null:
 		parent = self
-	var car := _spawn_car(parent, pos, false)
+	var car := RigidBody3D.new()
+	car.set_script(CAR_SCRIPT)
+	car.position = pos
 	car.rotation.y = yaw
+	car.set("color_index", color if color >= 0 else rng.randi_range(0, 7))
+	parent.add_child(car)
 	return car
 
 
@@ -532,7 +639,7 @@ func random_sidewalk_point(near: Vector3, min_d: float, max_d: float) -> Vector3
 			2: p = Vector3(bx + off, 0.2, bz + t)
 			_: p = Vector3(bx + block_size - off, 0.2, bz + t)
 		var d := p.distance_to(near)
-		if d >= min_d * 0.8 and d <= max_d * 1.3 and not is_inside_building(p, 0.6):
+		if d >= min_d * 0.8 and d <= max_d * 1.3 and not is_inside_building(p, 0.6) and not in_base(p):
 			return p
 	return near + Vector3(randf_range(-5, 5), 0.2, randf_range(-5, 5))
 

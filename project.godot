@@ -21,6 +21,7 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 
 Controls="*res://scripts/controls.gd"
 Game="*res://scripts/game.gd"
+Settings="*res://scripts/settings.gd"
 
 [display]
 

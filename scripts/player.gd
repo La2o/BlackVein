@@ -35,7 +35,7 @@ const STATE_NAMES := ["Ground", "Air", "Wall run", "Glide", "Dash", "Tether", "D
 @export var wall_jump_push := 16.0
 @export var wall_jump_up := 14.0
 @export var ledge_vault_up := 11.0
-@export var ledge_vault_forward := 9.0
+@export var ledge_vault_forward := 6.5
 
 @export_group("Glide")
 @export var glide_fall_speed := 3.5
@@ -55,8 +55,8 @@ const STATE_NAMES := ["Ground", "Air", "Wall run", "Glide", "Dash", "Tether", "D
 @export_group("Camera")
 @export var mouse_sensitivity := 0.0025
 @export var stick_sensitivity := 3.2
-@export var camera_height := 1.5
-@export var camera_distance := 5.5
+@export var camera_height := 1.85
+@export var camera_distance := 6.0
 @export var base_fov := 72.0
 @export var max_fov := 96.0
 
@@ -177,17 +177,20 @@ func apply_upgrades() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var sens := mouse_sensitivity
+		var sens := mouse_sensitivity * Settings.mouse_sensitivity
+		var inv := -1.0 if Settings.invert_y else 1.0
 		yaw -= event.relative.x * sens
-		pitch -= event.relative.y * sens
+		pitch -= event.relative.y * sens * inv
 		pitch = clampf(pitch, -1.35, 0.95)
 
 
 func _process(delta: float) -> void:
 	var real := delta / maxf(Engine.time_scale, 0.05)
 	var look := Vector2(Input.get_axis("look_left", "look_right"), Input.get_axis("look_up", "look_down"))
-	yaw -= look.x * stick_sensitivity * real
-	pitch = clampf(pitch - look.y * stick_sensitivity * 0.7 * real, -1.35, 0.95)
+	var ss := stick_sensitivity * Settings.stick_sensitivity
+	var inv := -1.0 if Settings.invert_y else 1.0
+	yaw -= look.x * ss * real
+	pitch = clampf(pitch - look.y * ss * 0.7 * real * inv, -1.35, 0.95)
 	_update_camera(real)
 
 
@@ -888,8 +891,9 @@ func _update_camera(delta: float) -> void:
 	spring.spring_length = lerpf(spring.spring_length, dist, 1.0 - exp(-6.0 * delta))
 	var speed := velocity.length()
 	var t := clampf((speed - walk_speed) / (dash_speed - walk_speed), 0.0, 1.0)
-	camera.fov = lerpf(camera.fov, lerpf(base_fov, max_fov, t), 1.0 - exp(-4.0 * delta))
+	var fov0 := Settings.fov
+	camera.fov = lerpf(camera.fov, lerpf(fov0, fov0 + (max_fov - base_fov), t), 1.0 - exp(-4.0 * delta))
 	trauma = maxf(0.0, trauma - delta * 1.3)
-	var s := trauma * trauma
+	var s := trauma * trauma * Settings.camera_shake
 	camera.h_offset = randf_range(-1.0, 1.0) * 0.45 * s
 	camera.v_offset = randf_range(-1.0, 1.0) * 0.45 * s

@@ -58,7 +58,7 @@ func _apply() -> void:
 	if day < 0.0:
 		col = dusk_col.lerp(moon_col, clampf(-day * 4.0, 0.0, 1.0))
 	sun.light_color = col
-	sun.light_energy = lerpf(0.12, 1.35, light_amount)
+	sun.light_energy = lerpf(0.3, 1.35, light_amount)
 	sun.shadow_enabled = light_amount > 0.05 or day < -0.2
 	if sky_mat:
 		var top_day := Color(0.3, 0.45, 0.65)
@@ -77,7 +77,11 @@ func _apply() -> void:
 		sky_mat.ground_horizon_color = hor
 		sky_mat.ground_bottom_color = hor.darkened(0.6)
 		env.fog_light_color = hor.lerp(Color(0.5, 0.5, 0.5), 0.2)
-	env.ambient_light_energy = lerpf(0.35, 1.0, light_amount)
+	# ambient: sky color by day, a cool moonlit blue at night so streets stay readable
+	var amb_day: Color = sky_mat.sky_horizon_color.lerp(sky_mat.sky_top_color, 0.5) if sky_mat else Color(0.6, 0.6, 0.65)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = amb_day.lerp(Color(0.16, 0.19, 0.3), night).lerp(Color(0.62, 0.62, 0.66), light_amount * 0.4)
+	env.ambient_light_energy = lerpf(1.1, 0.75, light_amount)
 	env.background_energy_multiplier = lerpf(0.4, 1.0, light_amount)
 	if Game.city:
 		Game.city.set_night(night)

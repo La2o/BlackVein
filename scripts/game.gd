@@ -46,6 +46,7 @@ var total_xp := 0
 var level := 1
 var skill_points := 1
 var skills := {}            # skill id -> rank
+var flags := {}             # story/unlock flags, e.g. "artillery_codes"
 var play_time := 0.0
 var autosave_timer := 45.0
 const MAX_LEVEL := 50
@@ -69,6 +70,7 @@ const SKILLS := {
 	"dive": ["Dive Bomb", "Attack in mid-air to slam down with a shockwave", "Abilities", 1, 3, 1, ""],
 	"focus": ["Focus", "Slow down time (drains biomass)", "Abilities", 2, 10, 1, ""],
 	"decoy": ["Biomass Decoy", "A clone that draws enemy fire, then explodes", "Abilities", 2, 12, 1, ""],
+	"artillery": ["Artillery Strike", "While disguised as a soldier, call a barrage on where you aim. Needs codes from a base commander", "Abilities", 2, 8, 1, "flag:artillery_codes"],
 	"groundspike": ["Groundspike", "Devastator: rings of spikes erupt around you", "Devastators", 3, 14, 1, ""],
 	"tendrils": ["Tendril Barrage", "Devastator: tendrils skewer everything nearby", "Devastators", 3, 18, 1, "groundspike"],
 	"vitality": ["Vitality", "+20% maximum health per rank", "Body", 1, 1, 5, ""],
@@ -79,6 +81,10 @@ const SKILLS := {
 const CATEGORIES := ["Movement", "Forms", "Defense", "Abilities", "Devastators", "Body"]
 
 var kills := {"military": 0, "infected": 0, "civilian": 0}
+var combo := 0
+var combo_timer := 0.0
+var best_combo := 0
+var boss: Node3D = null          # set while a boss fight is running (HUD shows its health)
 var hit_stop_timer := 0.0
 var focus_active := false
 var rng := RandomNumberGenerator.new()
@@ -106,7 +112,9 @@ func reset_state() -> void:
 	level = 1
 	skill_points = 1
 	skills = {}
+	flags = {}
 	play_time = 0.0
+	best_combo = 0
 	kills = {"military": 0, "infected": 0, "civilian": 0}
 
 
@@ -119,6 +127,10 @@ func _process(delta: float) -> void:
 	if get_tree().paused:
 		return
 	play_time += real_delta
+	if combo > 0:
+		combo_timer -= real_delta
+		if combo_timer <= 0.0:
+			_end_combo()
 	autosave_timer -= real_delta
 	if autosave_timer <= 0.0:
 		save_game()
@@ -154,6 +166,31 @@ func say(text: String, color := Color.WHITE) -> void:
 
 func feed(text: String, color := Color(1, 0.85, 0.6)) -> void:
 	event_feed.emit(text, color)
+
+
+# ---------------------------------------------------------------- combos
+
+const COMBO_RANKS := [[60, "SAVAGE"], [40, "S"], [25, "A"], [15, "B"], [8, "C"], [0, "D"]]
+
+
+## Called whenever the player lands a hit. Long chains of hits pay bonus XP.
+func register_hit() -> void:
+	combo += 1
+	combo_timer = 2.6
+	best_combo = maxi(best_combo, combo)
+
+
+func combo_rank() -> String:
+	for r in COMBO_RANKS:
+		if combo >= int(r[0]):
+			return r[1]
+	return "D"
+
+
+func _end_combo() -> void:
+	if combo >= 8:
+		add_xp(int(combo * 1.5), "%s combo  x%d" % [combo_rank(), combo])
+	combo = 0
 
 
 # ---------------------------------------------------------------- progression
@@ -206,8 +243,12 @@ func skill_block_reason(id: String) -> String:
 		return "Maxed"
 	if level < int(s[4]):
 		return "Needs level %d" % int(s[4])
-	if s[6] != "" and not has_skill(s[6]):
-		return "Needs " + SKILLS[s[6]][0]
+	var req: String = s[6]
+	if req.begins_with("flag:"):
+		if not flags.get(req.substr(5), false):
+			return "Consume a base commander"
+	elif req != "" and not has_skill(req):
+		return "Needs " + SKILLS[req][0]
 	if skill_points < int(s[3]):
 		return "Needs %d point%s" % [int(s[3]), "s" if int(s[3]) > 1 else ""]
 	return ""
@@ -247,7 +288,7 @@ func save_game(announce := false) -> void:
 	var data := {
 		"version": 1,
 		"level": level, "xp": xp, "total_xp": total_xp, "skill_points": skill_points,
-		"skills": skills, "kills": kills, "play_time": play_time,
+		"skills": skills, "kills": kills, "play_time": play_time, "flags": flags, "best_combo": best_combo,
 		"hour": daynight.hour if daynight else 16.0,
 		"player": {
 			"pos": [player.global_position.x, player.global_position.y, player.global_position.z],
@@ -289,6 +330,8 @@ func load_game() -> bool:
 	for k in saved_kills:
 		kills[k] = int(saved_kills[k])
 	play_time = float(d.get("play_time", 0.0))
+	flags = d.get("flags", {})
+	best_combo = int(d.get("best_combo", 0))
 	if daynight:
 		daynight.hour = float(d.get("hour", 16.0))
 	var pd: Dictionary = d.get("player", {})
@@ -481,10 +524,11 @@ func explode(center: Vector3, radius: float, damage: float, source: Node = null,
 
 ## Tell nearby civilians to run.
 func panic_at(center: Vector3, radius: float) -> void:
-	for n in get_tree().get_nodes_in_group("civilians"):
-		var c := n as Node3D
-		if c and c.global_position.distance_to(center) < radius and c.has_method("panic"):
-			c.panic(center)
+	for g in ["civilians", "traffic"]:
+		for n in get_tree().get_nodes_in_group(g):
+			var c := n as Node3D
+			if c and c.global_position.distance_to(center) < radius and c.has_method("panic"):
+				c.panic(center)
 
 
 # ---------------------------------------------------------------- queries

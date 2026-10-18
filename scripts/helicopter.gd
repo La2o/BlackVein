@@ -13,6 +13,7 @@ var falling := false
 var pilot: Node = null
 var event_tag := ""
 var patrol_point := Vector3.ZERO
+var parked := false
 
 var _rotor: Node3D
 var _tail_rotor: Node3D
@@ -157,6 +158,9 @@ func take_hit(info: Dictionary) -> void:
 		Game.raise_alert(Game.player.global_position, "You attacked a gunship")
 		Game.add_heat(0.1)
 	hp -= dmg
+	parked = false
+	if src == Game.player and dmg > 1.0:
+		Game.register_hit()
 	if hp <= 0.0 and not falling:
 		_start_fall(src)
 
@@ -207,7 +211,12 @@ func _physics_process(delta: float) -> void:
 		if get_slide_collision_count() > 0 or _fall_timer <= 0.0 or global_position.y < 1.5:
 			_crash()
 		return
+	if parked and pilot == null:
+		_rotor.rotation.y -= delta * 26.0
+		velocity = Vector3.ZERO
+		return
 	if pilot:
+		parked = false
 		_fly_piloted(delta)
 	else:
 		_think_timer -= delta
