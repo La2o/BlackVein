@@ -40,6 +40,7 @@ and controller names depending on what you used last.
 | Focus (slow motion) | Z | L3 (click left stick) |
 | Cycle head form: normal / Thermal / Night Vision / Predator Sense | V | R3 (click right stick) |
 | Biomass Decoy | B | D-pad down |
+| Bio-Bomb (while holding someone) | B | D-pad down |
 | Creature form: cycle Brute / Stalker / Wraith / human | N | Hold LB + press D-pad down |
 | Hijack tank / gunship | E next to it (or Tether onto it) | RB |
 | Pick up a gun | E | RB |

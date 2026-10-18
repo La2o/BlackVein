@@ -430,7 +430,12 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("creature_form") or (mod and Input.is_action_just_pressed("decoy")):
 		_cycle_creature()
 		return
-	if Input.is_action_just_pressed("decoy") and not mod:
+	if Input.is_action_just_pressed("decoy") and not mod and held and held_kind == "npc":
+		if Game.has_skill("bio_bomb"):
+			_bio_bomb_held()
+		else:
+			Game.locked_message("bio_bomb")
+	elif Input.is_action_just_pressed("decoy") and not mod:
 		if Game.has_skill("decoy"):
 			_spawn_decoy()
 		else:
@@ -995,6 +1000,24 @@ func max_allies() -> int:
 
 func ally_count() -> int:
 	return get_tree().get_nodes_in_group("allies").size()
+
+
+## Bio-Bomb: the person you're holding swells with biomass and bursts 1.6 s later. Throw them first.
+func _bio_bomb_held() -> void:
+	var target := held
+	if target == null or not is_instance_valid(target) or not target.has_method("arm_bio_bomb"):
+		return
+	if target.bio_bomb_timer >= 0.0:
+		return
+	if player.biomass < 25.0:
+		Game.say("A bio-bomb needs 25 biomass", Color(1, 0.6, 0.5))
+		return
+	player.biomass -= 25.0
+	violence_timer = 2.0
+	player.conspicuous_timer = 2.0
+	target.arm_bio_bomb(player)
+	Game.fx.sound("consume", player.global_position, 0.0, 0.5)
+	Game.stat_add("bio_bombs")
 
 
 func _brand_held() -> void:

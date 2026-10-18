@@ -157,6 +157,7 @@ const SKILLS := {
 	"focus": ["Focus", "Slow down time (drains biomass)", "Abilities", 2, 10, 1, ""],
 	"dominate": ["Dominate", "Grab someone and press Special to brand them: they follow you and fight for you. +2 allies per rank", "Abilities", 2, 5, 3, ""],
 	"decoy": ["Biomass Decoy", "A clone that draws enemy fire, then explodes", "Abilities", 2, 12, 1, ""],
+	"bio_bomb": ["Bio-Bomb", "Grab someone and press Decoy to plant a bio-bomb in them, then throw them. They burst 1.6 s later", "Abilities", 2, 13, 1, "decoy"],
 	"artillery": ["Artillery Strike", "While disguised as a soldier, call a barrage on where you aim. Needs codes from a base commander", "Abilities", 2, 8, 1, "flag:artillery_codes"],
 	"groundspike": ["Groundspike", "Devastator: rings of spikes erupt around you", "Devastators", 3, 14, 1, ""],
 	"tendrils": ["Tendril Barrage", "Devastator: tendrils skewer everything nearby", "Devastators", 3, 18, 1, "groundspike"],

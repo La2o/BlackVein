@@ -546,6 +546,32 @@ func _run_all() -> void:
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)
 
+	# ---------------- Bio-Bomb: plant one in someone you hold, throw them, they burst
+	Game.skills["decoy"] = 1
+	Game.skills["bio_bomb"] = 1
+	player.biomass = player.max_biomass
+	player.yaw = 0.0
+	var bomb: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(0, 0, -1.6))
+	var bystanders: Array = []
+	for k in 3:
+		bystanders.append(Game.military.spawn_npc("soldier", player.global_position + Vector3(k * 1.5 - 1.5, 0, -11)))
+	await _wait(0.2)
+	await _tap("grab")
+	await _wait(0.2)
+	await _tap("decoy")
+	check("decoy while holding someone plants a bio-bomb", is_instance_valid(bomb) and bomb.bio_bomb_timer > 0.0)
+	player.powers.drop_held()   # drop them among the soldiers
+	bomb.global_position = player.global_position + Vector3(0, 0.5, -11)
+	await _wait(2.2)
+	var hurt := 0
+	for b in bystanders:
+		if not is_instance_valid(b) or b.hp < b.max_hp:
+			hurt += 1
+	check("the bio-bomb bursts and hurts everyone near it", not is_instance_valid(bomb) and hurt >= 2, "%d hurt" % hurt)
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	player.health = player.max_health
+
 	# ---------------- arm forms and specials
 	for f in PlayerPowers.FORM_NAMES.size():
 		player.powers.set_form(f)

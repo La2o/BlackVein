@@ -90,6 +90,9 @@ var _last_seen_player := 99.0
 var _shield: MeshInstance3D       # riot troopers
 var _laser: MeshInstance3D        # snipers: the red aiming line
 var _aim_time := 0.0
+var bio_bomb_timer := -1.0        # counting down to a bio-bomb burst
+var _bomber: Node
+var _bomb_light: OmniLight3D
 var noticing := false              # a soldier who can see you and finds you suspicious (stealth meter)
 var _marker: Label3D               # "?" while they're suspicious, "!" once they're after you
 var _grabbed_by: Node = null
@@ -506,6 +509,43 @@ func on_thrown(vel: Vector3, by: Node) -> void:
 	global_basis = Basis()
 
 
+## Planted by the player (Bio-Bomb skill): swell, pulse red, then burst.
+func arm_bio_bomb(by: Node) -> void:
+	bio_bomb_timer = 1.6
+	_bomber = by
+	_bomb_light = OmniLight3D.new()
+	_bomb_light.light_color = Color(1, 0.15, 0.05)
+	_bomb_light.omni_range = 4.0
+	_bomb_light.position = Vector3.UP * 0.4 * scale_factor
+	add_child(_bomb_light)
+
+
+func _tick_bio_bomb(delta: float) -> void:
+	bio_bomb_timer -= delta
+	var k := 1.0 - clampf(bio_bomb_timer / 1.6, 0.0, 1.0)
+	if _bomb_light:
+		_bomb_light.light_energy = (1.0 + 4.0 * k) * (0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.001 * (8.0 + 22.0 * k)))
+	if model:
+		model.scale = Vector3.ONE * scale_factor * (1.0 + 0.18 * k)
+	# thrown bombs burst on impact
+	if state == S.LAUNCHED and _airborne_time > 0.12 and get_slide_collision_count() > 0:
+		bio_bomb_timer = 0.0
+	if bio_bomb_timer > 0.0:
+		return
+	bio_bomb_timer = -1.0
+	var at := global_position + Vector3.UP * 0.5
+	var by: Node = _bomber if is_instance_valid(_bomber) else null
+	if _grabbed_by and is_instance_valid(_grabbed_by) and _grabbed_by == Game.player:
+		Game.player.powers.drop_held()
+	Game.fx.debris(at, 18, Color(0.45, 0.04, 0.03))
+	Game.explode(at, 8.0, 140.0, by, 26.0)
+	Game.add_xp(10, "Bio-bomb")
+	if faction == "military" and is_alive():
+		Game.kills["military"] += 1
+	get_tree().call_group("event_listeners", "on_unit_removed", self, "consumed")
+	queue_free()
+
+
 func _end_exception(by) -> void:
 	if is_instance_valid(by):
 		remove_collision_exception_with(by)
@@ -636,6 +676,10 @@ func _physics_process(delta: float) -> void:
 	_check_stranded(delta)
 	if model == null:
 		return
+	if bio_bomb_timer >= 0.0:
+		_tick_bio_bomb(delta)
+		if not is_instance_valid(self) or is_queued_for_deletion():
+			return
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_leap_cooldown = maxf(0.0, _leap_cooldown - delta)
 	_scream_cooldown = maxf(0.0, _scream_cooldown - delta)

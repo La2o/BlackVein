@@ -368,6 +368,7 @@ R Artillery strike (needs a military disguise)   |   [color=#9fd0ff]hold LB + RB
 C Tether: zip to any surface, yank enemies, latch onto helicopters   |   [color=#9fd0ff]LT[/color]
 Z Focus: slow motion (drains biomass)   |   [color=#9fd0ff]L3[/color]
 B Biomass Decoy: a clone that draws fire, then explodes   |   [color=#9fd0ff]D-pad down[/color]
+B while holding someone: Bio-Bomb (throw them, they burst)   |   [color=#9fd0ff]D-pad down[/color]
 V Thermal vision   |   [color=#9fd0ff]R3[/color]
 
 [b]GETTING STRONGER[/b]
@@ -1291,7 +1292,9 @@ func _update_powers_text() -> void:
 		line2.append("%s tether" % _k("tether"))
 	if Game.has_skill("focus"):
 		line2.append("%s focus%s" % [_k("focus"), " ON" if pw.focus_on else ""])
-	if Game.has_skill("decoy"):
+	if pw.held and Game.has_skill("bio_bomb") and pw.held_kind == "npc":
+		line2.append("%s bio-bomb" % _k("decoy"))
+	elif Game.has_skill("decoy"):
 		line2.append("%s decoy%s" % [_k("decoy"), "" if pw.decoy_cooldown <= 0.0 else " %ds" % int(ceil(pw.decoy_cooldown))])
 	if Game.has_skill("thermal") or Game.has_skill("night_vision"):
 		line2.append("%s vision" % _k("thermal"))

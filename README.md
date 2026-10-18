@@ -95,6 +95,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Head form (vision): Thermal / Night / Predator | V | R3 |
 | **Forms wheel** | Hold Alt or X | Hold D-pad up |
 | Biomass decoy | B | D-pad down |
+| Bio-bomb (while holding someone) | B | D-pad down |
 | Creature form (Brute / Stalker / Wraith) | N | Hold LB + D-pad down |
 | Artillery strike (in military disguise) | R | Hold LB + RB |
 | Groundspike devastator | G | Hold LB + X |

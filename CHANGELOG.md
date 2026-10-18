@@ -13,6 +13,8 @@ All notable changes to BLACKVEIN. Newest first.
   laser for 1.6 s, then fire one heavy shot. Break line of sight before the shot lands.
 - **Brute infected**: hulking, spiked infected that leap like hunters and hit hard. Most outbreaks
   have one guarding the hive.
+- **Bio-Bomb** (Abilities, level 13, needs Decoy): grab someone and press Decoy to fill them with
+  unstable biomass, then throw them. They burst on impact, or 1.6 s later, in a big explosion.
 - Riot trooper and sniper disguises get the same access as soldiers.
 
 ### Fixed
