@@ -51,7 +51,7 @@ func _process(delta: float) -> void:
 		if b and is_instance_valid(b) and b.has_method("is_alive") and b.is_alive() and b.global_position.distance_to(p.global_position) < 220.0:
 			want = "boss"
 	_current = want
-	# city ambience by day, crickets and wind at night (quieter in combat)
+	# city ambience by day, soft wind at night (quieter in combat)
 	var night: bool = Game.daynight != null and Game.daynight.is_night()
 	var amb := 0.55 if _current == "ambient" else 0.25
 	if _city.stream:

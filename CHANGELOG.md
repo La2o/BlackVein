@@ -2,6 +2,11 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.5.1] — 2026-10-18
+
+### Changed
+- Removed the cricket chirping from the night ambience; nights now just have soft wind.
+
 ## [0.5.0] — 2026-10-18 — Dominate, better looks, working controllers, faster jumps
 
 ### New

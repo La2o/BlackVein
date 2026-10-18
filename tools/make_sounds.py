@@ -162,12 +162,8 @@ def main():
     siren = np.sin(2 * np.pi * np.cumsum(sf) / SR) * np.sin(np.linspace(0, np.pi, sl)) * 0.06
     city[i:i + sl] += siren
     save("city", city, 0.5)
-    # night ambience: crickets and wind (20 s loop)
+    # night ambience: soft wind (20 s loop)
     night = lp(noise(d), 180) * 0.4 * (0.7 + 0.3 * np.sin(2 * np.pi * 0.07 * tt))
-    for k in range(70):
-        i = rng.integers(0, n - 4000)
-        chirp = np.sin(2 * np.pi * rng.uniform(4200, 5200) * t(0.18)) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 30 * t(0.18))))
-        night[i:i + len(chirp)] += chirp * env(len(chirp), 0.01, 0.1) * 0.05
     save("night", night, 0.45)
     print("sounds written to", os.path.abspath(OUT))
 
