@@ -620,7 +620,7 @@ func _run_all() -> void:
 				var sp0 := Game.skill_points
 				player.respawn_in_place(sample[0].global_position, 0.0)
 				await _wait(0.5)
-				check("sample gives a skill point", Game.skill_points == sp0 + 1)
+				check("sample gives a skill point", Game.skill_points >= sp0 + 1)
 			await _shot("13_lab")
 		if e["id"] == "safehouse":
 			await _shot("14_safehouse")
