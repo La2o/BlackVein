@@ -2,6 +2,12 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.8.1] — 2026-10-18
+
+### New
+- The build number (e.g. `v0.8.1`) shows faintly in the bottom-right corner, so you always know
+  which version you're playing. The FPS counter moved up a little to make room.
+
 ## [0.8.0] — 2026-10-18 — Light Body, seamless running, brighter nights
 
 ### New

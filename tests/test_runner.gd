@@ -902,6 +902,10 @@ func _run_all() -> void:
 	check("keys can be rebound", Settings.key_name("consume") == "K", Settings.key_name("consume"))
 	Settings.reset_bindings()
 	check("keys reset to defaults", Settings.key_name("consume") == "F", Settings.key_name("consume"))
+	check("build number shows bottom right", Game.hud.version_label.visible
+		and Game.hud.version_label.text == "v" + str(ProjectSettings.get_setting("application/config/version"))
+		and Game.hud.version_label.get_global_rect().end.x > get_viewport().get_visible_rect().size.x - 40.0,
+		Game.hud.version_label.text)
 	# the "what's new" popup can be clicked right away and closes back into the game
 	Settings.last_seen_version = "0.0.1"
 	Game.hud._maybe_show_whats_new()

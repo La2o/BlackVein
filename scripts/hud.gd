@@ -69,6 +69,7 @@ var _rebind_buttons := {}
 var _rebinding := ""
 var combo_label: Label
 var fps_label: Label
+var version_label: Label
 var boss_box: VBoxContainer
 var boss_bar: ProgressBar
 var boss_label: Label
@@ -569,8 +570,15 @@ func _build_extras() -> void:
 	root.add_child(combo_label)
 	fps_label = _label("", 14, Color(0.7, 1, 0.7))
 	fps_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	fps_label.position = Vector2(-110, -30)
+	fps_label.position = Vector2(-110, -50)
 	root.add_child(fps_label)
+	# build number in the corner, so screenshots and bug reports say which version they're from
+	version_label = _label("v" + str(ProjectSettings.get_setting("application/config/version", "")), 13,
+		Color(1, 1, 1, 0.45), 3)
+	version_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT, Control.PRESET_MODE_MINSIZE, 10)
+	version_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	version_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	root.add_child(version_label)
 	boss_box = VBoxContainer.new()
 	boss_box.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	boss_box.position = Vector2(-300, 66)
