@@ -28,7 +28,8 @@ and controller names depending on what you used last.
 | Dive bomb | Left click in the air | X in the air |
 | Form special | Right click | Y |
 | Choose arm form | 1–7, mouse wheel | D-pad left / right |
-| Shield / Armor / none | X | D-pad up |
+| **Forms wheel** (pick head, arm, leg and body forms in slow motion) | Hold Alt (or hold X) | Hold D-pad up |
+| Cycle body form: none / Shield / Armor / Wings | Tap X | Tap D-pad up |
 | Grab / throw | E | RB |
 | Drop what you hold (or brand them as an ally, with Dominate) | Right click | Y |
 | Consume | F | LB |
@@ -36,7 +37,7 @@ and controller names depending on what you used last.
 | Tendril Barrage | T | Hold LB + press Y |
 | Artillery strike (needs a military disguise) | R | Hold LB + press RB |
 | Focus (slow motion) | Z | L3 (click left stick) |
-| Thermal vision | V | R3 (click right stick) |
+| Cycle head form: normal / Thermal / Night Vision / Predator Sense | V | R3 (click right stick) |
 | Biomass Decoy | B | D-pad down |
 | Hijack tank / gunship | E next to it (or Tether onto it) | RB |
 | Pick up a gun | E | RB |

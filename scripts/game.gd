@@ -87,7 +87,7 @@ const ACHIEVEMENTS := [
 	["events", "Busy Night", "Complete 25 world events", "events", 25],
 	["racer", "Free Runner", "Win 5 rooftop races", "races", 5],
 	["warlord", "Warlord", "Brand 25 allies", "brands", 25],
-	["wardrobe", "Thousand Faces", "Collect 8 disguises in your wardrobe", "wardrobe", 8],
+	["wardrobe", "Thousand Faces", "Collect all 6 kinds of disguise", "wardrobe", 6],
 	["infiltrator", "Infiltrator", "Steal an Evolution Sample from a lab", "samples", 1],
 	["nest", "Exterminator II", "Destroy the Hive Heart in the subway", "hive_hearts", 1],
 	["army_of_six", "Personal Army", "Lead 6 allies at once", "max_allies", 6],
@@ -123,7 +123,11 @@ const SKILLS := {
 	"glide": ["Glide", "Hold jump in the air to glide", "Movement", 1, 2, 1, ""],
 	"air_dash": ["Air Dash", "Dash in mid-air", "Movement", 1, 2, 1, ""],
 	"tether": ["Tether", "Zip to any surface, yank enemies to you, latch onto helicopters", "Movement", 2, 4, 1, ""],
-	"wings": ["Tendril Wings", "While gliding, press jump to flap upward. More flaps per rank", "Movement", 2, 15, 3, "glide"],
+	"wings": ["Wings", "Body form: flesh wings. Flap upward while gliding (more flaps per rank); in the Wings body form you glide much faster", "Movement", 2, 15, 3, "glide"],
+	"runner_legs": ["Runner Legs", "Leg form: much faster sprinting and longer running jumps", "Movement", 2, 4, 1, ""],
+	"leaper_legs": ["Leaper Legs", "Leg form: huge jumps, and every hard landing becomes a stomp", "Movement", 2, 6, 1, ""],
+	"crawler_legs": ["Crawler Legs", "Leg form: cling to walls without sprinting, run along buildings as long as you like", "Movement", 2, 8, 1, ""],
+	"crusher_legs": ["Crusher Legs", "Leg form: sprint through people and cars, can't be knocked back, brutal landings", "Movement", 2, 10, 1, ""],
 	"agility": ["Agility", "+10% sprint and wall-run speed per rank", "Movement", 1, 1, 5, ""],
 	"leap": ["Leap", "Higher super jumps and longer glides per rank", "Movement", 1, 1, 5, ""],
 	"claws": ["Claws", "Lightning-fast slashes. Special: Spike Line", "Forms", 1, 2, 1, ""],
@@ -134,7 +138,9 @@ const SKILLS := {
 	"spike_form": ["Bone Spikes", "Fire piercing bone spikes from your forearm. Special: Spike Storm", "Forms", 2, 13, 1, ""],
 	"shield": ["Shield", "Block bullets and rockets from the front", "Defense", 2, 6, 1, ""],
 	"armor": ["Armor", "Take less damage and ram through anything", "Defense", 2, 8, 1, ""],
-	"thermal": ["Thermal Vision", "See warm bodies through smoke and darkness", "Abilities", 1, 3, 1, ""],
+	"thermal": ["Thermal Vision", "Head form: see warm bodies through smoke and darkness", "Abilities", 1, 3, 1, ""],
+	"night_vision": ["Night Vision", "Head form: see clearly in the dark", "Abilities", 1, 4, 1, ""],
+	"predator_sense": ["Predator Sense", "Head form: see soldiers, infected and targets glowing through walls", "Abilities", 2, 9, 1, "thermal"],
 	"dive": ["Dive Bomb", "Attack in mid-air to slam down with a shockwave", "Abilities", 1, 3, 1, ""],
 	"focus": ["Focus", "Slow down time (drains biomass)", "Abilities", 2, 10, 1, ""],
 	"dominate": ["Dominate", "Grab someone and press Special to brand them: they follow you and fight for you. +2 allies per rank", "Abilities", 2, 5, 3, ""],
@@ -232,8 +238,14 @@ func set_focus(on: bool) -> void:
 	_apply_time_scale()
 
 
+var wheel_slowmo := false
+
+
 func _apply_time_scale() -> void:
 	if hit_stop_timer > 0.0:
+		return
+	if wheel_slowmo:
+		Engine.time_scale = 0.12
 		return
 	Engine.time_scale = 0.35 if focus_active else 1.0
 
@@ -457,7 +469,7 @@ func save_game(announce := false) -> void:
 			"pos": _save_pos(),
 			"health": player.health, "biomass": player.biomass, "disguise": player.disguise,
 			"outfit": {} if player.model.true_form else outfit_to_json(player.model.outfit),
-			"form": pw.form, "defense": pw.defense,
+			"form": pw.form, "defense": pw.defense, "vision": pw.vision, "legs": pw.legs,
 		},
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -497,6 +509,8 @@ func load_game() -> bool:
 	flags = d.get("flags", {})
 	disguises = []
 	for dd in d.get("disguises", []):
+		if disguises.any(func(x): return x["kind"] == str(dd.get("kind", "civilian"))):
+			continue   # older saves could hold several of one kind
 		disguises.append({"kind": str(dd.get("kind", "civilian")), "label": str(dd.get("label", "")), "outfit": outfit_from_json(dd.get("outfit", {}))})
 	stats = d.get("stats", {})
 	goal_index = int(d.get("goal_index", 0))
@@ -528,6 +542,12 @@ func load_game() -> bool:
 		if pw.defense_unlocked(def_i):
 			pw.defense = def_i
 			player.model.set_defense(def_i)
+		var legs_i := int(pd.get("legs", 0))
+		if pw.legs_unlocked(legs_i):
+			pw.set_legs(legs_i, true)
+		var vis_i := int(pd.get("vision", 0))
+		if pw.vision_unlocked(vis_i):
+			pw.set_vision(vis_i, true)
 	xp_changed.emit()
 	say("Welcome back  ·  Level %d" % level, Color(1, 0.85, 0.6))
 	return true
@@ -564,16 +584,10 @@ func outfit_from_json(o: Dictionary) -> Dictionary:
 func add_disguise(kind: String, label: String, outfit: Dictionary) -> void:
 	if not DISGUISE_INFO.has(kind):
 		return
-	# one slot per military/scientist kind (latest wins); civilians keep up to 4 looks
-	if kind != "civilian":
-		for k in disguises.size():
-			if disguises[k]["kind"] == kind:
-				disguises[k] = {"kind": kind, "label": label, "outfit": outfit}
-				return
-	else:
-		var civs := disguises.filter(func(d): return d["kind"] == "civilian")
-		if civs.size() >= 4:
-			disguises.erase(civs[0])
+	# one disguise per kind: once you have a civilian (or a soldier...), that's enough
+	for d in disguises:
+		if d["kind"] == kind:
+			return
 	disguises.append({"kind": kind, "label": label, "outfit": outfit})
 	while disguises.size() > DISGUISE_LIMIT:
 		disguises.pop_front()

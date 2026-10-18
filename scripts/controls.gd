@@ -53,6 +53,7 @@ func _ready() -> void:
 	_add("evolve_menu", [_k(KEY_TAB), _k(KEY_U), _jb(JOY_BUTTON_BACK)])
 	_add("map", [_k(KEY_M)])
 	_add("disguise_menu", [_k(KEY_I)])   # controller: hold LB + press B
+	_add("forms_wheel", [_k(KEY_ALT), _k(KEY_CAPSLOCK)])   # controller: hold D-pad Up (tap still cycles body forms)
 	_add("pause", [_k(KEY_ESCAPE), _jb(JOY_BUTTON_START)])
 	_add("toggle_help", [_k(KEY_F1), _k(KEY_H)])
 	_add("respawn", [_k(KEY_F5)])

@@ -49,7 +49,8 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Consume | F | LB |
 | Tether | C | LT |
 | Focus (slow motion) | Z | L3 |
-| Thermal vision | V | R3 |
+| Head form (vision): Thermal / Night / Predator | V | R3 |
+| **Forms wheel** | Hold Alt or X | Hold D-pad up |
 | Biomass decoy | B | D-pad down |
 | Artillery strike (in military disguise) | R | Hold LB + RB |
 | Groundspike devastator | G | Hold LB + X |
@@ -64,9 +65,15 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 
 - **Movement:** super sprint, vertical and sideways wall running, charged super jumps,
   double jump, gliding, air dash, tether zips, dive bombs, shockwave landings.
-- **Seven arm forms:** Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass, Bone Spikes —
-  each with its own combo and special move.
-- **Defense:** Shield and Armor.
+- **Body-part forms, mixed freely on the forms wheel:**
+  - **Head:** Thermal Vision, Night Vision, Predator Sense (see enemies through walls).
+  - **Arms:** Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass, Bone Spikes — each with its own
+    combo and special move.
+  - **Body:** Shield, Armor, Wings.
+  - **Legs:** Runner (speed), Leaper (huge jumps), Crawler (cling to walls), Crusher (unstoppable).
+- **Prototype-style parkour:** flips, wall backflips, ledge flips, barrel-roll air dashes, landing
+  rolls, superhero landings, vaults over cars, a leaning "ninja run" at top speed.
+- **Sculpted 3D people:** faces, hands, bending elbows and knees, and outfits for every kind of person.
 - **Consume & disguise:** eat anyone to heal and take their identity. Change disguise while unseen
   to make the military lose you.
 - **Grab & throw** people and cars. **Pick up** soldiers' rifles and rocket launchers.

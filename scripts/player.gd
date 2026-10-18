@@ -121,6 +121,17 @@ var speed_mult := 1.0
 var jump_mult := 1.0
 var hits_taken_recent := 0.0
 
+# acrobatics (visual only): flips, rolls, vaults, landing poses
+var trick := ""
+var _trick_t := 0.0
+var _trick_len := 0.0
+var _trick_dir := 1.0
+var _hero_t := 0.0
+var _base_q := Quaternion.IDENTITY
+var _bank := 0.0
+var _last_facing := Vector3.FORWARD
+var _vault_cd := 0.0
+
 @onready var visual: Node3D = $Visual
 @onready var model: Node3D = $Visual/Model
 @onready var powers: PlayerPowers = $Powers
@@ -155,6 +166,10 @@ func respawn(at: Vector3) -> void:
 	facing = Vector3.FORWARD.rotated(Vector3.UP, yaw)
 	state = State.AIR
 	charging = false
+	double_jump_ready = true
+	dash_ready = true
+	trick = ""
+	_hero_t = 0.0
 	health = max_health
 	biomass = maxf(biomass, max_biomass * 0.6)
 	visual.visible = true
@@ -208,6 +223,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	var real := delta / maxf(Engine.time_scale, 0.05)
 	var look := Vector2(Input.get_axis("look_left", "look_right"), Input.get_axis("look_up", "look_down"))
+	if Game.hud and Game.hud.wheel_open:
+		look = Vector2.ZERO
 	var ss := stick_sensitivity * Settings.stick_sensitivity
 	var inv := -1.0 if Settings.invert_y else 1.0
 	yaw -= look.x * ss * real
@@ -318,17 +335,50 @@ func _state_ground(delta: float) -> void:
 	if (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and dash_cooldown_timer <= 0.0 and powers.can_move():
 		_start_dash()
 		return
-	if sprinting and wall_cooldown <= 0.0:
+	if (sprinting or powers.clings_to_walls()) and wall_cooldown <= 0.0:
 		var n := _wall_ahead(wish)
 		if n != Vector3.ZERO:
 			_enter_wall(n)
+			return
+	if sprinting:
+		_try_vault(delta)
+
+
+## Sprinting into something low (a car, bench, low wall) hops over it without slowing down.
+func _try_vault(delta: float) -> void:
+	_vault_cd -= delta
+	var hv := Vector3(velocity.x, 0, velocity.z)
+	if _vault_cd > 0.0 or hv.length() < 9.0 or not is_on_floor():
+		return
+	var d := hv.normalized()
+	var reach := CAPSULE_RADIUS + 0.4 + hv.length() * 0.06
+	var mask := Game.LAYER_WORLD | Game.LAYER_PROPS | Game.LAYER_VEHICLE
+	var ex: Array[RID] = [get_rid()]
+	var low := Game.raycast(global_position + Vector3.DOWN * 0.5, global_position + Vector3.DOWN * 0.5 + d * reach, mask, ex)
+	if low.is_empty():
+		return
+	var high := Game.raycast(global_position + Vector3.UP * 0.75, global_position + Vector3.UP * 0.75 + d * (reach + 0.8), mask, ex)
+	if not high.is_empty():
+		return
+	_vault_cd = 0.6
+	velocity.y = 10.0
+	state = State.AIR
+	coyote = 0.0
+	double_jump_ready = true
+	start_trick("vault", 0.5, 1.0 if randf() < 0.5 else -1.0)
+	Game.fx.sound("whoosh", global_position, -8.0)
+	Game.stat_add("vaults")
+	conspicuous_timer = maxf(conspicuous_timer, 1.0)
 
 
 func _ground_jump() -> void:
 	var hspeed := Vector3(velocity.x, 0, velocity.z).length()
 	var running := hspeed > walk_speed * 1.3
 	# horizontal velocity is left untouched: jumping never slows you down
-	velocity.y = (run_jump_velocity if running else jump_velocity) * sqrt(jump_mult)
+	velocity.y = (run_jump_velocity if running else jump_velocity) * sqrt(jump_mult) * powers.jump_factor()
+	if running and powers.legs == PlayerPowers.Legs.RUNNER:
+		velocity.x *= 1.15
+		velocity.z *= 1.15
 	state = State.AIR
 	air_press = false
 	double_jump_ready = true
@@ -354,7 +404,7 @@ func _jump_boost(delta: float) -> void:
 		return
 	boost_timer -= delta
 	boost_held += delta
-	velocity.y += jump_boost_accel * jump_mult * delta
+	velocity.y += jump_boost_accel * jump_mult * powers.jump_factor() * delta
 	charging = true
 	charge = clampf(boost_held / jump_boost_time, 0.0, 1.0)
 	if not _super_done and boost_held > jump_boost_time * 0.6:
@@ -397,7 +447,7 @@ func _air_common() -> void:
 			_start_dash()
 			return
 		Game.locked_message("air_dash")
-	if sprinting and wall_cooldown <= 0.0:
+	if (sprinting or powers.clings_to_walls()) and wall_cooldown <= 0.0:
 		var dir := wish
 		if dir.length() < 0.3:
 			dir = Vector3(velocity.x, 0, velocity.z).normalized()
@@ -409,10 +459,17 @@ func _air_common() -> void:
 func _double_jump() -> void:
 	boost_timer = 0.0
 	charging = false
-	velocity.y = maxf(velocity.y, double_jump_velocity * sqrt(jump_mult))
+	velocity.y = maxf(velocity.y, double_jump_velocity * sqrt(jump_mult) * (1.0 + (powers.jump_factor() - 1.0) * 0.5))
 	if wish.length() > 0.1:
 		velocity += wish * double_jump_boost
 	double_jump_ready = false
+	# a flip: sideways input does a side flip, otherwise a front flip or a corkscrew
+	var right := Basis.looking_at(facing, Vector3.UP).x
+	var side := wish.dot(right)
+	if absf(side) > 0.6:
+		start_trick("sideflip", 0.5, signf(side))
+	else:
+		start_trick("frontflip" if randf() < 0.6 else "corkscrew", 0.52)
 	model.scale = Vector3(0.8, 1.25, 0.8)
 	Game.fx.burst_ring(global_position + Vector3.DOWN * 0.8, Color(1, 0.3, 0.2, 0.6), 2.5)
 	Game.fx.sound("jump", global_position, -4.0)
@@ -422,7 +479,8 @@ func _double_jump() -> void:
 func _state_glide(delta: float) -> void:
 	if Input.is_action_just_pressed("jump") and flaps_left > 0:
 		flaps_left -= 1
-		velocity.y = 14.0
+		velocity.y = 14.0 * (1.3 if powers.defense == PlayerPowers.Defense.WINGS else 1.0)
+		model.flap()
 		model.scale = Vector3(1.3, 0.8, 1.3)
 		Game.fx.burst_ring(global_position, Color(0.8, 0.1, 0.06, 0.6), 3.0)
 		Game.fx.sound("whoosh", global_position, 0.0)
@@ -436,15 +494,20 @@ func _state_glide(delta: float) -> void:
 	var target_dir := wish.normalized() if wish.length() > 0.1 else dir
 	var ang := dir.signed_angle_to(target_dir, Vector3.UP)
 	dir = dir.rotated(Vector3.UP, clampf(ang, -glide_turn * delta, glide_turn * delta))
-	var gs := glide_speed * jump_mult
+	var wing_form := powers.defense == PlayerPowers.Defense.WINGS
+	var gs := glide_speed * jump_mult * (1.55 if wing_form else 1.0)
 	if speed < gs:
 		speed = move_toward(speed, gs, 14.0 * delta)
 	else:
 		speed = move_toward(speed, gs, 5.0 * delta)
 	velocity.x = dir.x * speed
 	velocity.z = dir.z * speed
-	velocity.y = move_toward(velocity.y, -glide_fall_speed / jump_mult, gravity * 1.3 * delta)
+	velocity.y = move_toward(velocity.y, -glide_fall_speed / jump_mult * (0.6 if wing_form else 1.0), gravity * 1.3 * delta)
 	_air_common()
+
+
+func max_flaps() -> int:
+	return Game.skill_rank("wings") + (3 if powers.defense == PlayerPowers.Defense.WINGS else 0)
 
 
 func _start_dash() -> void:
@@ -455,6 +518,8 @@ func _start_dash() -> void:
 	dash_cooldown_timer = dash_cooldown
 	if state != State.GROUND:
 		dash_ready = false
+	if state != State.GROUND and state != State.DASH:
+		start_trick("barrel", dash_time + 0.15, 1.0 if randf() < 0.5 else -1.0)
 	state = State.DASH
 	trauma = minf(1.0, trauma + 0.12)
 	conspicuous_timer = maxf(conspicuous_timer, 1.5)
@@ -504,7 +569,7 @@ func _enter_wall(n: Vector3) -> void:
 	state = State.WALL
 	boost_timer = 0.0
 	charging = false
-	flaps_left = Game.skill_rank("wings")
+	flaps_left = max_flaps()
 	Game.stat_add("wall_runs")
 	wall_normal = n
 	charging = false
@@ -527,10 +592,17 @@ func _state_wall(delta: float) -> void:
 		_leave_wall_edge()
 		return
 	wall_normal = Vector3(n.x, 0, n.z).normalized()
-	if not sprinting:
+	var cling := powers.clings_to_walls()
+	if not sprinting and not cling:
 		_detach(2.5)
 		return
 	var into := wish.dot(-wall_normal)
+	if cling and wish.length() < 0.2:
+		# Crawler legs: hang on the wall
+		velocity = velocity.move_toward(-wall_normal * 1.5, wall_accel * delta)
+		if Input.is_action_just_pressed("jump"):
+			_wall_jump()
+		return
 	if wish.length() < 0.2 or into < -0.4:
 		_detach(5.0)
 		return
@@ -548,7 +620,7 @@ func _state_wall(delta: float) -> void:
 		dir = dir.normalized()
 	if dir.length() > 0.05:
 		wall_dir = dir.normalized()
-	var target := dir * wall_run_speed * speed_mult - wall_normal * wall_stick
+	var target := dir * wall_run_speed * speed_mult * (1.25 if cling else 1.0) - wall_normal * wall_stick
 	velocity = velocity.move_toward(target, wall_accel * delta)
 	conspicuous_timer = maxf(conspicuous_timer, 1.0)
 	if Input.is_action_just_pressed("jump"):
@@ -566,6 +638,8 @@ func _leave_wall_edge() -> void:
 	if velocity.y > 4.0:
 		velocity = Vector3.UP * ledge_vault_up - wall_normal * ledge_vault_forward
 		model.scale = Vector3(0.85, 1.2, 0.85)
+		facing = -wall_normal
+		start_trick("frontflip", 0.45)
 
 
 func _detach(push: float) -> void:
@@ -586,6 +660,7 @@ func _wall_jump() -> void:
 	facing = wall_normal
 	model.scale = Vector3(0.8, 1.25, 0.8)
 	Game.fx.sound("jump", global_position, -5.0)
+	start_trick("backflip", 0.55)
 
 
 # ------------------------------------------------------------------ special movement
@@ -715,7 +790,7 @@ func take_hit(info: Dictionary) -> void:
 	if Game.hud and Game.hud.has_method("flash_damage"):
 		Game.hud.flash_damage(clampf(dmg / 30.0, 0.15, 1.0))
 	var force: Vector3 = info["force"]
-	if force.length() > 9.0 and not powers.is_armored() and state in [State.GROUND, State.AIR, State.GLIDE]:
+	if force.length() > 9.0 and not powers.unstoppable() and state in [State.GROUND, State.AIR, State.GLIDE]:
 		velocity += force * 0.6
 		if state == State.GROUND and force.y > 3.0:
 			state = State.AIR
@@ -851,12 +926,21 @@ func _check_landing() -> void:
 		double_jump_ready = true
 		dash_ready = true
 		air_press = false
-		flaps_left = Game.skill_rank("wings")
+		flaps_left = max_flaps()
+		var stomp_at := heavy_landing_speed
+		if powers.legs in [PlayerPowers.Legs.LEAPER, PlayerPowers.Legs.CRUSHER]:
+			stomp_at = 16.0
+		var moving_on := sprinting and wish.length() > 0.3
+		if impact > 16.0 and moving_on and not was_dive:
+			start_trick("roll", 0.5)
+			Game.fx.debris(global_position + Vector3.DOWN * 0.8, 6, Color(0.5, 0.48, 0.45))
+		elif (was_dive or impact > stomp_at) and not moving_on:
+			_hero_t = 0.55
 		if was_dive:
 			_heavy_landing(maxf(impact, 60.0), true)
-		elif impact > heavy_landing_speed:
-			_heavy_landing(impact, false)
-		elif impact > 8.0:
+		elif impact > stomp_at:
+			_heavy_landing(impact * (1.25 if powers.legs == PlayerPowers.Legs.CRUSHER else 1.0), false)
+		elif impact > 8.0 and trick != "roll":
 			model.scale = Vector3(1.2, 0.8, 1.2)
 
 
@@ -889,17 +973,47 @@ func _heavy_landing(impact: float, dive: bool) -> void:
 
 # ------------------------------------------------------------------ visuals and camera
 
+func start_trick(kind: String, length: float, dir := 1.0) -> void:
+	trick = kind
+	_trick_t = 0.0
+	_trick_len = length
+	_trick_dir = dir
+	if kind in ["frontflip", "backflip", "corkscrew", "sideflip"]:
+		Game.fx.sound("whoosh", global_position, -10.0, 0.25)
+
+
+const POSE_TUCK := {"la": Vector3(1.9, 0, -0.35), "ra": Vector3(1.9, 0, 0.35), "lf": 1.6, "rf": 1.6,
+	"ll": Vector3(1.8, 0, -0.1), "rl": Vector3(1.8, 0, 0.1), "lk": -2.3, "rk": -2.3, "speed": 28.0}
+const POSE_HERO := {"ll": Vector3(1.6, 0, -0.15), "lk": -2.2, "rl": Vector3(-0.35, 0, 0.12), "rk": -2.1,
+	"ra": Vector3(0.5, 0, 0.18), "rf": 0.0, "la": Vector3(-0.6, 0, -0.9), "lf": 0.7, "speed": 30.0}
+const POSE_ROCKET := {"la": Vector3(-0.55, 0, -0.35), "ra": Vector3(-0.55, 0, 0.35), "lf": 0.1, "rf": 0.1,
+	"ll": Vector3(0.15, 0, 0), "rl": Vector3(-0.1, 0, 0), "lk": -0.15, "rk": -0.6}
+const POSE_SKYDIVE := {"la": Vector3(0.5, 0, -1.5), "ra": Vector3(0.5, 0, 1.5), "lf": 0.5, "rf": 0.5,
+	"ll": Vector3(-0.4, 0, -0.18), "rl": Vector3(-0.4, 0, 0.18), "lk": -0.8, "rk": -0.8, "speed": 6.0}
+const POSE_LONGJUMP := {"ll": Vector3(1.1, 0, 0), "lk": -0.4, "rl": Vector3(-0.7, 0, 0), "rk": -1.3,
+	"la": Vector3(-1.0, 0, -0.45), "ra": Vector3(1.1, 0, 0.3), "lf": 0.4, "rf": 0.6}
+const POSE_NINJA := {"la": Vector3(-1.05, 0, -0.3), "ra": Vector3(-1.05, 0, 0.3), "lf": 0.25, "rf": 0.25}
+const POSE_VAULT := {"la": Vector3(0.3, 0, -0.5), "lf": 0.0, "ra": Vector3(-0.4, 0, 1.2), "rf": 0.5,
+	"ll": Vector3(1.3, 0, 0.5), "rl": Vector3(0.9, 0, 0.6), "lk": -1.6, "rk": -1.0, "speed": 24.0}
+
+
 func _update_visual(delta: float) -> void:
+	var real := delta / maxf(Engine.time_scale, 0.05)
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	var hspeed := hv.length()
 	var target_basis: Basis
 	var target_offset := Vector3.ZERO
 	var mode := "idle"
+	var pose := {}
+	var extra := Basis.IDENTITY
 	if state == State.WALL:
 		var up_v := wall_normal if absf(wall_dir.dot(wall_normal)) < 0.95 else Vector3.UP
 		target_basis = Basis.looking_at(wall_dir, up_v)
 		target_offset = wall_normal * 0.45
 		mode = "run"
+		# lean back off the wall a little when running straight up it
+		if wall_dir.y > 0.7:
+			target_basis = target_basis.rotated(target_basis.x, 0.12)
 	else:
 		if face_override_timer > 0.0:
 			facing = face_override
@@ -911,8 +1025,8 @@ func _update_visual(delta: float) -> void:
 				target_basis = target_basis.rotated(target_basis.x, -1.25)
 				mode = "glide"
 			State.DASH:
-				target_basis = target_basis.rotated(target_basis.x, -0.6)
-				mode = "run"
+				target_basis = target_basis.rotated(target_basis.x, -0.6 if is_on_floor() else -1.3)
+				mode = "run" if is_on_floor() else "glide"
 			State.DIVE:
 				target_basis = target_basis.rotated(target_basis.x, -0.4)
 				mode = "crouch"
@@ -921,6 +1035,14 @@ func _update_visual(delta: float) -> void:
 				mode = "air"
 			State.AIR:
 				mode = "air"
+				if _super_done and velocity.y > 6.0:
+					pose = POSE_ROCKET
+				elif velocity.y < -24.0:
+					pose = POSE_SKYDIVE
+					target_basis = target_basis.rotated(target_basis.x, -0.75)
+				elif hspeed > 16.0 and velocity.y > -6.0:
+					pose = POSE_LONGJUMP
+					target_basis = target_basis.rotated(target_basis.x, -0.2)
 			State.LOCKED:
 				mode = lock_mode if lock_mode != "float" else "glide"
 			State.DEAD:
@@ -930,17 +1052,71 @@ func _update_visual(delta: float) -> void:
 			_:
 				if hspeed > walk_speed * 1.3:
 					mode = "run"
-					target_basis = target_basis.rotated(target_basis.x, -0.28)
+					# the faster you go, the harder you lean in
+					var lean := lerpf(0.28, 0.5, clampf((hspeed - 14.0) / 14.0, 0.0, 1.0))
+					target_basis = target_basis.rotated(target_basis.x, -lean)
+					if hspeed > 23.0:
+						pose = POSE_NINJA
 				elif hspeed > 0.8:
 					mode = "walk"
+	# bank into turns
+	var turn := _last_facing.signed_angle_to(facing, Vector3.UP) / maxf(real, 0.001)
+	_last_facing = facing
+	var bank_target := 0.0
+	if state in [State.GROUND, State.GLIDE, State.AIR] and hspeed > 10.0:
+		bank_target = clampf(-turn * 0.09 * clampf(hspeed / 20.0, 0.5, 1.5), -0.55, 0.55)
+	_bank = lerpf(_bank, bank_target, 1.0 - exp(-6.0 * real))
+	# tricks override the pose and add a spin on top of the base orientation
+	if trick != "":
+		_trick_t += real
+		var t := clampf(_trick_t / _trick_len, 0.0, 1.0)
+		var e := t * t * (3.0 - 2.0 * t)
+		match trick:
+			"frontflip":
+				extra = Basis(Vector3.RIGHT, -TAU * e)
+				pose = POSE_TUCK
+			"backflip":
+				extra = Basis(Vector3.RIGHT, TAU * e)
+				pose = POSE_TUCK
+			"corkscrew":
+				extra = Basis(Vector3.UP, TAU * e * _trick_dir) * Basis(Vector3.RIGHT, -TAU * e)
+				pose = POSE_TUCK
+			"sideflip":
+				extra = Basis(Vector3.BACK, TAU * e * _trick_dir)
+				pose = POSE_TUCK
+			"barrel":
+				extra = Basis(Vector3.BACK, TAU * e * _trick_dir)
+				pose = {"la": Vector3(3.0, 0, -0.2), "ra": Vector3(-0.3, 0, 0.3), "lf": 0.0, "rf": 0.3,
+					"ll": Vector3(-0.2, 0, -0.1), "rl": Vector3(-0.2, 0, 0.1), "lk": -0.3, "rk": -0.5}
+			"roll":
+				extra = Basis(Vector3.RIGHT, -TAU * e)
+				target_offset += Vector3.DOWN * 0.45 * sin(PI * t)
+				pose = POSE_TUCK
+			"vault":
+				extra = Basis(Vector3.BACK, 1.15 * sin(PI * t) * _trick_dir)
+				pose = POSE_VAULT
+		if t >= 1.0 or (trick != "roll" and state in [State.WALL, State.DEAD, State.PILOT]):
+			trick = ""
+		elif trick != "roll" and trick != "vault" and is_on_floor() and _trick_t > 0.12:
+			trick = ""
+	if _hero_t > 0.0:
+		_hero_t -= real
+		var ht := clampf(_hero_t / 0.55, 0.0, 1.0)
+		pose = POSE_HERO
+		extra = Basis(Vector3.RIGHT, -0.55 * minf(1.0, ht * 3.0))
+		target_offset += Vector3.DOWN * 0.42 * minf(1.0, ht * 3.0)
+		if hspeed > 6.0 or state != State.GROUND:
+			_hero_t = 0.0
 	var k := 1.0 - exp(-14.0 * delta)
-	var q := visual.basis.get_rotation_quaternion().slerp(target_basis.get_rotation_quaternion(), k)
-	visual.basis = Basis(q)
-	visual.position = visual.position.lerp(target_offset, k)
+	_base_q = _base_q.slerp(target_basis.get_rotation_quaternion(), k)
+	visual.basis = Basis(_base_q) * Basis(Vector3.BACK, _bank) * extra
+	visual.position = visual.position.lerp(target_offset, 1.0 - exp(-20.0 * delta))
 	var scale_target := Vector3.ONE
 	model.scale = model.scale.lerp(scale_target, 1.0 - exp(-10.0 * delta))
 	var anim_speed := hspeed if state != State.WALL else velocity.length()
 	model.wings_visible = Game.has_skill("wings")
+	if not pose.is_empty():
+		model.pose_override = pose
 	model.animate(delta, anim_speed, mode)
 
 
@@ -964,5 +1140,9 @@ func _update_camera(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, lerpf(fov0, fov0 + (max_fov - base_fov), t), 1.0 - exp(-4.0 * delta))
 	trauma = maxf(0.0, trauma - delta * 1.3)
 	var s := trauma * trauma * Settings.camera_shake
+	var roll_target := -_bank * 0.25
+	if state == State.WALL and absf(wall_dir.y) < 0.6:
+		roll_target = clampf(wall_normal.dot(pivot.global_transform.basis.x), -1.0, 1.0) * 0.12
+	camera.rotation.z = lerpf(camera.rotation.z, roll_target, 1.0 - exp(-5.0 * delta))
 	camera.h_offset = randf_range(-1.0, 1.0) * 0.45 * s
 	camera.v_offset = randf_range(-1.0, 1.0) * 0.45 * s

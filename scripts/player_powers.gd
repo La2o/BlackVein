@@ -7,12 +7,18 @@ extends Node
 ## Tether (zip / yank), Focus (slow motion) and Biomass Decoy.
 
 enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
-enum Defense { NONE, SHIELD, ARMOR }
+enum Defense { NONE, SHIELD, ARMOR, WINGS }
+enum Vision { NORMAL, THERMAL, NIGHT, PREDATOR }
+enum Legs { NORMAL, RUNNER, LEAPER, CRAWLER, CRUSHER }
 
 const FORM_NAMES := ["Fists", "Claws", "Hammerfist", "Blade", "Whipfist", "Musclemass", "Bone Spikes"]
-const DEFENSE_NAMES := ["None", "Shield", "Armor"]
+const DEFENSE_NAMES := ["Normal body", "Shield", "Armor", "Wings"]
 const FORM_SKILLS := ["", "claws", "hammer", "blade", "whip", "muscle_form", "spike_form"]
-const DEFENSE_SKILLS := ["", "shield", "armor"]
+const DEFENSE_SKILLS := ["", "shield", "armor", "wings"]
+const VISION_NAMES := ["Normal sight", "Thermal Vision", "Night Vision", "Predator Sense"]
+const VISION_SKILLS := ["", "thermal", "night_vision", "predator_sense"]
+const LEG_NAMES := ["Normal legs", "Runner Legs", "Leaper Legs", "Crawler Legs", "Crusher Legs"]
+const LEG_SKILLS := ["", "runner_legs", "leaper_legs", "crawler_legs", "crusher_legs"]
 const SPECIAL_NAMES := ["Uppercut", "Spike Line", "Ground Slam", "Whirlwind", "Whip Grab", "Thunderclap", "Spike Storm"]
 const FORMS := {
 	Form.FISTS: {"damage": 12.0, "range": 2.4, "arc": 75.0, "interval": 0.3, "combo": 3, "knock": 6.0, "finisher": 16.0, "vehicle": 0.6, "styles": [0, 0, 3], "sound": "punch", "kind": "melee"},
@@ -30,6 +36,11 @@ var player: Player
 var form: int = Form.FISTS
 var defense: int = Defense.NONE
 var thermal_on := false
+var vision: int = Vision.NORMAL
+var legs: int = Legs.NORMAL
+var _crush_timer := 0.0
+var _tint_timer := 0.0
+var _defense_hold := 0.0
 var focus_on := false
 var combo_index := 0
 var combo_reset := 0.0
@@ -75,13 +86,32 @@ func speed_factor() -> float:
 		f *= 0.65
 	if defense == Defense.ARMOR:
 		f *= 0.85
+	match legs:
+		Legs.RUNNER: f *= 1.35
+		Legs.CRUSHER: f *= 0.95
 	if weapon != "":
 		f *= 0.85
 	return f
 
 
 func is_transformed() -> bool:
-	return form != Form.FISTS or defense != Defense.NONE or held != null or weapon != "" or devastating != ""
+	return form != Form.FISTS or defense != Defense.NONE or legs != Legs.NORMAL or held != null or weapon != "" or devastating != ""
+
+
+## multiplies jump strength (leg forms)
+func jump_factor() -> float:
+	match legs:
+		Legs.LEAPER: return 1.5
+		Legs.RUNNER: return 1.1
+	return 1.0
+
+
+func clings_to_walls() -> bool:
+	return legs == Legs.CRAWLER
+
+
+func unstoppable() -> bool:
+	return legs == Legs.CRUSHER or defense == Defense.ARMOR
 
 
 func is_armored() -> bool:
@@ -170,6 +200,14 @@ func defense_unlocked(d: int) -> bool:
 	return d == 0 or Game.has_skill(DEFENSE_SKILLS[d])
 
 
+func vision_unlocked(v: int) -> bool:
+	return v == 0 or Game.has_skill(VISION_SKILLS[v])
+
+
+func legs_unlocked(l: int) -> bool:
+	return l == 0 or Game.has_skill(LEG_SKILLS[l])
+
+
 func _cycle_form(step: int) -> void:
 	var f := form
 	for k in FORM_NAMES.size():
@@ -246,6 +284,9 @@ func _physics_process(delta: float) -> void:
 		_update_devastator(delta)
 		return
 
+	if Game.hud and Game.hud.wheel_open:
+		# picking forms: no attacks or powers fire from the same buttons
+		return
 	var mod := Input.is_action_pressed("devastator_mod")
 	if mod and Input.is_action_just_pressed("dash") and Game.hud:
 		Game.hud.open_wardrobe()
@@ -266,13 +307,24 @@ func _physics_process(delta: float) -> void:
 		_try_consume()
 	if Input.is_action_just_pressed("grab") and not mod:
 		_grab_pressed()
-	if Input.is_action_just_pressed("cycle_defense"):
-		_cycle_defense()
+	# body form button: tap to cycle, hold to open the forms wheel
+	if Input.is_action_pressed("cycle_defense"):
+		_defense_hold += delta / maxf(Engine.time_scale, 0.05)
+		if _defense_hold > 0.28 and Game.hud and not Game.hud.wheel_open:
+			Game.hud.open_wheel()
+	elif _defense_hold > 0.0:
+		if _defense_hold <= 0.28:
+			_cycle_defense()
+		_defense_hold = 0.0
+	if Input.is_action_just_pressed("forms_wheel") and Game.hud and not Game.hud.wheel_open:
+		Game.hud.open_wheel()
 	if Input.is_action_just_pressed("thermal"):
-		if Game.has_skill("thermal"):
-			set_thermal(not thermal_on)
-		else:
-			Game.locked_message("thermal")
+		_cycle_vision()
+	_update_legs(delta)
+	_tint_timer -= delta
+	if _tint_timer <= 0.0 and vision == Vision.PREDATOR:
+		_tint_timer = 0.5
+		refresh_tints()
 	if Input.is_action_just_pressed("focus"):
 		if Game.has_skill("focus"):
 			_set_focus(not focus_on)
@@ -1011,26 +1063,109 @@ func _clear_consume_lines() -> void:
 # ------------------------------------------------------------------ defense, vision, focus, decoy
 
 func _cycle_defense() -> void:
-	if not defense_unlocked(1) and not defense_unlocked(2):
+	var n := DEFENSE_NAMES.size()
+	var any := false
+	for d in range(1, n):
+		any = any or defense_unlocked(d)
+	if not any:
 		Game.locked_message("shield")
 		return
-	for k in 3:
-		defense = (defense + 1) % 3
-		if defense_unlocked(defense):
+	var d := defense
+	for k in n:
+		d = (d + 1) % n
+		if defense_unlocked(d):
 			break
-	player.model.set_defense(defense)
-	Game.say("Defense: " + DEFENSE_NAMES[defense], Color(1, 0.7, 0.5))
+	set_defense(d)
+
+
+func set_defense(d: int, silent := false) -> void:
+	if not defense_unlocked(d):
+		Game.locked_message(DEFENSE_SKILLS[d])
+		return
+	defense = d
+	player.model.set_defense(d)
+	if silent:
+		return
+	Game.say(DEFENSE_NAMES[d], Color(1, 0.7, 0.5))
 	Game.fx.sound("block", player.global_position, -6.0)
+	Game.fx.burst_ring(player.global_position, Color(0.7, 0.2, 0.9, 0.5), 1.6)
 
 
+func _cycle_vision() -> void:
+	var n := VISION_NAMES.size()
+	var any := false
+	for v in range(1, n):
+		any = any or vision_unlocked(v)
+	if not any:
+		Game.locked_message("thermal")
+		return
+	var v := vision
+	for k in n:
+		v = (v + 1) % n
+		if vision_unlocked(v):
+			break
+	set_vision(v)
+
+
+func set_vision(v: int, silent := false) -> void:
+	if not vision_unlocked(v):
+		Game.locked_message(VISION_SKILLS[v])
+		return
+	vision = v
+	thermal_on = v == Vision.THERMAL
+	for nd in get_tree().get_nodes_in_group("warm"):
+		if nd.has_method("set_thermal"):
+			nd.set_thermal(thermal_on)
+	refresh_tints()
+	if Game.hud and Game.hud.has_method("set_vision"):
+		Game.hud.set_vision(v)
+	if not silent:
+		Game.say(VISION_NAMES[v], Color(0.6, 0.85, 1.0))
+		Game.fx.sound_ui("zap")
+
+
+## old name kept for tests and saves
 func set_thermal(on: bool) -> void:
-	thermal_on = on
-	for n in get_tree().get_nodes_in_group("warm"):
-		if n.has_method("set_thermal"):
-			n.set_thermal(on)
-	if Game.hud and Game.hud.has_method("set_thermal"):
-		Game.hud.set_thermal(on)
+	set_vision(Vision.THERMAL if on else Vision.NORMAL, true)
 	Game.fx.sound_ui("zap")
+
+
+## Predator Sense outlines people through walls; everyone else goes back to normal.
+func refresh_tints() -> void:
+	for nd in get_tree().get_nodes_in_group("npcs"):
+		if nd.has_method("refresh_tint"):
+			nd.refresh_tint()
+
+
+func set_legs(l: int, silent := false) -> void:
+	if not legs_unlocked(l):
+		Game.locked_message(LEG_SKILLS[l])
+		return
+	legs = l
+	player.model.set_legs(l)
+	player.apply_upgrades()
+	if silent:
+		return
+	Game.say(LEG_NAMES[l], Color(0.6, 1.0, 0.6))
+	Game.fx.sound("consume", player.global_position, -12.0, 0.3)
+	Game.fx.burst_ring(player.global_position + Vector3.DOWN * 0.7, Color(0.3, 0.9, 0.3, 0.5), 1.6)
+
+
+## Crusher legs: sprinting plows through people and cars.
+func _update_legs(delta: float) -> void:
+	if legs != Legs.CRUSHER:
+		return
+	_crush_timer -= delta
+	var hv := Vector3(player.velocity.x, 0, player.velocity.z)
+	if _crush_timer > 0.0 or hv.length() < 15.0 or player.state != player.State.GROUND:
+		return
+	_crush_timer = 0.15
+	var front := player.global_position + hv.normalized() * 1.3
+	var hits := Game.damage_area(front, 1.8, 30.0 * player.damage_mult, 18.0, player, "impact", Game.MASK_HITTABLE)
+	if hits > 0:
+		player.add_trauma(0.15)
+		Game.fx.debris(front, 4)
+		violence_timer = 2.0
 
 
 func _set_focus(on: bool) -> void:

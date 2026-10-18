@@ -83,8 +83,11 @@ The PCK is embedded, so each build is a single file. Smoke-test the Linux one wi
 
 ## Release checklist
 
-1. Tests pass (0 failed).
+1. Tests pass (0 failed) locally **and on GitHub**. After every push, check the Actions run:
+   `gh run list -R La2o/BlackVein -L 1`, then read its annotations (failed checks are reported there,
+   the raw log host is blocked from the cloud workspace):
+   `gh api repos/La2o/BlackVein/check-runs/<job id>/annotations`. Fix anything that fails.
 2. CHANGELOG.md has a new entry.
-3. Bump `config/version` in project.godot if it's a release.
+3. Bump `config/version` in project.godot if it's a release, and `application/file_version` / `product_version` in export_presets.cfg (the .exe details).
 4. Run the soak test: `godot --headless --path . res://tests/soak.tscn -- seconds=300` — no SCRIPT ERRORs.
 5. Export Windows + Linux, zip the source without `.godot/` and `export/`.

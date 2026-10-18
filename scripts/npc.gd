@@ -43,6 +43,7 @@ var is_ally := false               # branded by the player's Dominate power
 var patrol_points: Array = []      # if set (indoors), wander/patrol only between these spots
 var _brand_mark: MeshInstance3D
 var _ally_teleport_cd := 0.0
+var _ally_far_time := 0.0
 static var _brand_mat: StandardMaterial3D
 var in_base := false
 var _pound_cooldown := 6.0
@@ -128,7 +129,7 @@ func setup(k: String, extra := {}) -> void:
 			var sp := MeshInstance3D.new()
 			sp.mesh = cone
 			sp.material_override = spike_mat
-			sp.position = Vector3((i % 2) * 0.12 - 0.06, 0.55 - i * 0.16, 0.26)
+			sp.position = Vector3((i % 2) * 0.12 - 0.06, 0.66 - i * 0.16, 0.19)
 			sp.rotation.x = 0.9
 			model.torso.add_child(sp)
 			model.all_meshes.append(sp)
@@ -174,46 +175,121 @@ func setup(k: String, extra := {}) -> void:
 		"civilian": state = S.WANDER
 		"military": state = S.PATROL
 		"infected": state = S.WANDER
-	if Game.player and Game.player.powers.thermal_on:
+	refresh_tint()
+
+
+static var _sense_mats := {}
+
+
+## The overlay a person shows when not flashing from a hit: ally brand, Predator Sense
+## outline (seen through walls) or thermal glow.
+func refresh_tint() -> void:
+	if model == null or has_meta("flashing"):
+		return
+	var pw: PlayerPowers = Game.player.powers if Game.player else null
+	var m: Material = null
+	if is_ally:
+		m = _brand_mat
+	elif pw and pw.vision == PlayerPowers.Vision.PREDATOR and is_alive():
+		var col := Color(0.4, 0.8, 1.0, 0.18)
+		if faction == "military":
+			col = Color(1.0, 0.15, 0.1, 0.55)
+		elif faction == "infected":
+			col = Color(1.0, 0.55, 0.05, 0.5)
+		if memory != "" or boss_name != "" or event_tag != "":
+			col = Color(1.0, 0.85, 0.2, 0.7)
+		var key := col.to_html()
+		if not _sense_mats.has(key):
+			var sm := StandardMaterial3D.new()
+			sm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			sm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			sm.no_depth_test = true
+			sm.albedo_color = col
+			sm.render_priority = 10
+			_sense_mats[key] = sm
+		m = _sense_mats[key]
+	model._thermal_on = false
+	model.set_tint(m)
+	if pw and pw.thermal_on and m == null:
 		model.set_thermal(true)
 
 
 func _make_outfit(k: String) -> Dictionary:
-	var skins := [Color(0.85, 0.68, 0.55), Color(0.62, 0.45, 0.33), Color(0.42, 0.29, 0.2), Color(0.95, 0.8, 0.68), Color(0.3, 0.2, 0.14)]
+	var skins := [Color(0.85, 0.68, 0.55), Color(0.62, 0.45, 0.33), Color(0.42, 0.29, 0.2), Color(0.95, 0.8, 0.68),
+		Color(0.3, 0.2, 0.14), Color(0.76, 0.6, 0.47), Color(0.55, 0.38, 0.27)]
 	var skin: Color = skins[randi() % skins.size()]
+	var hair_cols := [Color(0.06, 0.05, 0.04), Color(0.18, 0.11, 0.06), Color(0.32, 0.2, 0.1), Color(0.6, 0.45, 0.25),
+		Color(0.5, 0.18, 0.08), Color(0.55, 0.55, 0.55), Color(0.1, 0.08, 0.07)]
+	var hair_col: Color = hair_cols[randi() % hair_cols.size()]
+	var r := randf()
+	var body := "f" if r < 0.42 else ("h" if r < 0.55 else "m")
+	var hair := _pick(["short", "short", "buzz", "bald", "curly"]) if body != "f" else _pick(["long", "long", "bun", "ponytail", "curly", "short"])
+	var person := {"skin": skin, "body": body, "hair": hair, "hair_color": hair_col,
+		"beard": body != "f" and randf() < 0.3, "glasses": randf() < 0.12}
 	match k:
-		"soldier":
-			return {"shirt": Color(0.3, 0.33, 0.22), "pants": Color(0.25, 0.27, 0.18), "skin": skin, "gear": "helmet", "item": "rifle"}
-		"rocket_soldier":
-			return {"shirt": Color(0.32, 0.32, 0.24), "pants": Color(0.24, 0.25, 0.18), "skin": skin, "gear": "helmet", "item": "launcher"}
+		"soldier", "rocket_soldier":
+			person.merge({"shirt": Color(0.3, 0.33, 0.22), "pants": Color(0.27, 0.29, 0.2), "gear": "helmet",
+				"gear_color": Color(0.24, 0.28, 0.19), "item": "rifle" if k == "soldier" else "launcher",
+				"top": "long", "camo": true, "vest": true, "vest_color": Color(0.2, 0.23, 0.15), "gloves": true,
+				"boots": true, "belt": true, "shoes": Color(0.12, 0.1, 0.08), "body": "f" if randf() < 0.2 else "m",
+				"beard": false, "glasses": false}, true)
+			return person
 		"elite":
-			return {"shirt": Color(0.07, 0.07, 0.08), "pants": Color(0.09, 0.09, 0.1), "skin": skin, "gear": "helmet",
-				"gear_color": Color(0.1, 0.1, 0.11), "item": "rifle", "glow": Color(0.2, 0.6, 1.0)}
+			person.merge({"shirt": Color(0.07, 0.07, 0.08), "pants": Color(0.09, 0.09, 0.1), "gear": "helmet",
+				"gear_color": Color(0.1, 0.1, 0.11), "item": "rifle", "glow": Color(0.2, 0.6, 1.0), "glow_style": "tech",
+				"top": "long", "vest": true, "vest_color": Color(0.13, 0.13, 0.15), "gloves": true, "boots": true,
+				"belt": true, "body": "m", "beard": false, "glasses": false}, true)
+			return person
 		"commander":
-			return {"shirt": Color(0.22, 0.25, 0.17), "pants": Color(0.18, 0.2, 0.14), "skin": skin, "gear": "cap",
-				"gear_color": Color(0.2, 0.22, 0.15), "item": "rifle", "glow": Color(1, 0.8, 0.2)}
+			person.merge({"shirt": Color(0.22, 0.25, 0.17), "pants": Color(0.18, 0.2, 0.14), "gear": "officer",
+				"gear_color": Color(0.2, 0.22, 0.15), "item": "rifle", "glow": Color(1, 0.8, 0.2), "glow_style": "medals",
+				"top": "long", "boots": true, "belt": true, "gloves": true, "body": "m", "hair": "short",
+				"hair_color": Color(0.5, 0.5, 0.5), "glasses": false}, true)
+			return person
 		"scientist":
-			return {"shirt": Color(0.92, 0.92, 0.9), "pants": Color(0.25, 0.27, 0.3), "skin": skin, "gear": "hair",
-				"gear_color": Color(0.5, 0.5, 0.5), "coat": true}
+			var shirts := [Color(0.62, 0.72, 0.85), Color(0.85, 0.85, 0.82), Color(0.55, 0.62, 0.55), Color(0.8, 0.7, 0.75)]
+			person.merge({"shirt": shirts[randi() % shirts.size()], "pants": Color(0.25, 0.27, 0.3), "gear": "none",
+				"top": "long", "coat": true, "coat_color": Color(0.93, 0.94, 0.95), "glasses": randf() < 0.6,
+				"badge": true, "belt": true, "shoes": Color(0.15, 0.1, 0.07)}, true)
+			return person
 		"infected":
 			var rag: Color = Color(randf_range(0.15, 0.35), randf_range(0.12, 0.3), randf_range(0.1, 0.25))
-			return {"shirt": rag, "pants": rag.darkened(0.3), "skin": Color(0.45, 0.48, 0.38), "glow": Color(0.9, 0.12, 0.05)}
+			person.merge({"shirt": rag, "pants": rag.darkened(0.3), "skin": Color(0.45, 0.48, 0.38),
+				"glow": Color(0.9, 0.12, 0.05), "glow_style": "veins", "infected": true, "top": _pick(["tshirt", "long", "tank"]),
+				"glasses": false, "gear": "none"}, true)
+			return person
 		"hunter":
 			return {"shirt": Color(0.3, 0.08, 0.07), "pants": Color(0.22, 0.06, 0.05), "skin": Color(0.35, 0.1, 0.09),
-				"glow": Color(1, 0.15, 0.05), "bulk": 1.5}
+				"glow": Color(1, 0.15, 0.05), "bulk": 1.5, "infected": true, "top": "tank", "veins": true, "hair": "bald", "body": "m"}
 		"leviathan":
 			return {"shirt": Color(0.12, 0.03, 0.03), "pants": Color(0.1, 0.02, 0.02), "skin": Color(0.2, 0.04, 0.04),
-				"glow": Color(1, 0.35, 0.05), "bulk": 1.9}
+				"glow": Color(1, 0.35, 0.05), "bulk": 1.9, "infected": true, "top": "tank", "veins": true, "hair": "bald", "body": "h"}
 		"patient_zero":
 			return {"shirt": Color(0.85, 0.86, 0.88), "pants": Color(0.2, 0.21, 0.24), "skin": Color(0.7, 0.72, 0.75),
-				"gear": "hood", "gear_color": Color(0.9, 0.9, 0.92), "glow": Color(0.2, 0.7, 1.0), "coat": true}
+				"gear": "hood", "gear_color": Color(0.9, 0.9, 0.92), "glow": Color(0.2, 0.7, 1.0), "coat": true,
+				"coat_color": Color(0.88, 0.89, 0.91), "veins": true, "top": "long", "boots": true}
 		_:
 			var shirts := [Color(0.7, 0.2, 0.2), Color(0.2, 0.35, 0.6), Color(0.85, 0.8, 0.7), Color(0.25, 0.25, 0.28),
-				Color(0.55, 0.45, 0.2), Color(0.3, 0.5, 0.35), Color(0.6, 0.3, 0.5), Color(0.9, 0.55, 0.2)]
-			var pants := [Color(0.15, 0.17, 0.25), Color(0.3, 0.28, 0.25), Color(0.1, 0.1, 0.1), Color(0.45, 0.4, 0.32)]
-			var gears := ["hair", "hair", "cap", "none"]
-			return {"shirt": shirts[randi() % shirts.size()], "pants": pants[randi() % pants.size()], "skin": skin,
-				"gear": gears[randi() % gears.size()], "gear_color": Color(randf() * 0.3, randf() * 0.25, randf() * 0.2)}
+				Color(0.55, 0.45, 0.2), Color(0.3, 0.5, 0.35), Color(0.6, 0.3, 0.5), Color(0.9, 0.55, 0.2),
+				Color(0.12, 0.13, 0.16), Color(0.75, 0.75, 0.78), Color(0.35, 0.22, 0.15)]
+			var pants := [Color(0.15, 0.17, 0.25), Color(0.3, 0.28, 0.25), Color(0.1, 0.1, 0.1), Color(0.45, 0.4, 0.32),
+				Color(0.22, 0.3, 0.45), Color(0.5, 0.48, 0.45)]
+			var shoes := [Color(0.08, 0.07, 0.07), Color(0.85, 0.85, 0.85), Color(0.3, 0.18, 0.1), Color(0.15, 0.2, 0.35)]
+			var leg := "pants"
+			if body == "f" and randf() < 0.3:
+				leg = "skirt"
+			elif randf() < 0.15:
+				leg = "shorts"
+			person.merge({"shirt": shirts[randi() % shirts.size()], "pants": pants[randi() % pants.size()],
+				"shoes": shoes[randi() % shoes.size()], "accent": shirts[randi() % shirts.size()],
+				"top": _pick(["tshirt", "tshirt", "long", "jacket", "hoodie", "tank"]), "legwear": leg,
+				"gear": "cap" if randf() < 0.15 else "none", "gear_color": shirts[randi() % shirts.size()],
+				"belt": randf() < 0.3}, true)
+			return person
+
+
+func _pick(options: Array) -> String:
+	return str(options[randi() % options.size()])
 
 
 # ------------------------------------------------------------------ public API
@@ -660,7 +736,9 @@ func _think_ally() -> void:
 	var dist_p := Vector2(me.x - ppos.x, me.z - ppos.z).length()
 	# can't follow up walls: catch up when the player is far away
 	_ally_teleport_cd -= 0.3
-	if dist_p > 85.0 and _ally_teleport_cd <= 0.0 and not p.is_dead():
+	_ally_far_time = _ally_far_time + 0.3 if dist_p > 30.0 else 0.0
+	if (dist_p > 85.0 or _ally_far_time > 4.0) and _ally_teleport_cd <= 0.0 and not p.is_dead():
+		_ally_far_time = 0.0
 		_ally_teleport_cd = 4.0
 		var spot: Vector3 = Game.interiors.random_floor_point() if Game.interiors and Game.interiors.is_inside() \
 			else Game.city.random_sidewalk_point(ppos, 10.0, 22.0)
@@ -891,7 +969,8 @@ func _act(delta: float) -> void:
 			goal.y = global_position.y
 			var d := Vector2(goal.x - global_position.x, goal.z - global_position.z).length()
 			if d > 3.0:
-				_go(goal, run_speed if d > 10.0 else walk_speed * 1.6, delta)
+				# branded allies sprint hard to keep up with you
+				_go(goal, run_speed * (1.7 if d > 20.0 else 1.0) if d > 10.0 else walk_speed * 1.6, delta)
 			else:
 				_stop(delta)
 
@@ -1252,7 +1331,4 @@ func _animate(delta: float) -> void:
 		set_meta("flashing", true)
 	elif has_meta("flashing"):
 		remove_meta("flashing")
-		model.set_tint(_brand_mat if is_ally else null)
-		model._thermal_on = false
-		if Game.player and Game.player.powers.thermal_on:
-			model.set_thermal(true)
+		refresh_tint()

@@ -56,6 +56,10 @@ A quick guide to your first hour.
   allies follow you and fight. Branded soldiers with rocket launchers are great against tanks.
 - Grab a car (E / RB) and throw it at a tank. Musclemass throws harder.
 - Tether (C / LT) at a helicopter to latch on and hijack it.
-- Thermal vision helps at night and in fog.
+- Thermal vision helps in fog, Night Vision at night, and Predator Sense shows every soldier
+  through walls.
+- **The forms wheel** (hold Alt / X / D-pad up) slows time and lets you set every body part:
+  head (vision), arms (combat), body (shield, armor, wings) and legs (Runner, Leaper, Crawler, Crusher).
+  Try Crawler legs for climbing and Wings for crossing the city.
 - The Biomass Decoy draws every gun in the area — great for slipping away.
 - Settings has mouse sensitivity, field of view, key rebinding, crowd density and graphics quality.

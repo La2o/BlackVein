@@ -225,6 +225,95 @@ func _run_all() -> void:
 	await _shot("04_glide")
 	_release_all()
 
+	# ---------------- acrobatics
+	await _teleport(Game.city.spawn_point + Vector3(0, 30, 0))
+	await _tap("jump")
+	await _wait(0.1)
+	await _tap("jump")
+	check("double jump does a flip", player.trick in ["frontflip", "corkscrew", "sideflip"], player.trick)
+	_release_all()
+	await _teleport(Game.city.spawn_point + Vector3(0, 45, 0))
+	var saw_hero := false
+	for i in 240:
+		await get_tree().physics_frame
+		if player._hero_t > 0.0:
+			saw_hero = true
+			break
+	check("big landing strikes a superhero pose", saw_hero)
+	await _wait(0.8)
+
+	# ---------------- body-part forms
+	var pw := player.powers
+	pw.set_legs(PlayerPowers.Legs.RUNNER)
+	check("runner legs sprint faster", pw.speed_factor() > 1.3 and not player.model._leg_parts.is_empty())
+	await _teleport(Game.city.spawn_point)
+	await _wait(0.4)
+	var peaks := []
+	for l in [PlayerPowers.Legs.NORMAL, PlayerPowers.Legs.LEAPER]:
+		pw.set_legs(l)
+		await _wait(0.3)
+		var jy0 := player.global_position.y
+		await _tap("jump")
+		var peak := jy0
+		for i in 120:
+			await get_tree().physics_frame
+			peak = maxf(peak, player.global_position.y)
+		peaks.append(peak - jy0)
+		await _wait(0.6)
+	check("leaper legs jump much higher", peaks[1] > peaks[0] * 1.6, "%.1f m vs %.1f m" % [peaks[1], peaks[0]])
+	pw.set_legs(PlayerPowers.Legs.CRAWLER)
+	await _teleport(start, -PI * 0.5)
+	await _wait(0.3)
+	Input.action_press("move_forward")
+	await _wait(1.2)
+	Input.action_release("move_forward")
+	var on_wall := player.state == Player.State.WALL
+	await _wait(1.0)
+	check("crawler legs climb without sprinting and cling", on_wall and player.state == Player.State.WALL,
+		"state %s" % Player.STATE_NAMES[player.state])
+	_release_all()
+	pw.set_legs(PlayerPowers.Legs.CRUSHER)
+	check("crusher legs can't be knocked back", pw.unstoppable())
+	pw.set_legs(PlayerPowers.Legs.NORMAL)
+	pw.set_defense(PlayerPowers.Defense.WINGS)
+	await _teleport(Game.city.spawn_point + Vector3(0, 70, 0))
+	await _tap("jump")
+	Input.action_press("jump")
+	Input.action_press("move_forward")
+	await _wait(2.0)
+	var gspeed := Vector2(player.velocity.x, player.velocity.z).length()
+	check("wings body form glides fast", player.state == Player.State.GLIDE and gspeed > player.glide_speed * 1.2,
+		"%.1f m/s" % gspeed)
+	check("wings are on your back", player.model._wing_pivots.size() == 2 and player.model._wing_pivots[0].visible)
+	await _shot("04b_wings")
+	_release_all()
+	pw.set_defense(PlayerPowers.Defense.NONE)
+	await _wait(3.0)
+	await _clear_units()
+	await _teleport(Game.city.spawn_point)
+	var watcher: Node3D = Game.military.spawn_npc("soldier", player.global_position + Vector3(0, 0, -6))
+	await _wait(0.2)
+	pw.set_vision(PlayerPowers.Vision.PREDATOR)
+	var over := watcher.model.torso.material_overlay as StandardMaterial3D
+	check("predator sense shows soldiers through walls", over != null and over.no_depth_test)
+	pw.set_vision(PlayerPowers.Vision.NIGHT)
+	check("night vision", Game.hud._night_target == 1.0 and watcher.model.torso.material_overlay == null)
+	pw.set_vision(PlayerPowers.Vision.NORMAL)
+	await _clear_units()
+
+	# ---------------- forms wheel
+	Game.hud.open_wheel()
+	await get_tree().process_frame
+	check("forms wheel opens in slow motion", Game.hud.wheel_open and Engine.time_scale < 0.2, "time %.2f" % Engine.time_scale)
+	var wh: Control = Game.hud.wheel
+	for i in wh.entries.size():
+		if wh.entries[i]["part"] == "legs" and wh.entries[i]["index"] == PlayerPowers.Legs.LEAPER:
+			wh.hovered = i
+	wh.close_wheel(true)
+	await get_tree().process_frame
+	check("forms wheel switches forms", pw.legs == PlayerPowers.Legs.LEAPER and not Game.hud.wheel_open and Engine.time_scale > 0.9)
+	pw.set_legs(PlayerPowers.Legs.NORMAL)
+
 	# ---------------- heavy landing shoves cars
 	await _clear_units()
 	var car: Node3D = Game.nearest_in_group("cars", Game.city.spawn_point, 60.0)

@@ -5,16 +5,26 @@ extends CanvasLayer
 
 const SCREEN_FX := preload("res://shaders/screen_fx.gdshader")
 const SPEED_LINES := preload("res://shaders/speed_lines.gdshader")
+const FORMS_WHEEL := preload("res://scripts/forms_wheel.gd")
 
 const KEYS := {
 	"attack": ["LMB", "X"], "special": ["RMB", "Y"], "grab": ["E", "RB"], "consume": ["F", "LB"],
 	"jump": ["Space", "A"], "dash": ["Q", "B"], "tether": ["C", "LT"], "focus": ["Z", "L3"],
 	"thermal": ["V", "R3"], "decoy": ["B", "D-pad Down"], "defense": ["X", "D-pad Up"],
+	"wheel": ["Alt / hold X", "Hold D-pad Up"],
 	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-7 / Wheel", "D-pad L/R"],
 	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"], "wardrobe": ["I", "LB+B"],
 }
 
 var player: Node
+var wheel: Control
+var wheel_open: bool:
+	get:
+		return wheel != null and wheel.open
+var _night := 0.0
+var _night_target := 0.0
+var _sense := 0.0
+var _sense_target := 0.0
 var using_pad := false
 
 var root: Control
@@ -97,6 +107,9 @@ func _ready() -> void:
 	_build_extras()
 	_build_achievements()
 	_build_wardrobe()
+	wheel = Control.new()
+	wheel.set_script(FORMS_WHEEL)
+	add_child(wheel)
 	Game.notify.connect(_on_notify)
 	Game.event_feed.connect(_on_feed)
 	Game.alert_changed.connect(_on_alert_changed)
@@ -624,12 +637,13 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.6[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.7[/color][/b]
 
-[b]Disguise wardrobe[/b] (I / hold LB + B) — switch between every identity you've consumed.
-[b]Buildings you can enter[/b] — research labs, the military bunker, a subway nest and your
-own safehouse. Look for the glowing doors (squares on the minimap).
-[b]Menus work with a controller[/b] — D-pad to move, A to select, B to go back.
+[b]Forms wheel[/b] (hold Alt or X / hold D-pad Up) — time slows and you pick a form for every
+body part: [b]head[/b] (Thermal, Night Vision, Predator Sense), [b]arms[/b], [b]body[/b] (Shield, Armor,
+[b]Wings[/b]) and [b]legs[/b] (Runner, Leaper, Crawler, Crusher). Unlock them in Skills.
+[b]Parkour[/b] — flips, wall backflips, landing rolls, superhero landings, vaults over cars.
+[b]New 3D people[/b] — faces, hands, real outfits, bending elbows and knees.
 
 Full list: CHANGELOG.md"""
 
@@ -1017,6 +1031,19 @@ func set_thermal(on: bool) -> void:
 	_thermal_target = 1.0 if on else 0.0
 
 
+## head forms: 0 normal, 1 thermal, 2 night vision, 3 predator sense
+func set_vision(v: int) -> void:
+	_thermal_target = 1.0 if v == 1 else 0.0
+	_night_target = 1.0 if v == 2 else 0.0
+	_sense_target = 1.0 if v == 3 else 0.0
+
+
+func open_wheel() -> void:
+	if _any_menu_open() or get_tree().paused:
+		return
+	wheel.open_wheel()
+
+
 func set_focus(on: bool) -> void:
 	_focus_target = 1.0 if on else 0.0
 
@@ -1159,8 +1186,16 @@ func _update_powers_text() -> void:
 			forms_owned += 1
 	if forms_owned > 1:
 		parts.append("%s forms" % _k("forms"))
-	if pw.defense_unlocked(1) or pw.defense_unlocked(2):
-		parts.append("%s defense: %s" % [_k("defense"), pw.DEFENSE_NAMES[pw.defense]])
+	parts.append("%s forms wheel" % _k("wheel"))
+	var loadout: Array[String] = []
+	if pw.vision != 0:
+		loadout.append(pw.VISION_NAMES[pw.vision])
+	if pw.defense != 0:
+		loadout.append(pw.DEFENSE_NAMES[pw.defense])
+	if pw.legs != 0:
+		loadout.append(pw.LEG_NAMES[pw.legs])
+	if not loadout.is_empty():
+		parts.append("[%s]" % " · ".join(loadout))
 	parts.append("%s grab   %s consume   %s disguises" % [_k("grab"), _k("consume"), _k("wardrobe")])
 	var line2: Array[String] = []
 	if Game.has_skill("tether"):
@@ -1169,8 +1204,8 @@ func _update_powers_text() -> void:
 		line2.append("%s focus%s" % [_k("focus"), " ON" if pw.focus_on else ""])
 	if Game.has_skill("decoy"):
 		line2.append("%s decoy%s" % [_k("decoy"), "" if pw.decoy_cooldown <= 0.0 else " %ds" % int(ceil(pw.decoy_cooldown))])
-	if Game.has_skill("thermal"):
-		line2.append("%s thermal%s" % [_k("thermal"), " ON" if pw.thermal_on else ""])
+	if Game.has_skill("thermal") or Game.has_skill("night_vision"):
+		line2.append("%s vision" % _k("thermal"))
 	if Game.has_skill("groundspike"):
 		line2.append("%s spikes" % _k("spikes"))
 	if Game.has_skill("tendrils"):
@@ -1235,13 +1270,18 @@ func _update_screen_fx(delta: float) -> void:
 	_damage = maxf(0.0, _damage - delta * 1.5)
 	_thermal = move_toward(_thermal, _thermal_target, delta * 4.0)
 	_focus = move_toward(_focus, _focus_target, delta * 4.0)
+	_night = move_toward(_night, _night_target, delta * 4.0)
+	_sense = move_toward(_sense, _sense_target, delta * 4.0)
 	var low := clampf(1.0 - player.health / maxf(player.max_health, 1.0) / 0.3, 0.0, 1.0)
 	var m := screen_fx.material as ShaderMaterial
 	m.set_shader_parameter("thermal", _thermal)
 	m.set_shader_parameter("damage", _damage)
 	m.set_shader_parameter("low_health", low if not player.is_dead() else 0.0)
 	m.set_shader_parameter("focus", _focus)
-	screen_fx.visible = _thermal > 0.0 or _damage > 0.0 or low > 0.0 or _focus > 0.0
+	m.set_shader_parameter("night", _night)
+	m.set_shader_parameter("sense", _sense)
+	m.set_shader_parameter("wheel", 1.0 if wheel_open else 0.0)
+	screen_fx.visible = _thermal > 0.0 or _damage > 0.0 or low > 0.0 or _focus > 0.0 or _night > 0.0 or _sense > 0.0 or wheel_open
 	var spd: float = player.velocity.length()
 	var sm := speed_lines.material as ShaderMaterial
 	sm.set_shader_parameter("intensity", clampf((spd - 22.0) / 25.0, 0.0, 1.0))

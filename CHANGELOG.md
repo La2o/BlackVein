@@ -2,6 +2,45 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.7.0] — 2026-10-18 — Body-part forms, parkour, 3D people
+
+### New
+- **Forms wheel** (hold Alt or X / hold D-pad Up): time slows to a crawl and a radial menu shows
+  every form for every body part. Point with the mouse or a stick, release to switch.
+- **Body-part forms** — mix and match:
+  - **Head:** Thermal Vision, **Night Vision** (new), **Predator Sense** (new: soldiers, infected
+    and targets glow through walls). V / R3 cycles them.
+  - **Arms:** the 7 combat forms.
+  - **Body:** Shield, Armor and **Wings** (new: flesh-and-bone wings on your back; glide much
+    faster, flap higher, 3 extra flaps). X / D-pad Up cycles them.
+  - **Legs (new):** **Runner** (35% faster sprint, longer running jumps), **Leaper** (huge jumps,
+    hard landings become stomps), **Crawler** (climb walls without sprinting, hang on walls, run
+    along buildings as long as you like), **Crusher** (sprint through people and cars, can't be
+    knocked back, stronger landings). Each shows on your legs.
+  - New skills: Night Vision, Predator Sense, Runner / Leaper / Crawler / Crusher Legs.
+- **Prototype-style parkour animations:** front flips and corkscrews on double jumps, side flips,
+  backflips off walls, a flip over the ledge when you reach a roof, barrel-roll air dashes,
+  forward rolls when you land while sprinting, superhero landings (knee and fist down) after big
+  drops, automatic vaults over cars, benches and low walls, a deep lean and "ninja run" with arms
+  swept back at top speed, a rocket pose on super jumps, a skydive pose when falling fast,
+  banking into turns, and the camera tilts with you.
+- **Sculpted 3D people** replace the capsule figures: shaped bodies (three builds), faces with eyes,
+  brows, nose, lips and ears, hands with fingers, bending elbows and knees, and real outfits —
+  soldiers with camo, vests, pouches, gloves, boots and modelled rifles; scientists in lab coats
+  with glasses and ID badges; civilians with t-shirts, hoodies, jackets, skirts, shorts, caps,
+  beards and many hairstyles; infected with blotchy skin and glowing eyes. One shared material keeps
+  crowds fast.
+
+### Changed
+- **One disguise per type** in the wardrobe: once you have a civilian (or a soldier, scientist...),
+  more of the same aren't added. Old saves are cleaned up. "Thousand Faces" now means all 6 kinds.
+- Allies sprint to catch up and rejoin you if they're stuck far behind for a few seconds.
+- The GitHub test run now reports each failed check, and its log is kept with the run.
+
+### Fixed
+- Entering a building could throw you back to the street a second later (the "fell out of the
+  world" safety didn't know about interiors). People thrown around indoors no longer vanish.
+
 ## [0.6.0] — 2026-10-18 — Disguises and buildings you can enter
 
 ### New

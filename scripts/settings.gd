@@ -26,7 +26,8 @@ const REBINDABLE := [
 	["move_forward", "Move forward"], ["move_back", "Move back"], ["move_left", "Move left"], ["move_right", "Move right"],
 	["sprint", "Sprint"], ["jump", "Jump / glide"], ["dash", "Dash"], ["attack", "Attack"], ["special", "Special move"],
 	["grab", "Grab / throw / hijack"], ["consume", "Consume"], ["tether", "Tether"], ["focus", "Focus"],
-	["thermal", "Thermal vision"], ["decoy", "Decoy"], ["cycle_defense", "Shield / armor"],
+	["thermal", "Cycle head form (vision)"], ["decoy", "Decoy"], ["cycle_defense", "Cycle body form (hold: forms wheel)"],
+	["forms_wheel", "Forms wheel"],
 	["devastator_spikes", "Groundspike"], ["devastator_tendrils", "Tendril Barrage"], ["artillery", "Artillery"],
 	["evolve_menu", "Skills menu"], ["map", "Map"], ["disguise_menu", "Disguise wardrobe"],
 ]
