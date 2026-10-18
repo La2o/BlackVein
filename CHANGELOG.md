@@ -2,7 +2,7 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
-## [Unreleased]
+## [0.13.0] — 2026-10-19 — Ragdolls, new enemies, Bio-Bomb and time trials
 
 ### New
 - **Ragdolls**: people and soldiers go limp when they die. Their bodies tumble, fold over cars and
@@ -22,6 +22,7 @@ All notable changes to BLACKVEIN. Newest first.
 
 ### Fixed
 - A killing blow that also launched someone skipped their death entirely (no ragdoll, no death events).
+- Soldiers left on rooftops could be removed as "stranded" even when they belonged there (snipers).
 
  — 2026-10-19 — Creature forms, a stealth meter and collectibles
 

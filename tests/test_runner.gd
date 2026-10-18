@@ -558,12 +558,14 @@ func _run_all() -> void:
 	await _wait(0.2)
 	await _tap("grab")
 	await _wait(0.2)
+	for b in bystanders:
+		b.set_physics_process(false)   # keep them standing in a group
 	await _tap("decoy")
 	check("decoy while holding someone plants a bio-bomb", is_instance_valid(bomb) and bomb.bio_bomb_timer > 0.0)
 	player.powers.drop_held()   # drop them among the soldiers
 	await get_tree().physics_frame
-	bomb.velocity = Vector3.ZERO
-	bomb.global_position = bystanders[1].global_position + Vector3(0, 0.5, 1.0)
+	bomb.global_position = bystanders[1].global_position + Vector3(0, 1.5, 1.0)
+	bomb.on_thrown(Vector3(0, -6, 0), player)   # as if thrown at them: bursts on impact
 	var bomb_at: Vector3 = bomb.global_position
 	while is_instance_valid(bomb):
 		bomb_at = bomb.global_position

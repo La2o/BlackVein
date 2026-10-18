@@ -527,9 +527,6 @@ func _tick_bio_bomb(delta: float) -> void:
 		_bomb_light.light_energy = (1.0 + 4.0 * k) * (0.6 + 0.4 * sin(Time.get_ticks_msec() * 0.001 * (8.0 + 22.0 * k)))
 	if model:
 		model.scale = Vector3.ONE * scale_factor * (1.0 + 0.18 * k)
-	# thrown bombs burst on impact
-	if state == S.LAUNCHED and _airborne_time > 0.12 and get_slide_collision_count() > 0:
-		bio_bomb_timer = 0.0
 	if bio_bomb_timer > 0.0:
 		return
 	bio_bomb_timer = -1.0
@@ -663,7 +660,7 @@ var _roof_time := 0.0
 ## People who end up stranded on a rooftop (thrown, blasted, knocked off a
 ## building edge) get cleaned up once you're not around to see it.
 func _check_stranded(delta: float) -> void:
-	if global_position.y < 3.0 or global_position.y < -50.0 or is_ally or kind in ["hunter", "leviathan", "patient_zero"] \
+	if global_position.y < 3.0 or global_position.y < -50.0 or is_ally or kind in ["hunter", "leviathan", "patient_zero", "sniper"] \
 			or event_tag != "" or not is_on_floor():
 		_roof_time = 0.0
 		return
@@ -779,6 +776,8 @@ func _launched_physics(delta: float) -> void:
 				Game.fx.splat(global_position, n, Color(0.5, 0.02, 0.02), 10)
 				velocity = velocity.bounce(n) * 0.3
 				break
+	if bio_bomb_timer > 0.0 and _airborne_time > 0.1 and get_slide_collision_count() > 0:
+		bio_bomb_timer = 0.001   # thrown bio-bombs burst on impact
 	if is_on_floor() and _airborne_time > 0.1:
 		var impact := -pre.y
 		if state == S.LEAP:
@@ -1104,6 +1103,14 @@ func _act(delta: float) -> void:
 
 
 func _go(goal: Vector3, speed: float, delta: float) -> void:
+	if kind == "sniper" and not is_ally:
+		# snipers hold their rooftop and just turn to watch
+		var look := goal - global_position
+		look.y = 0.0
+		if look.length() > 0.5:
+			_face_dir = _face_dir.slerp(look.normalized(), clampf(delta * 3.0, 0.0, 1.0)).normalized()
+		_stop(delta)
+		return
 	_repath_timer -= delta
 	if _path_target == Vector3.INF or _path_target.distance_to(goal) > 3.0 or _repath_timer <= 0.0:
 		_path = Game.city.nav_path(global_position, goal)
