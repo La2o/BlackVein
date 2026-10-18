@@ -104,7 +104,7 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
   - **Head:** Thermal Vision, Night Vision, Predator Sense (see enemies through walls).
   - **Arms:** Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass, Bone Spikes — each with its own
     combo and special move.
-  - **Body:** Shield, Armor, Wings.
+  - **Body:** Shield, Armor, Wings, Light Body (faster running and jumping, takes more damage).
   - **Legs:** Runner (speed), Leaper (huge jumps), Crawler (cling to walls), Crusher (unstoppable).
 - **Prototype-style parkour:** flips, wall backflips, ledge flips, barrel-roll air dashes, landing
   rolls, superhero landings, vaults over cars, a leaning "ninja run" at top speed.
@@ -163,7 +163,7 @@ then prints PASS/FAIL for each check. GitHub runs it automatically on every push
 ## Making a build yourself
 
 In Godot: **Project → Export**, pick *Windows Desktop* or *Linux*, then **Export Project**
-(the first time, Godot offers to download its export templates). Or push a tag like `v0.7.1`
+(the first time, Godot offers to download its export templates). Or push a tag like `v0.8.0`
 to GitHub and the release workflow builds both, attaching them to a release whose notes come
 from CHANGELOG.md. To rebuild an older version, run **Release builds** from the Actions tab and
 enter its tag.

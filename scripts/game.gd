@@ -128,6 +128,7 @@ const SKILLS := {
 	"runner_legs": ["Runner Legs", "Leg form: much faster sprinting and longer running jumps", "Movement", 2, 4, 1, ""],
 	"leaper_legs": ["Leaper Legs", "Leg form: huge jumps, and every hard landing becomes a stomp", "Movement", 2, 6, 1, ""],
 	"crawler_legs": ["Crawler Legs", "Leg form: cling to walls without sprinting, run along buildings as long as you like", "Movement", 2, 8, 1, ""],
+	"light_body": ["Light Body", "Body form: a lean, stripped-down body built for running. 25% faster sprint and wall runs, higher jumps, sharper air control, but you take 30% more damage", "Movement", 2, 5, 1, ""],
 	"crusher_legs": ["Crusher Legs", "Leg form: sprint through people and cars, can't be knocked back, brutal landings", "Movement", 2, 10, 1, ""],
 	"agility": ["Agility", "+10% sprint and wall-run speed per rank", "Movement", 1, 1, 5, ""],
 	"leap": ["Leap", "Higher super jumps and longer glides per rank", "Movement", 1, 1, 5, ""],

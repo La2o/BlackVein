@@ -17,6 +17,7 @@ const KEYS := {
 }
 
 var player: Node
+var whats_new_panel: Control = null   # the "what's new" popup while it is showing
 var wheel: Control
 var wheel_open: bool:
 	get:
@@ -637,9 +638,12 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.7.1[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.8[/color][/b]
 
-[b]Seamless vaults[/b] — sprint at a car or low wall and you flow over it at full speed.
+[b]Light Body[/b] — a new body form for runners: faster sprints and wall runs, higher jumps
+(but you take more damage). Unlock it in Skills.
+[b]Seamless running[/b] — vault cars and low walls at full speed, curbs no longer stop you,
+and a charge-up animation when you hold jump.
 [b]Brighter nights[/b] — more moonlight, easier to see the streets.
 
 [b][color=#ff5544]0.7[/color][/b]
@@ -676,9 +680,23 @@ func _maybe_show_whats_new() -> void:
 	rt.add_theme_font_size_override("normal_font_size", 16)
 	rt.text = WHATS_NEW
 	v.add_child(rt)
-	var ok := _menu_button("Let's go", func(): panel.queue_free())
+	var ok := _menu_button("Let's go", close_whats_new)
 	v.add_child(ok)
-	get_tree().create_timer(14.0).timeout.connect(panel.queue_free)
+	# a real popup: the game waits, the mouse is free to click and the button has keyboard/pad focus
+	whats_new_panel = panel
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	ok.grab_focus.call_deferred()
+
+
+func close_whats_new() -> void:
+	if whats_new_panel == null:
+		return
+	if is_instance_valid(whats_new_panel):
+		whats_new_panel.queue_free()
+	whats_new_panel = null
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _build_wardrobe() -> void:
@@ -979,6 +997,12 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Esc / B / jump also close the "what's new" popup (Enter, Space and A press its button)
+	if whats_new_panel and (event.is_action_pressed("pause") or event.is_action_pressed("ui_cancel")
+			or event.is_action_pressed("jump")):
+		close_whats_new()
+		get_viewport().set_input_as_handled()
+		return
 	# B / Esc backs out of whatever menu is open
 	if event.is_action_pressed("ui_cancel") and not event is InputEventKey and _any_menu_open():
 		_back_out()

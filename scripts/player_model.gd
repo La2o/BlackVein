@@ -3,7 +3,7 @@ extends "res://scripts/humanoid.gd"
 ## body forms (shield, armor, wings) and leg forms.
 
 enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
-enum Defense { NONE, SHIELD, ARMOR, WINGS }
+enum Defense { NONE, SHIELD, ARMOR, WINGS, LIGHT }   # same order as PlayerPowers.Defense
 enum Legs { NORMAL, RUNNER, LEAPER, CRAWLER, CRUSHER }
 
 const FLESH := Color(0.42, 0.04, 0.05)
@@ -164,6 +164,13 @@ func _apply_defense() -> void:
 			for sh in [shin_l, shin_r]:
 				_add(_defense_parts, sh, capsule(0.085, 0.34), rock, Vector3(0, -0.14, 0))
 			_add(_defense_parts, self, box(Vector3(0.04, 0.4, 0.02)), glow, Vector3(0, 0.25, -0.22))
+		Defense.LIGHT:
+			# a lean runner's body: glowing sinew lines down every limb and two swept-back fins
+			for limb in [arm_l, arm_r, forearm_l, forearm_r, leg_l, leg_r, shin_l, shin_r]:
+				_add(_defense_parts, limb, box(Vector3(0.022, 0.3, 0.022)), glow, Vector3(0, -0.14, -0.075))
+			for side in [-1.0, 1.0]:
+				_add(_defense_parts, self, box(Vector3(0.025, 0.36, 0.14)), rock, Vector3(side * 0.12, 0.3, 0.17),
+					Vector3(0.55, 0, side * 0.3))
 
 
 ## Flesh-and-bone wings on the back, built once per outfit.

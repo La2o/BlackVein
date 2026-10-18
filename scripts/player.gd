@@ -131,6 +131,8 @@ var _base_q := Quaternion.IDENTITY
 var _bank := 0.0
 var _last_facing := Vector3.FORWARD
 var _vault_cd := 0.0
+var _charge_fx_t := 0.0
+var coiling := false   # showing the charge-jump coil this frame
 var _vault_t := 0.0       # time left in the current vault arc (plus a little landing grace)
 var _vault_speed := 0.0   # running speed the vault keeps
 const VAULT_MAX_HEIGHT := 1.8
@@ -291,6 +293,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	velocity /= comp
 	_push_props()
+	if state == State.GROUND:
+		_step_up(delta)
 	if _vault_t > 0.0:
 		_vault_assist(delta)
 	_check_landing()
@@ -406,6 +410,37 @@ func _try_vault(delta: float) -> bool:
 	return true
 
 
+## Curbs and other low steps: the capsule meets their edge at a wall-like angle and would stop
+## dead, so when running is blocked by something no taller than STEP_HEIGHT, step up onto it.
+const STEP_HEIGHT := 0.45
+
+func _step_up(delta: float) -> void:
+	if not is_on_wall():
+		return
+	var hv := Vector3(pre_move_velocity.x, 0, pre_move_velocity.z)
+	if hv.length() < 1.0:
+		return
+	var move := hv * delta
+	if move.length() < 0.05:
+		move = hv.normalized() * 0.05
+	var up := Vector3.UP * STEP_HEIGHT
+	var t := global_transform
+	if test_move(t, up):
+		return   # something overhead
+	t.origin += up
+	if test_move(t, move):
+		return   # still blocked when lifted: a real wall
+	t.origin += move
+	var hit := KinematicCollision3D.new()
+	if not test_move(t, -up - Vector3.UP * 0.05, hit):
+		return   # nothing to stand on (a ledge, not a step)
+	if hit.get_normal().y < 0.7:
+		return
+	global_position = t.origin + hit.get_travel()
+	velocity.x = hv.x
+	velocity.z = hv.z
+
+
 ## Keeps a vault flowing: if the arc clips the obstacle's edge, slide up over it at full
 ## speed instead of stopping against it.
 func _vault_assist(delta: float) -> void:
@@ -461,6 +496,14 @@ func _jump_boost(delta: float) -> void:
 	velocity.y += jump_boost_accel * jump_mult * powers.jump_factor() * delta
 	charging = true
 	charge = clampf(boost_held / jump_boost_time, 0.0, 1.0)
+	# energy gathering into the body while the jump charges
+	_charge_fx_t -= delta
+	if _charge_fx_t <= 0.0 and not _super_done:
+		_charge_fx_t = 0.045
+		var a := randf() * TAU
+		var r := lerpf(1.6, 0.9, charge)
+		var from := global_position + Vector3(cos(a) * r, randf_range(-0.9, 0.6), sin(a) * r)
+		Game.fx.tendril_flash(from, global_position + Vector3.DOWN * 0.2, 0.1, lerpf(0.03, 0.07, charge))
 	if not _super_done and boost_held > jump_boost_time * 0.6:
 		_super_done = true
 		Game.stat_add("super_jumps")
@@ -490,7 +533,7 @@ func _air_steer(delta: float) -> void:
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	if wish.length() > 0.1:
 		var keep := maxf(hv.length(), walk_speed * 1.2)
-		hv = hv.move_toward(wish * keep, air_accel * delta)
+		hv = hv.move_toward(wish * keep, air_accel * (1.6 if powers.is_light() else 1.0) * delta)
 		velocity.x = hv.x
 		velocity.z = hv.z
 
@@ -674,7 +717,8 @@ func _state_wall(delta: float) -> void:
 		dir = dir.normalized()
 	if dir.length() > 0.05:
 		wall_dir = dir.normalized()
-	var target := dir * wall_run_speed * speed_mult * (1.25 if cling else 1.0) - wall_normal * wall_stick
+	var light := PlayerPowers.LIGHT_SPEED if powers.is_light() else 1.0
+	var target := dir * wall_run_speed * speed_mult * light * (1.25 if cling else 1.0) - wall_normal * wall_stick
 	velocity = velocity.move_toward(target, wall_accel * delta)
 	conspicuous_timer = maxf(conspicuous_timer, 1.0)
 	if Input.is_action_just_pressed("jump"):
@@ -1044,6 +1088,9 @@ const POSE_TUCK := {"la": Vector3(1.9, 0, -0.35), "ra": Vector3(1.9, 0, 0.35), "
 	"ll": Vector3(1.8, 0, -0.1), "rl": Vector3(1.8, 0, 0.1), "lk": -2.3, "rk": -2.3, "speed": 28.0}
 const POSE_HERO := {"ll": Vector3(1.6, 0, -0.15), "lk": -2.2, "rl": Vector3(-0.35, 0, 0.12), "rk": -2.1,
 	"ra": Vector3(0.5, 0, 0.18), "rf": 0.0, "la": Vector3(-0.6, 0, -0.9), "lf": 0.7, "speed": 30.0}
+## charging a held jump: knees pulled up, arms swept down and back, coiled to spring
+const POSE_COIL := {"la": Vector3(-0.95, 0, -0.3), "ra": Vector3(-0.95, 0, 0.3), "lf": 0.7, "rf": 0.7,
+	"ll": Vector3(1.35, 0, -0.14), "rl": Vector3(1.2, 0, 0.14), "lk": -2.0, "rk": -1.8, "speed": 22.0}
 const POSE_ROCKET := {"la": Vector3(-0.55, 0, -0.35), "ra": Vector3(-0.55, 0, 0.35), "lf": 0.1, "rf": 0.1,
 	"ll": Vector3(0.15, 0, 0), "rl": Vector3(-0.1, 0, 0), "lk": -0.15, "rk": -0.6}
 const POSE_SKYDIVE := {"la": Vector3(0.5, 0, -1.5), "ra": Vector3(0.5, 0, 1.5), "lf": 0.5, "rf": 0.5,
@@ -1093,7 +1140,10 @@ func _update_visual(delta: float) -> void:
 				mode = "air"
 			State.AIR:
 				mode = "air"
-				if _super_done and velocity.y > 6.0:
+				if charging and not _super_done:
+					pose = POSE_COIL
+					target_basis = target_basis.rotated(target_basis.x, 0.3 * charge)
+				elif _super_done and velocity.y > 6.0:
 					pose = POSE_ROCKET
 				elif velocity.y < -24.0:
 					pose = POSE_SKYDIVE
@@ -1170,7 +1220,12 @@ func _update_visual(delta: float) -> void:
 	visual.basis = Basis(_base_q) * Basis(Vector3.BACK, _bank) * extra
 	visual.position = visual.position.lerp(target_offset, 1.0 - exp(-20.0 * delta))
 	var scale_target := Vector3.ONE
-	model.scale = model.scale.lerp(scale_target, 1.0 - exp(-10.0 * delta))
+	coiling = pose == POSE_COIL
+	if charging and not _super_done:
+		# squash down as the charge builds, released into a stretch at the super jump
+		scale_target = Vector3(1.0 + 0.14 * charge, 1.0 - 0.2 * charge, 1.0 + 0.14 * charge)
+	var scale_rate := 30.0 if charging and not _super_done else 10.0
+	model.scale = model.scale.lerp(scale_target, 1.0 - exp(-scale_rate * delta))
 	var anim_speed := hspeed if state != State.WALL else velocity.length()
 	model.wings_visible = Game.has_skill("wings")
 	if not pose.is_empty():

@@ -2,7 +2,15 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
-## [0.7.1] — 2026-10-18 — Seamless vaults, brighter nights
+## [0.8.0] — 2026-10-18 — Light Body, seamless running, brighter nights
+
+### New
+- **Light Body** (new body form, Movement skill from level 5): a lean, stripped-down runner's body
+  with glowing sinew lines and swept-back fins. 25% faster sprint and wall runs, 20% higher jumps
+  and sharper air control, but you take 30% more damage. Stacks with Runner Legs.
+- **Charge-jump animation:** holding jump coils you up (knees tucked, arms swept back, body
+  squashing down) while red energy gathers into you, then bursts into the rocket pose when the
+  super jump kicks in.
 
 ### Changed
 - **Vaults are seamless:** sprinting at a car, bench or low wall now spots it much earlier,
@@ -15,6 +23,10 @@ All notable changes to BLACKVEIN. Newest first.
   from the Actions tab.
 
 ### Fixed
+- **Running into side streets no longer stops you:** curbs (and any step up to 0.45 m) are
+  stepped onto at full speed instead of acting like a wall.
+- **The "what's new" popup can be clicked right away:** the game waits and the mouse is free
+  while it shows (no more pressing Esc first). Enter, Space, Esc or the controller closes it.
 - Close-range aim assist accepts targets beside the aim line; bone spikes fly past loose objects.
 - Respawning clears leftover air state (a jump right after respawn could glide instead of
   double jump).

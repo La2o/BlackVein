@@ -60,6 +60,7 @@ A quick guide to your first hour.
   through walls.
 - **The forms wheel** (hold Alt / X / D-pad up) slows time and lets you set every body part:
   head (vision), arms (combat), body (shield, armor, wings) and legs (Runner, Leaper, Crawler, Crusher).
-  Try Crawler legs for climbing and Wings for crossing the city.
+  Try Crawler legs for climbing, Wings for crossing the city, and Light Body with Runner legs
+  for pure speed (careful: it makes you fragile).
 - The Biomass Decoy draws every gun in the area — great for slipping away.
 - Settings has mouse sensitivity, field of view, key rebinding, crowd density and graphics quality.

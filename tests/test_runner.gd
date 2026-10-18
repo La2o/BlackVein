@@ -156,7 +156,15 @@ func _run_all() -> void:
 	await _wait(0.8)
 	var y0 := player.global_position.y
 	Input.action_press("jump")
-	await _wait(0.75)
+	var coil_pose := false
+	var squash := INF
+	for f in 14:
+		await get_tree().physics_frame
+		if player.charging:
+			coil_pose = coil_pose or player.coiling
+			squash = minf(squash, player.model.scale.y)
+	check("holding jump plays the charge-up coil", coil_pose and squash < 0.97, "pose %s, squash %.2f" % [coil_pose, squash])
+	await _wait(0.52)
 	Input.action_release("jump")
 	max_y = 0.0
 	t = 0.0
@@ -220,6 +228,41 @@ func _run_all() -> void:
 		"%.1f m past, wall %s" % [past, went_wall])
 	check("vaulting never slows the run", min_speed > player.sprint_speed * 0.85, "slowest %.1f m/s" % min_speed)
 	await _wait(1.0)
+
+	# ---------------- running onto a curb (side streets) never stops you
+	for walk in [false, true]:
+		await _teleport(Game.city.spawn_point, PI * 0.5)
+		await _wait(0.5)
+		if not walk:
+			Input.action_press("sprint")
+		Input.action_press("move_forward")
+		await _wait(1.0)
+		var cdir := Vector3(player.velocity.x, 0, player.velocity.z).normalized()
+		var speed0 := Vector3(player.velocity.x, 0, player.velocity.z).length()
+		var cfeet := player.global_position.y - 0.9
+		var curb := StaticBody3D.new()
+		curb.collision_layer = Game.LAYER_WORLD
+		var curb_shape := CollisionShape3D.new()
+		var curb_box := BoxShape3D.new()
+		curb_box.size = Vector3(30.0, 0.15, 30.0)
+		curb_shape.shape = curb_box
+		curb.add_child(curb_shape)
+		main.add_child(curb)
+		var curb_at := player.global_position + cdir * (4.0 + speed0 * 0.3 + 15.0)
+		curb.global_position = Vector3(curb_at.x, cfeet + 0.075, curb_at.z)
+		curb.look_at(curb.global_position + cdir.rotated(Vector3.UP, 0.5), Vector3.UP)   # met at an angle
+		var slowest := INF
+		t = 0.0
+		while t < 1.2:
+			await get_tree().physics_frame
+			t += get_physics_process_delta_time()
+			slowest = minf(slowest, Vector3(player.velocity.x, 0, player.velocity.z).length())
+		var on_top := player.global_position.y - 0.9 > cfeet + 0.1 and player.state == Player.State.GROUND
+		_release_all()
+		curb.queue_free()
+		check("%s onto a curb keeps going" % ("walking" if walk else "sprinting"), on_top and slowest > speed0 * 0.8,
+			"slowest %.1f of %.1f m/s, on top %s" % [slowest, speed0, on_top])
+		await _wait(0.5)
 
 	# ---------------- controller works on any device id
 	var joy := InputEventJoypadMotion.new()
@@ -326,6 +369,29 @@ func _run_all() -> void:
 	_release_all()
 	pw.set_defense(PlayerPowers.Defense.NONE)
 	await _wait(3.0)
+
+	# ---------------- Light Body: faster running and jumping, more damage taken
+	Game.skills.erase("light_body")
+	pw.set_defense(PlayerPowers.Defense.LIGHT, true)
+	check("Light Body is locked until learned", pw.defense != PlayerPowers.Defense.LIGHT)
+	Game.skills["light_body"] = 1
+	var base_speed := pw.speed_factor()
+	var base_jump := pw.jump_factor()
+	var base_dmg := pw.modify_incoming(10.0, Game.hit_info(10.0, Vector3.ZERO, null, "bullet"))
+	pw.set_defense(PlayerPowers.Defense.LIGHT, true)
+	check("Light Body runs faster", pw.speed_factor() > base_speed * 1.2, "%.2f -> %.2f" % [base_speed, pw.speed_factor()])
+	check("Light Body jumps higher", pw.jump_factor() > base_jump * 1.15, "%.2f -> %.2f" % [base_jump, pw.jump_factor()])
+	check("Light Body takes more damage",
+		pw.modify_incoming(10.0, Game.hit_info(10.0, Vector3.ZERO, null, "bullet")) > base_dmg * 1.2)
+	await _teleport(Game.city.spawn_point, PI * 0.5)
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await _wait(1.2)
+	var light_run := Vector3(player.velocity.x, 0, player.velocity.z).length()
+	_release_all()
+	check("Light Body sprint is faster in play", light_run > player.sprint_speed * 1.15, "%.1f m/s" % light_run)
+	pw.set_defense(PlayerPowers.Defense.NONE, true)
+	await _wait(1.0)
 	await _clear_units()
 	await _teleport(Game.city.spawn_point)
 	var watcher: Node3D = Game.military.spawn_npc("soldier", player.global_position + Vector3(0, 0, -6))
@@ -653,10 +719,16 @@ func _run_all() -> void:
 	var traffic := get_tree().get_nodes_in_group("traffic")
 	check("traffic spawns", traffic.size() > 0, "%d cars" % traffic.size())
 	if traffic.size() > 0:
+		# any car moving counts: one may be waiting at a red light
 		var tc: Node3D = traffic[0]
-		var tp := tc.global_position
+		var starts := traffic.map(func(c): return (c as Node3D).global_position)
 		await _wait(2.0)
-		check("traffic drives", not is_instance_valid(tc) or tc.global_position.distance_to(tp) > 2.0)
+		var moved := 0
+		for k in traffic.size():
+			var c = traffic[k]
+			if not is_instance_valid(c) or (c as Node3D).global_position.distance_to(starts[k]) > 2.0:
+				moved += 1
+		check("traffic drives", moved > 0, "%d of %d moved" % [moved, traffic.size()])
 		if is_instance_valid(tc):
 			tc.take_hit(Game.hit_info(10.0, Vector3(0, 5, 10), player, "melee"))
 			await _wait(0.2)
@@ -830,6 +902,23 @@ func _run_all() -> void:
 	check("keys can be rebound", Settings.key_name("consume") == "K", Settings.key_name("consume"))
 	Settings.reset_bindings()
 	check("keys reset to defaults", Settings.key_name("consume") == "F", Settings.key_name("consume"))
+	# the "what's new" popup can be clicked right away and closes back into the game
+	Settings.last_seen_version = "0.0.1"
+	Game.hud._maybe_show_whats_new()
+	await get_tree().process_frame
+	var popup_ok := Game.hud.whats_new_panel != null and get_tree().paused
+	if not DisplayServer.get_name() == "headless":
+		popup_ok = popup_ok and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE
+	var focused := get_viewport().gui_get_focus_owner()
+	check("what's new popup is clickable at once", popup_ok and focused is Button, str(focused))
+	var esc := InputEventAction.new()
+	esc.action = "pause"
+	esc.pressed = true
+	Input.parse_input_event(esc)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check("Esc closes the popup back into the game", Game.hud.whats_new_panel == null and not get_tree().paused
+		and not Game.hud.pause_menu.visible)
 	Game.skills["wings"] = 3
 	await _teleport(Game.city.spawn_point + Vector3(0, 50, 0))
 	await _tap("jump")

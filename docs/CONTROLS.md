@@ -29,7 +29,7 @@ and controller names depending on what you used last.
 | Form special | Right click | Y |
 | Choose arm form | 1–7, mouse wheel | D-pad left / right |
 | **Forms wheel** (pick head, arm, leg and body forms in slow motion) | Hold Alt (or hold X) | Hold D-pad up |
-| Cycle body form: none / Shield / Armor / Wings | Tap X | Tap D-pad up |
+| Cycle body form: none / Shield / Armor / Wings / Light Body | Tap X | Tap D-pad up |
 | Grab / throw | E | RB |
 | Drop what you hold (or brand them as an ally, with Dominate) | Right click | Y |
 | Consume | F | LB |

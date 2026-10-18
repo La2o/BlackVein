@@ -7,14 +7,14 @@ extends Node
 ## Tether (zip / yank), Focus (slow motion) and Biomass Decoy.
 
 enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
-enum Defense { NONE, SHIELD, ARMOR, WINGS }
+enum Defense { NONE, SHIELD, ARMOR, WINGS, LIGHT }
 enum Vision { NORMAL, THERMAL, NIGHT, PREDATOR }
 enum Legs { NORMAL, RUNNER, LEAPER, CRAWLER, CRUSHER }
 
 const FORM_NAMES := ["Fists", "Claws", "Hammerfist", "Blade", "Whipfist", "Musclemass", "Bone Spikes"]
-const DEFENSE_NAMES := ["Normal body", "Shield", "Armor", "Wings"]
+const DEFENSE_NAMES := ["Normal body", "Shield", "Armor", "Wings", "Light Body"]
 const FORM_SKILLS := ["", "claws", "hammer", "blade", "whip", "muscle_form", "spike_form"]
-const DEFENSE_SKILLS := ["", "shield", "armor", "wings"]
+const DEFENSE_SKILLS := ["", "shield", "armor", "wings", "light_body"]
 const VISION_NAMES := ["Normal sight", "Thermal Vision", "Night Vision", "Predator Sense"]
 const VISION_SKILLS := ["", "thermal", "night_vision", "predator_sense"]
 const LEG_NAMES := ["Normal legs", "Runner Legs", "Leaper Legs", "Crawler Legs", "Crusher Legs"]
@@ -86,6 +86,8 @@ func speed_factor() -> float:
 		f *= 0.65
 	if defense == Defense.ARMOR:
 		f *= 0.85
+	elif defense == Defense.LIGHT:
+		f *= LIGHT_SPEED
 	match legs:
 		Legs.RUNNER: f *= 1.35
 		Legs.CRUSHER: f *= 0.95
@@ -98,12 +100,23 @@ func is_transformed() -> bool:
 	return form != Form.FISTS or defense != Defense.NONE or legs != Legs.NORMAL or held != null or weapon != "" or devastating != ""
 
 
-## multiplies jump strength (leg forms)
+## multiplies jump strength (leg forms, Light Body)
 func jump_factor() -> float:
+	var f := LIGHT_JUMP if defense == Defense.LIGHT else 1.0
 	match legs:
-		Legs.LEAPER: return 1.5
-		Legs.RUNNER: return 1.1
-	return 1.0
+		Legs.LEAPER: return f * 1.5
+		Legs.RUNNER: return f * 1.1
+	return f
+
+
+## Light Body: a lean, stripped-down body built for running. Faster on the ground, up walls and
+## in the air, higher jumps — but it takes more damage.
+const LIGHT_SPEED := 1.25
+const LIGHT_JUMP := 1.2
+const LIGHT_DAMAGE := 1.3
+
+func is_light() -> bool:
+	return defense == Defense.LIGHT
 
 
 func clings_to_walls() -> bool:
@@ -146,6 +159,8 @@ func modify_incoming(dmg: float, info: Dictionary) -> float:
 				_: return dmg * 0.2
 	if defense == Defense.ARMOR:
 		dmg *= 0.45
+	elif defense == Defense.LIGHT:
+		dmg *= LIGHT_DAMAGE
 	if consuming:
 		dmg *= 0.6
 	return dmg

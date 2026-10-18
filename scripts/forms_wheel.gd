@@ -13,13 +13,13 @@ const ICONS := {
 	"head": ["eye", "thermal", "night", "predator"],
 	"arms": ["fists", "claws", "hammer", "blade", "whip", "muscle", "spikes"],
 	"legs": ["legs", "runner", "leaper", "crawler", "crusher"],
-	"body": ["torso", "shield", "armor", "wings"],
+	"body": ["torso", "shield", "armor", "wings", "light"],
 }
 const SHORT := {
 	"head": ["Normal", "Thermal", "Night", "Predator"],
 	"arms": ["Fists", "Claws", "Hammer", "Blade", "Whip", "Muscle", "Spikes"],
 	"legs": ["Normal", "Runner", "Leaper", "Crawler", "Crusher"],
-	"body": ["Normal", "Shield", "Armor", "Wings"],
+	"body": ["Normal", "Shield", "Armor", "Wings", "Light"],
 }
 const DESC := {
 	"head": ["Regular eyesight.", "Warm bodies glow through smoke and darkness.",
@@ -31,7 +31,7 @@ const DESC := {
 	"legs": ["Regular legs.", "Much faster sprint and longer running jumps.", "Huge jumps; hard landings become stomps.",
 		"Cling to walls and run along buildings forever.", "Plow through people and cars. Can't be knocked back."],
 	"body": ["No body form.", "Blocks bullets and rockets from the front.", "Take far less damage and ram through anything.",
-		"Flesh wings: glide fast and flap higher."],
+		"Flesh wings: glide fast and flap higher.", "Lean runner's body: faster runs and higher jumps, but you take more damage."],
 }
 
 var open := false
@@ -338,6 +338,9 @@ func _icon(kind: String, p: Vector2, col: Color) -> void:
 		"wings":
 			draw_colored_polygon(PackedVector2Array([p + Vector2(-2, 0), p + Vector2(-15, -11), p + Vector2(-12, 3), p + Vector2(-16, 9)]), col)
 			draw_colored_polygon(PackedVector2Array([p + Vector2(2, 0), p + Vector2(15, -11), p + Vector2(12, 3), p + Vector2(16, 9)]), col)
+		"light":
+			draw_colored_polygon(PackedVector2Array([p + Vector2(3, -14), p + Vector2(-8, 2), p + Vector2(-1, 2),
+				p + Vector2(-4, 14), p + Vector2(8, -3), p + Vector2(1, -3)]), col)
 		"lock":
 			draw_rect(Rect2(p - Vector2(5, 0), Vector2(10, 8)), col)
 			draw_arc(p, 4, PI, TAU, 8, col, 2.0)
