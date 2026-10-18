@@ -19,8 +19,8 @@ const H := 4.6
 const DEPTH := -140.0
 
 const TYPES := {
-	"lab": {"name": "Origin Biotech Lab", "color": Color(0.3, 0.85, 1.0), "allowed": ["scientist", "soldier", "rocket_soldier", "elite", "commander"]},
-	"bunker": {"name": "Military Bunker", "color": Color(1.0, 0.8, 0.2), "allowed": ["soldier", "rocket_soldier", "elite", "commander"]},
+	"lab": {"name": "Origin Biotech Lab", "color": Color(0.3, 0.85, 1.0), "allowed": ["scientist", "soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]},
+	"bunker": {"name": "Military Bunker", "color": Color(1.0, 0.8, 0.2), "allowed": ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]},
 	"nest": {"name": "Subway Nest", "color": Color(1.0, 0.25, 0.15), "allowed": []},
 	"safehouse": {"name": "Safehouse", "color": Color(0.4, 1.0, 0.5), "allowed": []},
 }
@@ -59,6 +59,11 @@ func is_inside() -> bool:
 
 func return_position() -> Vector3:
 	return _return_pos
+
+
+## Inside a guarded interior (a lab or the bunker), whatever you're wearing.
+func is_restricted_area(pos: Vector3) -> bool:
+	return root != null and pos.y <= DEPTH + 30.0 and not _allowed.is_empty()
 
 
 func restricted_for(pos: Vector3, disguise: String) -> bool:
@@ -614,12 +619,13 @@ func _build_bunker(_e: Dictionary) -> void:
 	var ac := _room_center("room_a")
 	for k in 3:
 		_box(root, Vector3(3.0, 2.2, 0.6), ac + Vector3((k - 1) * 4.5, 1.1, -6.5), olive)
-	for k in 2:
+	var rack := ["rifle", "launcher", "grenade", "mg"]
+	for k in rack.size():
 		var p := Area3D.new()
 		p.set_script(PICKUP)
 		root.add_child(p)
-		p.global_position = ac + Vector3((k - 0.5) * 4.0, 0.2, 0)
-		p.setup("rifle" if k == 0 else "launcher", 120 if k == 0 else 10)
+		p.global_position = ac + Vector3((k - 1.5) * 3.0, 0.2, 0)
+		p.setup(rack[k], PlayerPowers.WEAPONS[rack[k]]["armory"])
 	# barracks: bunks
 	var bc := _room_center("room_b")
 	for k in 4:

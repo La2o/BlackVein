@@ -148,7 +148,9 @@ func _maintain() -> void:
 	var hunted := Game.is_hunted()
 	var focus: Vector3 = Game.last_known_pos if Game.alert_level != Game.Alert.HIDDEN else ppos
 	# foot soldiers
-	var soldiers := _count("military", ppos, 150.0, "soldier") + _count("military", ppos, 150.0, "rocket_soldier") + _count("military", ppos, 150.0, "elite")
+	var soldiers := 0
+	for sk in Game.SOLDIER_KINDS:
+		soldiers += _count("military", ppos, 150.0, sk)
 	var wanted := 8
 	if hunted:
 		wanted = 10 + int(heat * 4.0)
@@ -160,8 +162,13 @@ func _maintain() -> void:
 		var base: Vector3 = Game.city.random_street_point(focus, min_d, 120.0)
 		for k in squad:
 			var kind := "soldier"
-			if hunted and randf() < 0.25 + heat * 0.04:
+			var roll := randf()
+			if hunted and roll < 0.25 + heat * 0.04:
 				kind = "rocket_soldier"
+			elif hunted and heat >= 1.5 and roll < 0.45 + heat * 0.04:
+				kind = "grenadier"
+			elif hunted and heat >= 2.5 and roll < 0.6 + heat * 0.03:
+				kind = "heavy_gunner"
 			if heat >= 4.0 and randf() < 0.35:
 				kind = "elite"
 			var s := spawn_npc(kind, base + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3)))

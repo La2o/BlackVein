@@ -1,13 +1,16 @@
 extends Node3D
-## Rockets, tank shells and helicopter missiles. Flies in a line (missiles
-## steer a little toward their target) and explodes on contact.
+## Rockets, tank shells, helicopter missiles and grenades. Flies in a line (missiles and locked-on
+## rockets steer toward their target) and explodes on contact. Grenades arc, bounce once and go off
+## on a short fuse.
 
 const STATS := {
 	"rocket": {"radius": 5.0, "damage": 32.0, "speed_trail": 1.0, "color": Color(1, 0.6, 0.2)},
 	"shell": {"radius": 6.5, "damage": 55.0, "speed_trail": 0.6, "color": Color(1, 0.8, 0.4)},
 	"missile": {"radius": 5.0, "damage": 30.0, "speed_trail": 1.0, "color": Color(1, 0.5, 0.2)},
 	"bomb": {"radius": 9.0, "damage": 80.0, "speed_trail": 0.5, "color": Color(1, 0.5, 0.2)},
+	"grenade": {"radius": 5.5, "damage": 38.0, "speed_trail": 0.3, "color": Color(0.6, 1.0, 0.3)},
 }
+const GRENADE_GRAVITY := 22.0
 
 var velocity := Vector3.ZERO
 var source: Node = null
@@ -16,6 +19,14 @@ var target: Node3D = null
 var life := 7.0
 var gravity := 0.0
 var _exclude: Array[RID] = []
+var _bounces := 0
+
+
+## Velocity that lobs a grenade from `from` to land on `to` after `time` seconds.
+static func lob_velocity(from: Vector3, to: Vector3, time: float) -> Vector3:
+	var v := (to - from) / time
+	v.y += 0.5 * GRENADE_GRAVITY * time
+	return v
 
 
 func launch(pos: Vector3, vel: Vector3, src: Node, k: String, homing_target: Node3D = null) -> void:
@@ -27,6 +38,9 @@ func launch(pos: Vector3, vel: Vector3, src: Node, k: String, homing_target: Nod
 	target = homing_target
 	if kind == "bomb":
 		gravity = 30.0
+	elif kind == "grenade":
+		gravity = GRENADE_GRAVITY
+		life = 2.2
 	if src is CollisionObject3D:
 		_exclude.append((src as CollisionObject3D).get_rid())
 	_build()
@@ -38,6 +52,9 @@ func _build() -> void:
 	var cap := CapsuleMesh.new()
 	cap.radius = 0.12 if kind != "bomb" else 0.35
 	cap.height = 0.8 if kind != "bomb" else 1.6
+	if kind == "grenade":
+		cap.radius = 0.11
+		cap.height = 0.3
 	body.mesh = cap
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(0.25, 0.27, 0.22)
@@ -92,14 +109,24 @@ func _physics_process(delta: float) -> void:
 	if life <= 0.0:
 		_detonate(global_position)
 		return
-	if target and is_instance_valid(target) and kind == "missile":
+	if target and is_instance_valid(target) and kind in ["missile", "rocket"]:
+		# a rocket fired with a lock turns hard enough to chase a gunship
 		var want := (target.global_position - global_position).normalized() * velocity.length()
-		velocity = velocity.move_toward(want, 18.0 * delta)
+		velocity = velocity.move_toward(want, (18.0 if kind == "missile" else 45.0) * delta)
 	velocity.y -= gravity * delta
 	var next := global_position + velocity * delta
 	var mask := Game.LAYER_WORLD | Game.LAYER_PLAYER | Game.MASK_HITTABLE
 	var hit := Game.raycast(global_position, next, mask, _exclude)
 	if not hit.is_empty():
+		var c := hit["collider"] as Node
+		if kind == "grenade" and _bounces < 1 and not (c and c.has_method("take_hit")):
+			# hit the ground or a wall: bounce once and keep the fuse burning
+			_bounces += 1
+			var n: Vector3 = hit["normal"]
+			velocity = velocity.bounce(n) * 0.4
+			global_position = (hit["position"] as Vector3) + n * 0.15
+			Game.fx.sound("land", global_position, -14.0, 0.3)
+			return
 		_detonate(hit["position"])
 		return
 	global_position = next

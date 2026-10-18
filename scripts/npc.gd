@@ -14,6 +14,8 @@ const KINDS := {
 	"scientist": {"hp": 45.0, "walk": 1.6, "run": 6.0, "faction": "civilian", "label": "a scientist"},
 	"soldier": {"hp": 55.0, "walk": 2.6, "run": 6.2, "faction": "military", "label": "a soldier", "weapon": "rifle"},
 	"rocket_soldier": {"hp": 55.0, "walk": 2.6, "run": 6.0, "faction": "military", "label": "a rocket soldier", "weapon": "launcher"},
+	"grenadier": {"hp": 60.0, "walk": 2.5, "run": 6.0, "faction": "military", "label": "a grenadier", "weapon": "grenade", "xp": 16},
+	"heavy_gunner": {"hp": 130.0, "walk": 2.0, "run": 4.6, "faction": "military", "label": "a heavy gunner", "weapon": "mg", "xp": 24},
 	"elite": {"hp": 150.0, "walk": 3.0, "run": 8.0, "faction": "military", "label": "a strike team soldier", "weapon": "rifle"},
 	"commander": {"hp": 220.0, "walk": 2.2, "run": 6.0, "faction": "military", "label": "the base commander", "weapon": "rifle"},
 	"infected": {"hp": 35.0, "walk": 2.0, "run": 7.2, "faction": "infected", "label": "an infected"},
@@ -227,6 +229,20 @@ func _make_outfit(k: String) -> Dictionary:
 	var person := {"skin": skin, "body": body, "hair": hair, "hair_color": hair_col,
 		"beard": body != "f" and randf() < 0.3, "glasses": randf() < 0.12}
 	match k:
+		"grenadier":
+			# soldier kit with a tan vest full of grenades
+			person.merge({"shirt": Color(0.36, 0.33, 0.24), "pants": Color(0.3, 0.28, 0.2), "gear": "helmet",
+				"gear_color": Color(0.32, 0.3, 0.2), "item": "rifle", "top": "long", "vest": true,
+				"vest_color": Color(0.45, 0.38, 0.22), "gloves": true, "boots": true, "belt": true,
+				"shoes": Color(0.12, 0.1, 0.08), "body": "m", "beard": false, "glasses": false}, true)
+			return person
+		"heavy_gunner":
+			# big, armoured, slow: a dark heavy vest and a bulky frame
+			person.merge({"shirt": Color(0.2, 0.22, 0.17), "pants": Color(0.18, 0.2, 0.15), "gear": "helmet",
+				"gear_color": Color(0.14, 0.15, 0.12), "item": "rifle", "top": "long", "vest": true,
+				"vest_color": Color(0.1, 0.11, 0.09), "gloves": true, "boots": true, "belt": true, "bulk": 1.35,
+				"shoes": Color(0.1, 0.09, 0.07), "body": "m", "beard": randf() < 0.4, "glasses": false}, true)
+			return person
 		"soldier", "rocket_soldier":
 			person.merge({"shirt": Color(0.3, 0.33, 0.22), "pants": Color(0.27, 0.29, 0.2), "gear": "helmet",
 				"gear_color": Color(0.24, 0.28, 0.19), "item": "rifle" if k == "soldier" else "launcher",
@@ -498,7 +514,7 @@ func _die(info: Dictionary) -> void:
 			"military":
 				Game.kills["military"] += 1
 				Game.add_heat(0.18)
-				Game.add_xp(30 if kind == "elite" else (14 if kind == "rocket_soldier" else 12))
+				Game.add_xp(int(KINDS[kind].get("xp", 30 if kind == "elite" else (14 if kind == "rocket_soldier" else 12))))
 			"infected":
 				Game.kills["infected"] += 1
 				Game.add_xp(150 if kind == "hunter" else (900 if kind == "leviathan" else (2000 if kind == "patient_zero" else 5)))
@@ -512,7 +528,7 @@ func _die(info: Dictionary) -> void:
 			"civilian":
 				Game.kills["civilian"] += 1
 	Game.fx.splat(global_position + Vector3.UP * 0.4, Vector3.UP, Color(0.5, 0.02, 0.02) if faction != "infected" else Color(0.35, 0.05, 0.03), 18)
-	if kind in ["soldier", "rocket_soldier", "elite"] and randf() < 0.4:
+	if kind in Game.SOLDIER_KINDS and randf() < 0.4:
 		_drop_weapon()
 	if kind == "hunter" or kind == "leviathan":
 		Game.fx.sound("roar", global_position, 2.0 if kind == "hunter" else 8.0, 0.3)
@@ -531,7 +547,7 @@ func _drop_weapon() -> void:
 	get_parent().add_child(p)
 	p.global_position = global_position + Vector3(0, -0.5, 0)
 	var weapon: String = KINDS[kind].get("weapon", "rifle")
-	p.setup(weapon, 90 if weapon == "rifle" else 6)
+	p.setup(weapon, PlayerPowers.WEAPONS[weapon]["drop"])
 	if model.held_item:
 		model.held_item.visible = false
 
@@ -1016,8 +1032,13 @@ func _act_engage(delta: float) -> void:
 	var to := tpos - global_position
 	var flat := Vector3(to.x, 0, to.z)
 	var dist := flat.length()
-	var ideal_min := 20.0 if kind == "rocket_soldier" else 10.0
-	var ideal_max := 40.0 if kind == "rocket_soldier" else 28.0
+	# rockets and grenades keep their distance; heavy gunners wade in
+	var ideal_min := 10.0
+	var ideal_max := 28.0
+	match kind:
+		"rocket_soldier": ideal_min = 20.0; ideal_max = 40.0
+		"grenadier": ideal_min = 16.0; ideal_max = 34.0
+		"heavy_gunner": ideal_min = 6.0; ideal_max = 20.0
 	_strafe_timer -= delta
 	if _strafe_timer <= 0.0:
 		_strafe_timer = randf_range(1.5, 3.0)
@@ -1047,11 +1068,19 @@ func _act_engage(delta: float) -> void:
 		_fire_rocket(tpos)
 		_burst_timer = randf_range(3.5, 5.0)
 		return
+	if kind == "grenadier":
+		_lob_grenade(tpos)
+		_burst_timer = randf_range(2.6, 4.0)
+		return
+	var heavy := kind == "heavy_gunner"
 	if _burst_left <= 0:
-		_burst_left = randi_range(3, 5)
+		_burst_left = randi_range(10, 16) if heavy else randi_range(3, 5)
 	_fire_bullet(tpos, dist)
 	_burst_left -= 1
-	_burst_timer = 0.11 if _burst_left > 0 else randf_range(0.9, 1.7)
+	if heavy:
+		_burst_timer = 0.07 if _burst_left > 0 else randf_range(1.6, 2.4)
+	else:
+		_burst_timer = 0.11 if _burst_left > 0 else randf_range(0.9, 1.7)
 
 
 func _fire_bullet(tpos: Vector3, dist: float) -> void:
@@ -1074,7 +1103,7 @@ func _fire_bullet(tpos: Vector3, dist: float) -> void:
 		if c and c.has_method("take_hit"):
 			var is_friend: bool = c.is_in_group("military") if not is_ally else (c == Game.player or c.is_in_group("allies"))
 			if not is_friend:
-				var dmg := 5.0 if kind == "elite" else 3.2
+				var dmg := 5.0 if kind == "elite" else (4.0 if kind == "heavy_gunner" else 3.2)
 				c.take_hit(Game.hit_info(dmg, dir * 1.5, self, "bullet"))
 	Game.fx.tracer(muzzle, end)
 	Game.fx.sound("gunshot", muzzle, -8.0, 0.2)
@@ -1094,6 +1123,19 @@ func _fire_rocket(tpos: Vector3) -> void:
 	p.launch(muzzle, dir * 40.0, self, "rocket")
 	Game.fx.sound("rocket", muzzle, -2.0)
 	Game.panic_at(global_position, 30.0)
+
+
+## An arcing grenade that lands near the target (a bit short or long, so you can dodge it).
+func _lob_grenade(tpos: Vector3) -> void:
+	var muzzle := global_position + Vector3.UP * 0.8 + _face_dir * 0.6
+	var land := tpos + Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
+	var p := Node3D.new()
+	p.set_script(PROJECTILE)
+	get_parent().add_child(p)
+	p.launch(muzzle, PROJECTILE.lob_velocity(muzzle, land, 1.1), self, "grenade")
+	Game.fx.sound("whoosh", muzzle, -4.0)
+	model.swing(true, 4, 0.2)
+	Game.panic_at(global_position, 26.0)
 
 
 func _act_chase(delta: float) -> void:

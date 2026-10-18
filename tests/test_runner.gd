@@ -802,6 +802,141 @@ func _run_all() -> void:
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)
 
+	# ---------------- stealth: parkour in a fitting disguise is fine; flying, powers and bases aren't
+	await _teleport(Game.city.spawn_point, PI * 0.5)
+	var real_disguise: String = player.disguise
+	player.disguise = "soldier"
+	player.parkour_timer = 2.0
+	check("parkour in a fitting disguise blends in", not player.is_conspicuous(), player.stand_out_reason())
+	player.parkour_timer = 0.0
+	player.state = Player.State.GLIDE
+	check("flying always stands out", player.is_conspicuous() and player.stand_out_reason() == "flying")
+	player.state = Player.State.GROUND
+	player.conspicuous_timer = 0.0
+	pw.set_form(PlayerPowers.Form.CLAWS)
+	check("visible powers stand out", player.is_conspicuous() and player.stand_out_reason() == "powers showing")
+	pw.set_form(PlayerPowers.Form.FISTS)
+	var base_mid: Vector3 = Game.city.base_points["center"]
+	check("bases are restricted areas", Game.in_restricted_area(base_mid) and not Game.in_restricted_area(Game.city.spawn_point))
+	await _teleport(base_mid + Vector3.UP)
+	player.parkour_timer = 2.0
+	check("parkour inside a base stands out, even in uniform", player.is_conspicuous()
+		and player.stand_out_reason() == "running around a restricted area", player.stand_out_reason())
+	player.parkour_timer = 0.0
+	check("walking calmly in uniform inside a base blends in", not player.is_conspicuous(), player.stand_out_reason())
+	# a soldier watches you sprint past in disguise and doesn't care
+	await _teleport(Game.city.spawn_point, PI * 0.5)
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	Game.suspicion = 0.0
+	var watcher2: Node3D = Game.military.spawn_npc("soldier", player.global_position + Vector3(-6, 0, 8))
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await _wait(2.0)
+	_release_all()
+	check("sprinting past a soldier in disguise raises no suspicion", Game.alert_level == Game.Alert.HIDDEN
+		and Game.suspicion < 0.1, "suspicion %.2f" % Game.suspicion)
+	watcher2.queue_free()
+	player.disguise = real_disguise
+	# stealth consume: nobody sees it, you get a bonus
+	await _clear_units()
+	var quiet0 := Game.stat("stealth_consumes")
+	var lone: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(0, 0.3, -1.4))
+	player.yaw = 0.0
+	await get_tree().physics_frame
+	await _tap("consume")
+	await _wait(1.3)
+	check("unseen consume counts as a stealth consume", Game.stat("stealth_consumes") > quiet0 and Game.alert_level == Game.Alert.HIDDEN)
+	if is_instance_valid(lone):
+		lone.queue_free()
+
+	# ---------------- guns, Prototype 1 style
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	await _teleport(Game.city.spawn_point, 0.0)
+	player.invuln_timer = 60.0
+	for wk in ["soldier", "rocket_soldier", "grenadier", "heavy_gunner"]:
+		var gunman = Game.military.spawn_npc(wk, player.global_position + Vector3(randf_range(-3, 3), 0, -8))
+		gunman._drop_weapon()
+	await get_tree().process_frame
+	var dropped := get_tree().get_nodes_in_group("pickups").map(func(pk): return str(pk.get("kind")))
+	check("soldiers drop rifles, rocket and grenade launchers, machine guns",
+		["rifle", "launcher", "grenade", "mg"].all(func(k): return dropped.has(k)), str(dropped))
+	for pk in get_tree().get_nodes_in_group("pickups"):
+		pk.queue_free()
+	await _clear_units()
+	var proj_script := preload("res://scripts/projectile.gd")
+	var find_proj := func(k: String) -> Node:
+		for c in player.get_parent().get_children():
+			if c.get_script() == proj_script and c.kind == k and c.source == player:
+				return c
+		return null
+	pw.give_weapon("grenade", 8)
+	player.yaw = 0.0
+	player.pitch = -0.15
+	await get_tree().physics_frame
+	await _tap("attack")
+	var nade: Node = find_proj.call("grenade")
+	check("grenade launcher lobs a grenade", nade != null and pw.ammo == 7 and nade.gravity > 0.0, "ammo %d" % pw.ammo)
+	await _wait(2.6)
+	check("grenades go off", nade == null or not is_instance_valid(nade))
+	pw.give_weapon("mg", 150)
+	check("heavy machine gun weighs you down", pw.speed_factor() < 0.8, "%.2f" % pw.speed_factor())
+	Input.action_press("attack")
+	await _wait(0.5)
+	_release_all()
+	check("heavy machine gun fires fast", 150 - pw.ammo >= 6, "%d rounds in 0.5 s" % (150 - pw.ammo))
+	pw._drop_weapon()
+	# rocket launcher locks onto vehicles
+	pw.give_weapon("launcher", 6)
+	var lock_tank = Game.military.spawn_ground_vehicle("tank", player.global_position + Vector3(0, 0.3, -45), 0.0)
+	lock_tank.abandoned = true
+	player.yaw = 0.0
+	player.pitch = -0.02
+	await _wait(0.2)
+	Input.action_press("special")
+	await _wait(0.9)
+	check("holding aim on a tank locks on", pw.lock_target == lock_tank, str(pw.lock_target))
+	Input.action_press("attack")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_release_all()
+	var homing: Node = find_proj.call("rocket")
+	check("locked rockets home in", homing != null and homing.target == lock_tank)
+	await _wait(1.5)
+	check("the locked rocket hits the tank", not is_instance_valid(lock_tank) or lock_tank.hp < 700.0)
+	pw._drop_weapon()
+	if is_instance_valid(lock_tank):
+		lock_tank.queue_free()
+	# the new soldiers fight with their own weapons
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	var gren = Game.military.spawn_npc("grenadier", player.global_position + Vector3(0, 0, -22))
+	var heavy = Game.military.spawn_npc("heavy_gunner", player.global_position + Vector3(6, 0, -14))
+	Game.raise_alert(player.global_position, "")
+	var saw_grenade := false
+	t = 0.0
+	while t < 6.0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		if not is_instance_valid(gren):
+			break
+		for c in gren.get_parent().get_children():   # soldiers' shots live next to them
+			if c.get_script() == proj_script and c.kind == "grenade" and c.source == gren:
+				saw_grenade = true
+	check("grenadiers lob grenades", saw_grenade)
+	check("heavy gunners are tough", heavy.max_hp > 100.0)
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	player.invuln_timer = 0.0
+
+	# ---------------- each level makes you a little tougher, right away
+	var hp_before := player.max_health
+	var lvl_before := Game.level
+	Game.add_xp(Game.xp_to_next(Game.level) - Game.xp + 1, "test")
+	check("levelling up raises max health at once", Game.level == lvl_before + 1 and player.max_health > hp_before,
+		"level %d->%d, health %.0f->%.0f" % [lvl_before, Game.level, hp_before, player.max_health])
+
 	# ---------------- disguise wardrobe
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)

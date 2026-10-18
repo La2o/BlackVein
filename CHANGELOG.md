@@ -2,6 +2,32 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.9.0] — 2026-10-18 — Stealth, guns, new soldiers
+
+### New
+- **Stealth that follows your disguise:** parkour (sprinting, vaults, wall runs, flips, super jumps)
+  no longer bothers the military when your disguise fits where you are. Attacking still gets you
+  spotted at once, and some things always stand out: flying (gliding, wing flaps, air dashes,
+  tether zips, dive bombs), visible body forms, carrying people or cars, and shockwave landings.
+  Inside bases and labs, any running around gives you away even in uniform.
+- **"Blending in" / "Standing out: why"** shows under the alert meter whenever soldiers are near.
+- **Stealth consumes:** consume someone no soldier can see for +50% XP (and they never know).
+- **Prototype 1 guns:** the **grenade launcher** (lobbed, bouncing grenades) and the **heavy machine
+  gun** (very fast, hits hard, slows you down) join the assault rifle and rocket launcher.
+- **Rocket lock-on:** hold Aim (Right click / Y) on a tank or gunship until it says LOCKED; your
+  rockets then home in.
+- **New soldiers:** **grenadiers** lob grenades from range and **heavy gunners** (big, armoured,
+  slow) wade in with long machine-gun bursts. They join the hunt as the heat rises, drop their
+  guns, and you can wear them as disguises. The bunker armory stocks all four guns.
+
+### Changed
+- Every level now visibly gives +2% max health and damage (shown on level up and in the Skills
+  menu). "Thousand Faces" now asks for 8 kinds of disguise.
+
+### Fixed
+- The per-level health and damage bonus only kicked in after you unlocked a skill or reloaded;
+  it now applies the moment you level up.
+
 ## [0.8.2] — 2026-10-18
 
 ### Fixed

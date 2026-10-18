@@ -36,6 +36,7 @@ and controller names depending on what you used last.
 | Groundspike | G | Hold LB + press X |
 | Tendril Barrage | T | Hold LB + press Y |
 | Artillery strike (needs a military disguise) | R | Hold LB + press RB |
+| With a gun: aim (rocket launcher: hold on a tank or gunship to lock on) | Hold Right click | Hold Y |
 | Focus (slow motion) | Z | L3 (click left stick) |
 | Cycle head form: normal / Thermal / Night Vision / Predator Sense | V | R3 (click right stick) |
 | Biomass Decoy | B | D-pad down |

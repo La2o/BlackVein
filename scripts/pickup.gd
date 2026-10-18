@@ -1,6 +1,6 @@
 extends Area3D
 ## A weapon lying on the ground (dropped by soldiers) or a supply cache.
-## kind: "rifle", "launcher" or "supply".
+## kind: a weapon from PlayerPowers.WEAPONS ("rifle", "launcher", "grenade", "mg"), "supply" or "sample".
 
 var kind := "rifle"
 var amount := 90
@@ -40,6 +40,17 @@ func setup(k: String, amt: int) -> void:
 			c.height = 1.1
 			mi.mesh = c
 			mi.rotation.x = PI * 0.5
+		"grenade":
+			var gl := CapsuleMesh.new()
+			gl.radius = 0.13
+			gl.height = 0.75
+			mi.mesh = gl
+			mi.rotation.x = PI * 0.5
+			glow.emission = Color(0.6, 1.0, 0.3)
+		"mg":
+			var b3 := BoxMesh.new()
+			b3.size = Vector3(0.14, 0.2, 1.25)
+			mi.mesh = b3
 		"sample":
 			var vial := CapsuleMesh.new()
 			vial.radius = 0.18

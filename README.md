@@ -77,7 +77,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Double jump / glide (hold) in the air | Space | A |
 | Dash | Q | B |
 | Attack (dive bomb in the air) | Left click | X |
-| Form special move | Right click | Y |
+| Form special move · aim a gun (hold on a vehicle to lock rockets on) | Right click | Y |
 | Switch arm form | 1–7 / mouse wheel | D-pad left / right |
 | Shield / armor | X | D-pad up |
 | Grab, throw, hijack, pick up | E | RB |
@@ -110,14 +110,17 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
   rolls, superhero landings, vaults over cars, a leaning "ninja run" at top speed.
 - **Sculpted 3D people:** faces, hands, bending elbows and knees, and outfits for every kind of person.
 - **Consume & disguise:** eat anyone to heal and take their identity. Change disguise while unseen
-  to make the military lose you.
-- **Grab & throw** people and cars. **Pick up** soldiers' rifles and rocket launchers.
+  to make the military lose you. Parkour all you like in a disguise that fits; flying, powers and
+  fights give you away. Consume unseen for bonus XP.
+- **Grab & throw** people and cars. **Pick up** soldiers' guns: assault rifles, heavy machine guns,
+  grenade launchers and rocket launchers that lock onto tanks and gunships.
 - **Hijack** tanks and gunships.
 - **Devastators:** Groundspike and Tendril Barrage.
 - **Original powers:** Tether, Focus (bullet time), Biomass Decoy, Tendril Wings, and
   **Dominate** — brand enemies so they follow you and fight for you.
-- **Living city:** civilians, soldiers, rocket teams, elite strike teams, infected, hunters,
-  tanks, trucks and gunships, plus a day/night cycle (the infected come out at night).
+- **Living city:** civilians, soldiers, rocket teams, grenadiers, heavy gunners, elite strike teams,
+  infected, hunters, tanks, trucks and gunships, plus a day/night cycle (the infected come out at
+  night).
 - **Military alert system:** hidden → suspicious → alert → searching, with escalating heat
   (more soldiers, tanks, gunships, airstrikes).
 - **World events:** infection outbreaks with hives, armored convoys, hunter packs, street battles,

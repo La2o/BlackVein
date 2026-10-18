@@ -51,11 +51,15 @@ var stats := {}             # counters: consumes, wall_runs, events, tanks, boss
 var disguises: Array = []   # wardrobe: [{kind, label, outfit}] of identities you've consumed
 var interiors: Node = null  # the enterable-buildings manager
 
-const MILITARY_DISGUISES := ["soldier", "rocket_soldier", "elite", "commander"]
+## Every kind of foot soldier (the commander is separate: he never leaves the base).
+const SOLDIER_KINDS := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite"]
+const MILITARY_DISGUISES := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]
 const DISGUISE_INFO := {
 	"civilian": ["Civilian", "Blend into crowds on the street. The military ignores you while you stay calm."],
 	"soldier": ["Soldier", "Walk into the military base and bunker. Soldiers get suspicious more slowly."],
 	"rocket_soldier": ["Rocket soldier", "Same access as a soldier: the base and the bunker."],
+	"grenadier": ["Grenadier", "Same access as a soldier: the base and the bunker."],
+	"heavy_gunner": ["Heavy gunner", "Same access as a soldier: the base and the bunker."],
 	"elite": ["Strike team", "Military access, and other soldiers trust you most."],
 	"commander": ["Base commander", "Full military access. Lets you call Artillery strikes."],
 	"scientist": ["Scientist", "Walk freely through the research labs without raising alarms."],
@@ -87,7 +91,7 @@ const ACHIEVEMENTS := [
 	["events", "Busy Night", "Complete 25 world events", "events", 25],
 	["racer", "Free Runner", "Win 5 rooftop races", "races", 5],
 	["warlord", "Warlord", "Brand 25 allies", "brands", 25],
-	["wardrobe", "Thousand Faces", "Collect all 6 kinds of disguise", "wardrobe", 6],
+	["wardrobe", "Thousand Faces", "Collect 8 different kinds of disguise", "wardrobe", 8],
 	["infiltrator", "Infiltrator", "Steal an Evolution Sample from a lab", "samples", 1],
 	["nest", "Exterminator II", "Destroy the Hive Heart in the subway", "hive_hearts", 1],
 	["army_of_six", "Personal Army", "Lead 6 allies at once", "max_allies", 6],
@@ -390,7 +394,10 @@ func add_xp(amount: int, reason := "") -> void:
 		level += 1
 		var pts := points_for_level(level)
 		skill_points += pts
-		say("LEVEL %d  ·  +%d skill point%s" % [level, pts, "s" if pts > 1 else ""], Color(1, 0.85, 0.3))
+		say("LEVEL %d  ·  +%d skill point%s  ·  +%d%% health & damage" % [level, pts, "s" if pts > 1 else "",
+			level_bonus_percent()], Color(1, 0.85, 0.3))
+		if player and player.has_method("apply_upgrades"):
+			player.apply_upgrades()
 		if fx:
 			fx.sound_ui("evolve", 0.0)
 		level_up.emit(level)
@@ -427,6 +434,18 @@ func skill_block_reason(id: String) -> String:
 	if skill_points < int(s[3]):
 		return "Needs %d point%s" % [int(s[3]), "s" if int(s[3]) > 1 else ""]
 	return ""
+
+
+## Every level past the first makes you a little tougher and stronger on its own (+2% max health and
+## +2% damage each); skills do the rest. Speed and jumps don't scale: the parkour is tuned around them.
+const LEVEL_BONUS := 0.02
+
+func level_bonus() -> float:
+	return (level - 1) * LEVEL_BONUS
+
+
+func level_bonus_percent() -> int:
+	return int(round(level_bonus() * 100.0))
 
 
 func unlock_skill(id: String) -> bool:
@@ -596,6 +615,14 @@ func add_disguise(kind: String, label: String, outfit: Dictionary) -> void:
 	stat_max("wardrobe", disguises.size())
 
 
+## Military bases, labs and the bunker: places where even the right uniform shouldn't be running
+## around or climbing walls.
+func in_restricted_area(pos: Vector3) -> bool:
+	if city and city.in_base(pos):
+		return true
+	return interiors != null and interiors.has_method("is_restricted_area") and interiors.is_restricted_area(pos)
+
+
 func is_trespassing(pos: Vector3) -> bool:
 	var dis := str(player.disguise) if player else "civilian"
 	if city and city.in_base(pos) and not dis in MILITARY_DISGUISES:
@@ -637,7 +664,7 @@ func report_sighting(pos: Vector3, conspicuous: bool, observer_pos: Vector3, del
 		var rate := lerpf(2.5, 0.5, clampf(dist / 70.0, 0.0, 1.0))
 		if thermal:
 			rate *= 2.0
-		elif player and str(player.disguise) in ["soldier", "rocket_soldier", "elite"]:
+		elif player and str(player.disguise) in SOLDIER_KINDS:
 			rate *= 0.5
 		suspicion += rate * delta
 		if suspicion >= 1.0:

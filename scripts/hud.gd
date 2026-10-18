@@ -47,6 +47,7 @@ var feed_box: VBoxContainer
 var events_label: RichTextLabel
 var alert_label: Label
 var suspicion_bar: ProgressBar
+var stealth_label: Label   # "Blending in" / "Standing out: flying" while soldiers are near
 var compass: Control
 var minimap: Control
 var crosshair: Control
@@ -276,6 +277,12 @@ func _build_right() -> void:
 	suspicion_bar.position = Vector2(-207, 264)
 	suspicion_bar.visible = false
 	root.add_child(suspicion_bar)
+	stealth_label = _label("", 13, Color(0.6, 0.9, 1.0), 3)
+	stealth_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	stealth_label.position = Vector2(-232, 270)
+	stealth_label.size = Vector2(210, 18)
+	stealth_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	root.add_child(stealth_label)
 	events_label = RichTextLabel.new()
 	events_label.bbcode_enabled = true
 	events_label.fit_content = true
@@ -484,8 +491,9 @@ func _build_evolve() -> void:
 
 
 func _refresh_evolve() -> void:
-	_evolve_ep_label.text = "Level %d   ·   %d / %d XP   ·   %d skill point%s" % [Game.level, Game.xp, Game.xp_to_next(Game.level),
-		Game.skill_points, "" if Game.skill_points == 1 else "s"]
+	_evolve_ep_label.text = "Level %d   ·   %d / %d XP   ·   %d skill point%s   ·   level bonus +%d%% health & damage" % [
+		Game.level, Game.xp, Game.xp_to_next(Game.level), Game.skill_points, "" if Game.skill_points == 1 else "s",
+		Game.level_bonus_percent()]
 	for id in _evolve_rows:
 		var sk: Array = Game.SKILLS[id]
 		var b: Button = _evolve_rows[id]["button"]
@@ -646,20 +654,15 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.8[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.9[/color][/b]
 
-[b]Light Body[/b] — a new body form for runners: faster sprints and wall runs, higher jumps
-(but you take more damage). Unlock it in Skills.
-[b]Seamless running[/b] — vault cars and low walls at full speed, curbs no longer stop you,
-and a charge-up animation when you hold jump.
-[b]Brighter nights[/b] — more moonlight, easier to see the streets.
-
-[b][color=#ff5544]0.7[/color][/b]
-[b]Forms wheel[/b] (hold Alt or X / hold D-pad Up) — time slows and you pick a form for every
-body part: [b]head[/b] (Thermal, Night Vision, Predator Sense), [b]arms[/b], [b]body[/b] (Shield, Armor,
-[b]Wings[/b]) and [b]legs[/b] (Runner, Leaper, Crawler, Crusher). Unlock them in Skills.
-[b]Parkour[/b] — flips, wall backflips, landing rolls, superhero landings, vaults over cars.
-[b]New 3D people[/b] — faces, hands, real outfits, bending elbows and knees.
+[b]Stealth[/b] — parkour all you like in a disguise that fits. Flying, powers and fights give you
+away; inside bases even running does. Watch "Blending in / Standing out" near soldiers.
+Consume someone unseen for bonus XP.
+[b]Guns[/b] — grenade launchers and heavy machine guns. Hold aim on a tank or gunship to lock
+rockets on.
+[b]New soldiers[/b] — grenadiers and heavy gunners.
+[b]Levels[/b] — every level gives +2% health and damage, right away.
 
 Full list: CHANGELOG.md"""
 
@@ -1189,6 +1192,7 @@ func _update_alert() -> void:
 			alert_label.text = "ALERT  " + "◆".repeat(int(ceil(Game.heat))) + "◇".repeat(5 - int(ceil(Game.heat)))
 			alert_label.add_theme_color_override("font_color", Color(1, 0.3, 0.25))
 	suspicion_bar.visible = Game.alert_level == Game.Alert.HIDDEN and Game.suspicion > 0.02
+	_update_stealth_label()
 	suspicion_bar.value = Game.suspicion * 100.0
 
 
@@ -1198,6 +1202,24 @@ const KEY_ACTIONS := {
 	"spikes": "devastator_spikes", "tendrils": "devastator_tendrils", "artillery": "artillery",
 	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu",
 }
+
+
+func _update_stealth_label() -> void:
+	var p := Game.player
+	stealth_label.visible = false
+	if p == null or p.is_dead() or p.vehicle != null or Game.alert_level != Game.Alert.HIDDEN:
+		return
+	var near := Game.nearest_in_group("military", p.global_position, 70.0)
+	if near == null:
+		return
+	var why: String = p.stand_out_reason()
+	stealth_label.visible = true
+	if why == "":
+		stealth_label.text = "Blending in"
+		stealth_label.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0))
+	else:
+		stealth_label.text = "Standing out: " + why
+		stealth_label.add_theme_color_override("font_color", Color(1, 0.55, 0.35))
 
 
 func _k(action: String) -> String:
@@ -1213,7 +1235,14 @@ func _update_powers_text() -> void:
 	var f: int = pw.form
 	form_label.text = "%s" % pw.FORM_NAMES[f].to_upper()
 	if pw.weapon != "":
-		form_label.text = "%s  (%d)" % ["ASSAULT RIFLE" if pw.weapon == "rifle" else "ROCKET LAUNCHER", pw.ammo]
+		form_label.text = "%s  (%d)" % [str(pw.WEAPONS[pw.weapon]["name"]).to_upper(), pw.ammo]
+		if pw.weapon == "launcher":
+			if pw.lock_target:
+				form_label.text += "   LOCKED"
+			elif pw._lock_on:
+				form_label.text += "   locking..."
+			else:
+				form_label.text += "   (hold %s on a vehicle to lock on)" % _k("special")
 	var parts: Array[String] = []
 	parts.append("%s %s" % [_k("special"), pw.SPECIAL_NAMES[f]])
 	var forms_owned := 0
@@ -1279,8 +1308,8 @@ func _update_prompt() -> void:
 		var food := Game.nearest_in_group("npcs", pos, 3.4, func(n): return n.can_be_consumed())
 		if v:
 			text = "%s hijack %s" % [_k("grab"), "gunship" if v.is_in_group("helicopters") else "tank"]
-		elif pick and pick.get("kind") != "supply":
-			text = "%s pick up %s" % [_k("grab"), "rifle" if pick.get("kind") == "rifle" else "rocket launcher"]
+		elif pick and player.powers.WEAPONS.has(pick.get("kind")):
+			text = "%s pick up %s" % [_k("grab"), str(player.powers.WEAPONS.get(pick.get("kind"), {"name": "weapon"})["name"]).to_lower()]
 		elif food:
 			text = "%s consume %s   %s grab" % [_k("consume"), str(food.get("label")), _k("grab")]
 		elif player.state == player.State.WALL:

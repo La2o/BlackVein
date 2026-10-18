@@ -114,7 +114,8 @@ var biomass := 60.0
 var regen_cap := 0.75
 var regen_rate := 6.0
 var time_since_damage := 99.0
-var conspicuous_timer := 0.0
+var conspicuous_timer := 0.0   # did something no human could (dash, tether, dive, smash...)
+var parkour_timer := 0.0       # vaulted, flipped or ran up a wall: fine in a fitting disguise
 var disguise := "civilian"
 var damage_mult := 1.0
 var speed_mult := 1.0
@@ -205,7 +206,7 @@ func respawn_in_place(at: Vector3, new_yaw: float) -> void:
 func apply_upgrades() -> void:
 	var ratio := health / maxf(max_health, 1.0)
 	# levels make you a little tougher by themselves; skills do the rest
-	var lvl_bonus := (Game.level - 1) * 0.02
+	var lvl_bonus := Game.level_bonus()
 	max_health = 100.0 * (1.0 + 0.2 * Game.skill_rank("vitality") + lvl_bonus)
 	health = max_health * ratio
 	max_biomass = 100.0 + 30.0 * Game.skill_rank("biomass")
@@ -251,6 +252,7 @@ func _physics_process(delta: float) -> void:
 	wall_cooldown = maxf(0.0, wall_cooldown - delta)
 	dash_cooldown_timer = maxf(0.0, dash_cooldown_timer - delta)
 	conspicuous_timer = maxf(0.0, conspicuous_timer - delta)
+	parkour_timer = maxf(0.0, parkour_timer - delta)
 	face_override_timer = maxf(0.0, face_override_timer - delta)
 	invuln_timer = maxf(0.0, invuln_timer - delta)
 	hits_taken_recent = maxf(0.0, hits_taken_recent - delta * 0.5)
@@ -406,7 +408,7 @@ func _try_vault(delta: float) -> bool:
 	start_trick("vault", 2.0 * vy / gravity, 1.0 if randf() < 0.5 else -1.0)
 	Game.fx.sound("whoosh", global_position, -8.0)
 	Game.stat_add("vaults")
-	conspicuous_timer = maxf(conspicuous_timer, 1.0)
+	parkour_timer = maxf(parkour_timer, 1.0)
 	return true
 
 
@@ -508,7 +510,7 @@ func _jump_boost(delta: float) -> void:
 		_super_done = true
 		Game.stat_add("super_jumps")
 		trauma = minf(1.0, trauma + 0.25)
-		conspicuous_timer = 2.0
+		parkour_timer = 2.0
 		Game.fx.shockwave(_takeoff, 4.0, Color(1, 0.9, 0.8, 0.6), 0.3)
 		Game.fx.debris(_takeoff + Vector3.UP * 0.1, 10)
 		Game.fx.sound("land", _takeoff, -4.0)
@@ -570,10 +572,11 @@ func _double_jump() -> void:
 	model.scale = Vector3(0.8, 1.25, 0.8)
 	Game.fx.burst_ring(global_position + Vector3.DOWN * 0.8, Color(1, 0.3, 0.2, 0.6), 2.5)
 	Game.fx.sound("jump", global_position, -4.0)
-	conspicuous_timer = maxf(conspicuous_timer, 1.0)
+	parkour_timer = maxf(parkour_timer, 1.0)
 
 
 func _state_glide(delta: float) -> void:
+	conspicuous_timer = maxf(conspicuous_timer, 1.5)   # nobody forgets seeing a man fly
 	if Input.is_action_just_pressed("jump") and flaps_left > 0:
 		flaps_left -= 1
 		velocity.y = 14.0 * (1.3 if powers.defense == PlayerPowers.Defense.WINGS else 1.0)
@@ -617,9 +620,13 @@ func _start_dash() -> void:
 		dash_ready = false
 	if state != State.GROUND and state != State.DASH:
 		start_trick("barrel", dash_time + 0.15, 1.0 if randf() < 0.5 else -1.0)
+	# a dash along the street is parkour; one through the air is flying
+	if state == State.GROUND:
+		parkour_timer = maxf(parkour_timer, 1.5)
+	else:
+		conspicuous_timer = maxf(conspicuous_timer, 1.5)
 	state = State.DASH
 	trauma = minf(1.0, trauma + 0.12)
-	conspicuous_timer = maxf(conspicuous_timer, 1.5)
 	Game.fx.sound("dash", global_position, -4.0)
 	Game.fx.burst_ring(global_position, Color(1, 0.4, 0.3, 0.5), 1.8)
 
@@ -675,7 +682,7 @@ func _enter_wall(n: Vector3) -> void:
 	air_press = false
 	var hspeed := Vector3(velocity.x, 0, velocity.z).length()
 	velocity = Vector3.UP * maxf(velocity.y, minf(hspeed, wall_run_speed)) - n * 2.0
-	conspicuous_timer = maxf(conspicuous_timer, 2.0)
+	parkour_timer = maxf(parkour_timer, 2.0)
 
 
 func _state_wall(delta: float) -> void:
@@ -720,7 +727,7 @@ func _state_wall(delta: float) -> void:
 	var light := PlayerPowers.LIGHT_SPEED if powers.is_light() else 1.0
 	var target := dir * wall_run_speed * speed_mult * light * (1.25 if cling else 1.0) - wall_normal * wall_stick
 	velocity = velocity.move_toward(target, wall_accel * delta)
-	conspicuous_timer = maxf(conspicuous_timer, 1.0)
+	parkour_timer = maxf(parkour_timer, 1.0)
 	if Input.is_action_just_pressed("jump"):
 		_wall_jump()
 	elif (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and powers.can_move() and Game.has_skill("air_dash"):
@@ -935,18 +942,49 @@ func add_trauma(amount: float) -> void:
 	trauma = minf(1.0, trauma + amount)
 
 
+## Would a soldier who sees you right now find you suspicious?
+## Parkour is fine in a disguise that fits where you are. Flying, visible powers, carrying people or
+## cars and smashing things never are, and inside a base or lab any running around gives you away.
 func is_conspicuous() -> bool:
 	if conspicuous_timer > 0.0:
 		return true
-	if state in [State.WALL, State.GLIDE, State.DASH, State.TETHER, State.DIVE]:
+	if is_flying():
+		return true
+	if powers.looks_inhuman():
+		return true
+	return is_doing_parkour() and Game.in_restricted_area(global_position)
+
+
+## Why soldiers would notice you right now ("" = you blend in). Shown on the HUD near soldiers.
+func stand_out_reason() -> String:
+	if Game.is_trespassing(global_position):
+		return "you don't belong here"
+	if is_flying() or (conspicuous_timer > 0.0 and state != State.GROUND):
+		return "flying"
+	if powers.held != null:
+		return "carrying something"
+	if powers.looks_inhuman():
+		return "powers showing"
+	if conspicuous_timer > 0.0:
+		return "making a scene"
+	if is_doing_parkour() and Game.in_restricted_area(global_position):
+		return "running around a restricted area"
+	return ""
+
+
+## Gliding, wing flaps, air dashes, tether zips and dive bombs.
+func is_flying() -> bool:
+	if state in [State.GLIDE, State.TETHER, State.DIVE]:
+		return true
+	return state == State.DASH and not is_on_floor()
+
+
+func is_doing_parkour() -> bool:
+	if parkour_timer > 0.0 or state in [State.WALL, State.DASH]:
 		return true
 	if state == State.AIR and absf(velocity.y) > 14.0:
 		return true
-	if Vector3(velocity.x, 0, velocity.z).length() > walk_speed * 1.35:
-		return true
-	if powers.is_transformed():
-		return true
-	return false
+	return Vector3(velocity.x, 0, velocity.z).length() > walk_speed * 1.35
 
 
 func is_dead() -> bool:

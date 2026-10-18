@@ -31,6 +31,15 @@ const FORMS := {
 }
 const DECOY_SCRIPT := preload("res://scripts/decoy.gd")
 const PROJECTILE_SCRIPT := preload("res://scripts/projectile.gd")
+## Guns you can pick up, Prototype 1 style. auto = hold to fire; drop/armory = rounds you get.
+const WEAPONS := {
+	"rifle": {"name": "Assault rifle", "auto": true, "cooldown": 0.09, "drop": 90, "armory": 120},
+	"launcher": {"name": "Rocket launcher", "auto": false, "cooldown": 0.9, "drop": 6, "armory": 10},
+	"grenade": {"name": "Grenade launcher", "auto": false, "cooldown": 0.7, "drop": 8, "armory": 14},
+	"mg": {"name": "Heavy machine gun", "auto": true, "cooldown": 0.055, "drop": 150, "armory": 250},
+}
+const LOCK_TIME := 0.5     # seconds of aiming at a vehicle to lock on
+const LOCK_RANGE := 260.0
 
 var player: Player
 var form: int = Form.FISTS
@@ -56,6 +65,9 @@ var held_kind := ""
 var weapon := ""
 var ammo := 0
 var fire_cooldown := 0.0
+var lock_target: Node3D = null   # rocket launcher: the vehicle you've locked onto
+var _lock_on: Node3D = null      # what the lock is building on
+var _lock_t := 0.0
 var consuming: Node3D = null
 var consume_timer := 0.0
 var consume_lines: Array[MeshInstance3D] = []
@@ -84,6 +96,8 @@ func speed_factor() -> float:
 	var f := 1.0
 	if held_kind == "car":
 		f *= 0.65
+	if weapon == "mg":
+		f *= 0.75   # a heavy machine gun weighs you down
 	if defense == Defense.ARMOR:
 		f *= 0.85
 	elif defense == Defense.LIGHT:
@@ -91,9 +105,19 @@ func speed_factor() -> float:
 	match legs:
 		Legs.RUNNER: f *= 1.35
 		Legs.CRUSHER: f *= 0.95
-	if weapon != "":
+	if weapon != "" and weapon != "mg":
 		f *= 0.85
 	return f
+
+
+## Something nobody human would be doing: a body form showing, carrying a person or a car, a
+## devastator, or a gun when you're not dressed as a soldier.
+func looks_inhuman() -> bool:
+	if form != Form.FISTS or defense != Defense.NONE or legs != Legs.NORMAL or devastating != "":
+		return true
+	if held != null:
+		return true
+	return weapon != "" and not str(player.disguise) in Game.MILITARY_DISGUISES
 
 
 func is_transformed() -> bool:
@@ -947,7 +971,7 @@ func _finish_brand(target) -> void:
 	Game.add_xp(15, "Branded " + str(target.label))
 	Game.say("%s is yours  (%d/%d allies)" % [str(target.label).capitalize(), ally_count(), max_allies()], Color(1, 0.4, 0.3))
 	if _witnessed(player.global_position):
-		Game.raise_alert(player.global_position, "Someone saw you brand a soldier" if target.kind in ["soldier", "rocket_soldier", "elite"] else "")
+		Game.raise_alert(player.global_position, "Someone saw you brand a soldier" if target.kind in Game.SOLDIER_KINDS else "")
 
 
 func drop_held() -> void:
@@ -1008,8 +1032,11 @@ func _finish_consume() -> void:
 	var bio := 30.0
 	var ep := 8
 	match kind:
-		"soldier", "rocket_soldier":
+		"soldier", "rocket_soldier", "grenadier":
 			ep = 20
+		"heavy_gunner":
+			ep = 35
+			bio = 45.0
 		"elite":
 			ep = 50
 			bio = 50.0
@@ -1030,12 +1057,17 @@ func _finish_consume() -> void:
 			bio = 100.0
 	player.heal(heal_amt)
 	player.biomass = minf(player.max_biomass, player.biomass + bio)
-	Game.add_ep(ep, "Consumed " + str(info.get("label", kind)))
+	var witnessed := _witnessed(player.global_position)
+	if witnessed:
+		Game.add_ep(ep, "Consumed " + str(info.get("label", kind)))
+	else:
+		# Prototype 2 style: nobody saw it, so nobody knows
+		Game.stat_add("stealth_consumes")
+		Game.add_ep(int(ep * 1.5), "Stealth consume: " + str(info.get("label", kind)))
 	Game.fx.splat(player.global_position + player.facing * 0.8, Vector3.UP, Color(0.45, 0.02, 0.02), 24)
 	Game.fx.burst_ring(player.global_position, Color(0.8, 0.05, 0.05, 0.7), 2.5)
 	player.add_trauma(0.15)
 	rumble(0.4, 0.4, 0.25)
-	var witnessed := _witnessed(player.global_position)
 	if info.has("outfit") and kind != "infected" and kind != "hunter":
 		player.disguise = kind
 		player.model.build(info["outfit"])
@@ -1227,7 +1259,7 @@ func _call_artillery() -> void:
 	if not Game.has_skill("artillery"):
 		Game.locked_message("artillery")
 		return
-	if not str(player.disguise) in ["soldier", "rocket_soldier", "elite", "commander"]:
+	if not str(player.disguise) in Game.MILITARY_DISGUISES:
 		Game.say("You need a military disguise to call artillery", Color(1, 0.6, 0.5))
 		return
 	if artillery_cooldown > 0.0:
@@ -1329,7 +1361,7 @@ func give_weapon(kind: String, rounds: int) -> void:
 	weapon = kind
 	ammo = rounds
 	_attach_weapon_mesh()
-	Game.say("Picked up %s" % ("assault rifle" if kind == "rifle" else "rocket launcher"), Color(1, 0.85, 0.5))
+	Game.say("Picked up a %s" % str(WEAPONS[kind]["name"]).to_lower(), Color(1, 0.85, 0.5))
 	Game.fx.sound("pickup", player.global_position, 0.0)
 
 
@@ -1346,6 +1378,15 @@ func _attach_weapon_mesh() -> void:
 		mi.mesh = player.model.box(Vector3(0.07, 0.12, 0.85))
 		mi.material_override = player.model.mat(Color(0.08, 0.08, 0.08), 0.0, 0.6, 0.4)
 		mi.position = Vector3(0, -0.05, -0.3)
+	elif weapon == "mg":
+		mi.mesh = player.model.box(Vector3(0.14, 0.2, 1.25))
+		mi.material_override = player.model.mat(Color(0.1, 0.1, 0.09), 0.0, 0.7, 0.35)
+		mi.position = Vector3(0, -0.06, -0.4)
+	elif weapon == "grenade":
+		mi.mesh = player.model.capsule(0.12, 0.75)
+		mi.material_override = player.model.mat(Color(0.28, 0.3, 0.2), 0.0, 0.4, 0.5)
+		mi.rotation.x = PI * 0.5
+		mi.position = Vector3(0, -0.05, -0.2)
 	else:
 		mi.mesh = player.model.capsule(0.09, 1.1)
 		mi.material_override = player.model.mat(Color(0.2, 0.25, 0.15))
@@ -1358,13 +1399,18 @@ func _drop_weapon() -> void:
 		return
 	weapon = ""
 	ammo = 0
+	lock_target = null
+	_lock_on = null
 	_attach_weapon_mesh()
 
 
 func _update_weapon() -> void:
-	var firing := Input.is_action_pressed("attack") if weapon == "rifle" else Input.is_action_just_pressed("attack")
+	var w: Dictionary = WEAPONS[weapon]
+	var firing := Input.is_action_pressed("attack") if w["auto"] else Input.is_action_just_pressed("attack")
 	player.model.arm_r.rotation = Vector3(1.45, 0, 0)
 	player.model.arm_l.rotation = Vector3(1.3, 0, -0.45)
+	if weapon == "launcher":
+		_update_lock()
 	if not firing or fire_cooldown > 0.0:
 		return
 	var aim: Dictionary = player.aim_point(220.0)
@@ -1373,36 +1419,92 @@ func _update_weapon() -> void:
 	player.face(dir, 0.5)
 	violence_timer = 3.0
 	player.conspicuous_timer = 3.0
-	if weapon == "rifle":
-		fire_cooldown = 0.09
-		dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.012).normalized()
-		var hit := Game.raycast(muzzle, muzzle + dir * 220.0, Game.LAYER_WORLD | Game.MASK_HITTABLE, [player.get_rid()])
-		var end := muzzle + dir * 220.0
-		if not hit.is_empty():
-			end = hit["position"]
-			var c := hit["collider"] as Node
-			if c and c.has_method("take_hit"):
-				c.take_hit(Game.hit_info(10.0 * player.damage_mult, dir * 3.0, player, "bullet"))
-				Game.fx.splat(end, -dir, Color(0.5, 0.02, 0.02), 4)
-			else:
-				Game.fx.debris(end, 2)
-		Game.fx.tracer(muzzle, end)
-		Game.fx.flash_light(muzzle, Color(1, 0.8, 0.4), 3.0, 6.0, 0.05)
-		Game.fx.sound("gunshot", muzzle, -4.0)
-		player.add_trauma(0.04)
-	else:
-		fire_cooldown = 0.9
-		var p := Node3D.new()
-		p.set_script(PROJECTILE_SCRIPT)
-		player.get_parent().add_child(p)
-		p.launch(muzzle, dir * 55.0, player, "rocket")
-		Game.fx.sound("rocket", muzzle, 0.0)
-		player.add_trauma(0.15)
+	fire_cooldown = w["cooldown"]
+	match weapon:
+		"rifle":
+			_fire_hitscan(muzzle, dir, 0.012, 10.0, 0.04)
+		"mg":
+			_fire_hitscan(muzzle, dir, 0.02, 16.0, 0.07)
+		"launcher":
+			var p := Node3D.new()
+			p.set_script(PROJECTILE_SCRIPT)
+			player.get_parent().add_child(p)
+			var locked := lock_target if lock_target and is_instance_valid(lock_target) else null
+			if locked:
+				dir = (dir + Vector3.UP * 0.25).normalized()   # loft it a little; it steers in
+			p.launch(muzzle, dir * 55.0, player, "rocket", locked)
+			Game.fx.sound("rocket", muzzle, 0.0)
+			player.add_trauma(0.15)
+		"grenade":
+			var land: Vector3 = aim["position"]
+			var dist := muzzle.distance_to(land)
+			if dist > 70.0:
+				land = muzzle + dir * 70.0
+				dist = 70.0
+			var g := Node3D.new()
+			g.set_script(PROJECTILE_SCRIPT)
+			player.get_parent().add_child(g)
+			g.launch(muzzle, PROJECTILE_SCRIPT.lob_velocity(muzzle, land, clampf(dist / 30.0, 0.35, 1.4)), player, "grenade")
+			Game.fx.sound("whoosh", muzzle, -2.0)
+			player.add_trauma(0.08)
 	rumble(0.15, 0.2, 0.06)
 	ammo -= 1
 	if ammo <= 0:
 		Game.say("Out of ammo", Color(1, 0.7, 0.5))
 		_drop_weapon()
+
+
+func _fire_hitscan(muzzle: Vector3, dir: Vector3, spread: float, damage: float, kick: float) -> void:
+	dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * spread).normalized()
+	var hit := Game.raycast(muzzle, muzzle + dir * 220.0, Game.LAYER_WORLD | Game.MASK_HITTABLE, [player.get_rid()])
+	var end := muzzle + dir * 220.0
+	if not hit.is_empty():
+		end = hit["position"]
+		var c := hit["collider"] as Node
+		if c and c.has_method("take_hit"):
+			c.take_hit(Game.hit_info(damage * player.damage_mult, dir * 3.0, player, "bullet"))
+			Game.fx.splat(end, -dir, Color(0.5, 0.02, 0.02), 4)
+		else:
+			Game.fx.debris(end, 2)
+	Game.fx.tracer(muzzle, end)
+	Game.fx.flash_light(muzzle, Color(1, 0.8, 0.4), 3.0, 6.0, 0.05)
+	Game.fx.sound("gunshot", muzzle, -4.0 if weapon == "rifle" else -1.0)
+	player.add_trauma(kick)
+
+
+## Rocket launcher lock-on (Prototype 1): hold Aim on a tank or gunship and the rockets home in.
+func _update_lock() -> void:
+	if not Input.is_action_pressed("special"):
+		lock_target = null
+		_lock_on = null
+		_lock_t = 0.0
+		return
+	var cam_pos: Vector3 = player.camera.global_position
+	var look: Vector3 = player.aim_direction()
+	var best: Node3D = null
+	var best_ang := deg_to_rad(7.0)
+	for v in get_tree().get_nodes_in_group("vehicles"):   # tanks, trucks and gunships
+		var n := v as Node3D
+		if n == null or n == player.vehicle or (n.has_method("is_alive") and not n.is_alive()):
+			continue
+		var to := n.global_position - cam_pos
+		if to.length() > LOCK_RANGE:
+			continue
+		var ang := look.angle_to(to)
+		if ang < best_ang and Game.line_of_sight(cam_pos, n.global_position + Vector3.UP):
+			best_ang = ang
+			best = n
+	if best != _lock_on:
+		_lock_on = best
+		_lock_t = 0.0
+		if lock_target != best:
+			lock_target = null
+	if best == null:
+		return
+	_lock_t += get_physics_process_delta_time()
+	if lock_target == null and _lock_t >= LOCK_TIME:
+		lock_target = best
+		Game.fx.sound_ui("zap", -6.0)
 
 
 # ------------------------------------------------------------------ controller rumble
