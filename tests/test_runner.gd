@@ -392,6 +392,8 @@ func _run_all() -> void:
 		player.yaw = 0.0
 		await _wait(0.2)
 		var hp0: float = dummy.hp
+		player.powers.attack_cooldown = 0.0
+		player.powers.special_cooldown = 0.0
 		await _tap("attack")
 		await _wait(0.6)
 		if is_instance_valid(dummy) and dummy.hp >= hp0:

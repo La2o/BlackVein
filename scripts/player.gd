@@ -168,6 +168,9 @@ func respawn(at: Vector3) -> void:
 	charging = false
 	double_jump_ready = true
 	dash_ready = true
+	air_press = false
+	boost_timer = 0.0
+	flaps_left = max_flaps()
 	trick = ""
 	_hero_t = 0.0
 	health = max_health
