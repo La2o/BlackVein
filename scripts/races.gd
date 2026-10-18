@@ -139,7 +139,7 @@ func _make_beacon(at: Vector3) -> Node3D:
 func _ring_mesh(radius: float) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	var tm := TorusMesh.new()
-	tm.inner_radius = radius - 0.3
+	tm.inner_radius = radius - 0.5
 	tm.outer_radius = radius
 	mi.mesh = tm
 	mi.material_override = _ring_mat

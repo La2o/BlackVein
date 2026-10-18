@@ -35,6 +35,8 @@ people are rigged, animated CC0 characters by Quaternius (credits in [assets/CRE
 | **Industry** to the east, with the military base | **Parks** among midtown's brick blocks |
 | ![An infection outbreak with a glowing hive in the street](docs/screenshots/outbreak.jpg) | ![A rainy night street](docs/screenshots/night.jpg) |
 | **Outbreaks** with hives to destroy | **Day and night**, rain and fog |
+| ![A sniper, a brute infected, a soldier and a riot trooper with a shield](docs/screenshots/enemies.jpg) | ![Time trial rings leading across the rooftops toward the suburbs](docs/screenshots/trials.jpg) |
+| **New enemies**: snipers, brutes and riot troopers | **Time trials** across the rooftops |
 
 ---
 
