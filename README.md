@@ -27,6 +27,8 @@ photo textures (credits in [assets/CREDITS.md](assets/CREDITS.md)).
 | **Hijack gunships** and tanks | **Day and night**, with disguises |
 | ![Driving a hijacked tank at dusk](docs/screenshots/tank.jpg) | ![Inside a research lab, disguised as a scientist](docs/screenshots/lab.jpg) |
 | **Tanks** that fire shells | **Research labs** to infiltrate |
+| ![A gravel rooftop above the textured city](docs/screenshots/rooftop.jpg) | ![An infection outbreak with a glowing hive in the street](docs/screenshots/outbreak.jpg) |
+| **Rooftops** over brick and concrete | **Outbreaks** with hives to destroy |
 
 ---
 
