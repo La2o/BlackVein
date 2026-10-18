@@ -388,7 +388,10 @@ func _find_target(max_range: float, cone_deg: float, dir: Vector3, mask := Game.
 		if dist < 0.01:
 			return n
 		var c := flat.normalized().dot(dir)
-		if c < cos_limit:
+		# up close, a fixed angle is too strict: also accept anyone in front within ~0.7 m of the aim line
+		var ahead := flat.dot(dir)
+		var lateral := (flat - dir * ahead).length()
+		if c < cos_limit and not (ahead > 0.0 and lateral < 0.7):
 			continue
 		var score := c * 2.0 - dist / max_range
 		if n.is_in_group("cars"):
@@ -581,6 +584,10 @@ func _spike_shot(dir: Vector3, spread: float) -> void:
 			pierced += 1
 			if c is CollisionObject3D:
 				exclude.append((c as CollisionObject3D).get_rid())
+			from = p
+		elif c is CollisionObject3D and ((c as CollisionObject3D).collision_layer & Game.LAYER_WORLD) == 0:
+			# something loose that can't be hurt: fly past it
+			exclude.append((c as CollisionObject3D).get_rid())
 			from = p
 		else:
 			end = p
