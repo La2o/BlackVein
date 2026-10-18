@@ -14,7 +14,7 @@ var invert_y := false
 var fov := 72.0
 var volume := 0.8
 var music_volume := 0.55
-var quality := 2                 # 0 low, 1 medium, 2 high
+var quality := 2                 # 0 low, 1 medium, 2 high, 3 ultra
 var camera_shake := 1.0
 var rumble := true
 var show_fps := false
@@ -157,6 +157,7 @@ func apply() -> void:
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.0001)))
 	AudioServer.set_bus_mute(0, volume <= 0.001)
 	var vp := get_viewport()
+	vp.use_taa = false
 	match quality:
 		0:
 			vp.msaa_3d = Viewport.MSAA_DISABLED
@@ -166,6 +167,12 @@ func apply() -> void:
 			vp.msaa_3d = Viewport.MSAA_2X
 			vp.scaling_3d_scale = 0.9
 			RenderingServer.directional_shadow_atlas_set_size(2048, true)
+		3:
+			# ultra: light bounces off buildings (SDFGI), soft volumetric fog, temporal anti-aliasing
+			vp.msaa_3d = Viewport.MSAA_4X
+			vp.use_taa = true
+			vp.scaling_3d_scale = 1.0
+			RenderingServer.directional_shadow_atlas_set_size(4096, true)
 		_:
 			vp.msaa_3d = Viewport.MSAA_4X
 			vp.scaling_3d_scale = 1.0
@@ -177,7 +184,13 @@ func apply() -> void:
 			we.environment.ssil_enabled = quality >= 2
 			we.environment.ssr_enabled = quality >= 2
 			we.environment.glow_enabled = quality >= 1
+			var forward_plus := RenderingServer.get_current_rendering_method() == "forward_plus"
+			we.environment.sdfgi_enabled = quality >= 3 and forward_plus
+			# street canyons get very dark with real bounced light alone: lift it
+			we.environment.sdfgi_energy = 2.4
+			we.environment.sdfgi_bounce_feedback = 0.7
+			we.environment.sdfgi_use_occlusion = true
 		var sun := Game.world.get_node_or_null("Sun") as DirectionalLight3D
 		if sun:
-			sun.directional_shadow_max_distance = [90.0, 160.0, 220.0][quality]
+			sun.directional_shadow_max_distance = [90.0, 160.0, 220.0, 300.0][clampi(quality, 0, 3)]
 	changed.emit()

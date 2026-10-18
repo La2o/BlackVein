@@ -2,6 +2,16 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.9.1] — 2026-10-18 — Real textures
+
+### New
+- **Photo textures** (free CC0 from ambientCG): buildings are now concrete, red brick or plaster
+  with real surface detail, streets are real asphalt, sidewalks are paving slabs, rooftops are
+  gravel with tar patches. Lane markings, windows and shop fronts are drawn on top as before.
+- **Ultra graphics** (Settings → Graphics quality): light bounces off buildings (global
+  illumination) and temporal anti-aliasing smooths edges. Needs a strong graphics card; High is
+  still the default.
+
 ## [0.9.0] — 2026-10-18 — Stealth, guns, new soldiers
 
 ### New

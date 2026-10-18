@@ -637,7 +637,7 @@ func _build_settings() -> void:
 	l.custom_minimum_size = Vector2(260, 0)
 	row.add_child(l)
 	var opt := OptionButton.new()
-	for q in ["Low (fast)", "Medium", "High"]:
+	for q in ["Low (fast)", "Medium", "High", "Ultra (global illumination)"]:
 		opt.add_item(q)
 	opt.selected = Settings.quality
 	opt.custom_minimum_size = Vector2(300, 40)

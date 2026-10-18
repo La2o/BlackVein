@@ -6,6 +6,7 @@ extends Node3D
 
 const BUILDING_SHADER := preload("res://shaders/building.gdshader")
 const ROAD_SHADER := preload("res://shaders/road.gdshader")
+const TEX := "res://assets/textures/"   # CC0 photo textures, see assets/CREDITS.md
 const CAR_SCRIPT := preload("res://scripts/car.gd")
 
 @export var blocks := 8
@@ -94,10 +95,20 @@ func _make_materials() -> void:
 		m.set_shader_parameter("glass_color", p[1])
 		m.set_shader_parameter("window_width", p[2])
 		m.set_shader_parameter("window_fill", p[3])
+		for t in ["concrete", "brick", "plaster", "gravel"]:
+			m.set_shader_parameter(t + "_col", load(TEX + t + "/color.jpg"))
+			m.set_shader_parameter(t + "_nrm", load(TEX + t + "/normal.jpg"))
 		building_mats.append(m)
 	_sidewalk_mat = StandardMaterial3D.new()
-	_sidewalk_mat.albedo_color = Color(0.46, 0.45, 0.43)
-	_sidewalk_mat.roughness = 0.95
+	_sidewalk_mat.albedo_color = Color(0.9, 0.88, 0.85)
+	_sidewalk_mat.albedo_texture = load(TEX + "paving/color.jpg")
+	_sidewalk_mat.normal_enabled = true
+	_sidewalk_mat.normal_texture = load(TEX + "paving/normal.jpg")
+	_sidewalk_mat.roughness_texture = load(TEX + "paving/roughness.jpg")
+	_sidewalk_mat.uv1_triplanar = true
+	_sidewalk_mat.uv1_world_triplanar = true
+	_sidewalk_mat.uv1_scale = Vector3.ONE / 2.5
+	_sidewalk_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	for c in [Color(0.35, 0.33, 0.3), Color(0.5, 0.47, 0.42), Color(0.27, 0.28, 0.3), Color(0.45, 0.3, 0.2)]:
 		var rm := StandardMaterial3D.new()
 		rm.albedo_color = c
@@ -175,6 +186,9 @@ func _build_ground(total: float) -> void:
 	road_mat.set_shader_parameter("period", period)
 	road_mat.set_shader_parameter("street", street_width)
 	road_mat.set_shader_parameter("origin", Vector2(x0, z0))
+	road_mat.set_shader_parameter("asphalt_col", load(TEX + "asphalt/color.jpg"))
+	road_mat.set_shader_parameter("asphalt_nrm", load(TEX + "asphalt/normal.jpg"))
+	road_mat.set_shader_parameter("asphalt_rough", load(TEX + "asphalt/roughness.jpg"))
 	var size := total + backdrop_ring * period * 2.0 + 400.0
 	_add_box(Vector3(size, 1.0, size), Vector3(0, -0.5, 0), road_mat)
 	# walking surface for the navigation bake (only the playable city)

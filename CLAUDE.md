@@ -10,8 +10,11 @@ Read this first in every new session. It's the fastest way to get back up to spe
 ## Engine & rules
 
 - Godot **4.5**, GDScript only, Forward+ renderer (must also work in Compatibility).
-- **No external assets.** Meshes are primitives built in code, sounds come from
-  `tools/make_sounds.py`. Keep it that way so the repo stays small and self-contained.
+- **External art is allowed** (the owner lifted the old code-only rule on 2026-10-18), but only with
+  a licence that allows use in a game: CC0 (ambientCG, Poly Haven, Kenney, Quaternius) or Mixamo.
+  Every asset goes under `assets/` and gets a line in `assets/CREDITS.md` (source, licence, URL).
+  Keep textures at 1K JPG unless there's a reason, so the repo stays small. Sounds still come from
+  `tools/make_sounds.py`.
 - Static typing: `:=` fails on values typed as Variant (e.g. results of methods on untyped
   nodes, Dictionary lookups). Use explicit types: `var x: Vector3 = d["pos"]`.
 - `Game.player` is typed `Player`, `Game.city` is typed `City` — use them for typed access.

@@ -7,6 +7,9 @@ uniform float period = 60.0;
 uniform float street = 16.0;
 uniform vec2 origin = vec2(0.0);
 uniform float wetness = 0.0;
+uniform sampler2D asphalt_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D asphalt_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D asphalt_rough : hint_roughness_r, filter_linear_mipmap_anisotropic, repeat_enable;
 
 varying vec3 wpos;
 
@@ -42,10 +45,12 @@ void fragment() {
 	vec2 c = abs(m - street * 0.5);
 	bool in_x_street = m.x < street; // street running along Z
 	bool in_z_street = m.y < street; // street running along X
-	// asphalt: grain, large blotches, darker tire tracks
-	float grain = hash(floor(wpos.xz * 6.0)) * 0.025;
+	// asphalt: a photo texture (CC0, assets/CREDITS.md) with large blotches on top
+	vec2 auv = wpos.xz / 3.5;
 	float blotch = fbm(wpos.xz * 0.08);
-	vec3 col = vec3(0.075) + vec3(grain) + vec3(blotch * 0.05);
+	vec3 col = texture(asphalt_col, auv).rgb * 0.42 * (0.85 + blotch * 0.3);
+	vec3 nmap = texture(asphalt_nrm, auv).rgb;
+	float base_rough = texture(asphalt_rough, auv).r;
 	// patched squares
 	vec2 patch_cell = floor(wpos.xz / 7.0);
 	if (hash(patch_cell) > 0.93) {
@@ -92,6 +97,8 @@ void fragment() {
 	float wet = clamp(wetness * 0.8 + puddle, 0.0, 1.0);
 	col *= mix(1.0, 0.55, wet);
 	ALBEDO = col;
-	ROUGHNESS = mix(0.9, 0.08, wet);
+	// paint lines and puddles are smooth; bare asphalt keeps its grain
+	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), clamp(max(line, wet), 0.0, 1.0));
+	ROUGHNESS = mix(base_rough, 0.08, wet);
 	SPECULAR = mix(0.4, 0.7, wet);
 }

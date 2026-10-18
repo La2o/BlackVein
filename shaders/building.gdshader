@@ -2,6 +2,8 @@ shader_type spatial;
 // Procedural skyscraper facade: windows with frames and blinds, floor bands,
 // pilasters, ground-floor storefronts, grime and per-building color variety,
 // all drawn from world position so every building of any size looks right.
+// Walls are concrete, brick or plaster photo textures (CC0, assets/CREDITS.md),
+// picked per building; roofs are gravel.
 
 uniform vec3 wall_color : source_color = vec3(0.6, 0.58, 0.54);
 uniform vec3 glass_color : source_color = vec3(0.14, 0.17, 0.21);
@@ -12,6 +14,14 @@ uniform float window_fill = 0.62;
 uniform float lit_chance = 0.25;
 uniform float night = 0.0;
 uniform float wetness = 0.0;
+uniform sampler2D concrete_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D concrete_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D brick_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D brick_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D plaster_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D plaster_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D gravel_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D gravel_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 instance uniform float tint = 0.0;     // -1..1, per-building brightness/hue shift
 instance uniform float seed = 0.0;
 
@@ -42,9 +52,28 @@ void fragment() {
 	float rough = 0.85;
 	float metal = 0.0;
 	vec3 emit = vec3(0.0);
+	vec3 nmap = vec3(0.5, 0.5, 1.0);
 	if (n.y < 0.5) {
 		bool x_face = n.x > n.z;
 		float u = x_face ? wpos.z : wpos.x;
+		// the wall material: concrete, brick or plaster, chosen per building
+		float pick = fract(seed * 7.31 + 0.13);
+		vec2 tuv = vec2(u, -wpos.y);
+		vec3 wall_tex;
+		if (pick < 0.4) {
+			wall_tex = texture(concrete_col, tuv / 4.0).rgb;
+			nmap = texture(concrete_nrm, tuv / 4.0).rgb;
+			base *= wall_tex * 1.7;
+		} else if (pick < 0.72) {
+			wall_tex = texture(brick_col, tuv / 2.4).rgb;
+			nmap = texture(brick_nrm, tuv / 2.4).rgb;
+			base = wall_tex * (1.0 + tint * 0.15);   // brick keeps its own colour
+		} else {
+			wall_tex = texture(plaster_col, tuv / 3.0).rgb;
+			nmap = texture(plaster_nrm, tuv / 3.0).rgb;
+			base *= wall_tex * 1.45;
+		}
+		col = base;
 		float face_id = (x_face ? sign(wnorm.x) * 3.0 : sign(wnorm.z) * 7.0) + seed * 17.0;
 		float y = wpos.y;
 		// streaks of grime running down from the windows
@@ -58,6 +87,7 @@ void fragment() {
 			float sign_band = step(3.6, y) * step(y, 4.4);
 			float h = hash(vec2(floor(u / cell_w), face_id));
 			if (shop > 0.5) {
+				nmap = vec3(0.5, 0.5, 1.0);
 				vec3 inside = mix(vec3(0.9, 0.75, 0.5), vec3(0.6, 0.8, 0.95), step(0.6, h));
 				col = mix(glass_color * 0.7, inside * 0.35, 0.4);
 				rough = 0.08;
@@ -71,6 +101,7 @@ void fragment() {
 				col = sign_col * 0.6;
 				emit = sign_col * night * 0.9 * step(0.3, h);
 				rough = 0.5;
+				nmap = vec3(0.5, 0.5, 1.0);
 			} else {
 				col = base * 0.45;
 			}
@@ -85,6 +116,7 @@ void fragment() {
 			// pilaster every 4 window columns
 			float pilaster = 1.0 - step(0.06, abs(fract(cell.x / 4.0) - 0.0)) ;
 			if (win > 0.5) {
+				nmap = vec3(0.5, 0.5, 1.0);
 				float tint_g = 0.85 + h * 0.3;
 				col = glass_color * tint_g;
 				rough = 0.06 + h * 0.08;
@@ -99,6 +131,7 @@ void fragment() {
 					emit *= mix(1.0, 0.45, blind);
 				}
 			} else if (frame > 0.5) {
+				nmap = vec3(0.5, 0.5, 1.0);
 				col = base * 0.55;
 				rough = 0.4;
 				metal = 0.2;
@@ -111,14 +144,18 @@ void fragment() {
 		}
 	} else {
 		// roof: gravel with tar patches
-		float g = noise(wpos.xz * 2.5) * 0.15 + hash(floor(wpos.xz * 8.0)) * 0.05;
-		col = base * (0.42 + g);
-		rough = 0.95;
+		vec3 gravel = texture(gravel_col, wpos.xz / 3.0).rgb;
+		nmap = texture(gravel_nrm, wpos.xz / 3.0).rgb;
+		float tar = smoothstep(0.55, 0.6, noise(wpos.xz * 0.3 + seed * 5.0));
+		col = mix(gravel * 0.62, vec3(0.06), tar * 0.8) * (1.0 + tint * 0.1);
+		rough = mix(0.95, 0.6, tar);
 	}
 	// rain makes surfaces darker and shinier
 	col *= mix(1.0, 0.75, wetness * (1.0 - metal));
 	rough = mix(rough, rough * 0.4, wetness);
 	ALBEDO = col;
+	NORMAL_MAP = nmap;
+	NORMAL_MAP_DEPTH = 1.2;
 	ROUGHNESS = rough;
 	METALLIC = metal;
 	EMISSION = emit;

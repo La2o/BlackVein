@@ -10,15 +10,21 @@ var dir := "user://shots"
 
 
 func _ready() -> void:
+	var quality := -1
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("shots="):
 			dir = a.substr(6)
+		if a.begins_with("quality="):   # 0 low .. 3 ultra
+			quality = int(a.substr(8))
 	Game.use_test_storage()
 	Game.delete_save()
 	Game.reset_state()
 	main = MAIN.instantiate()
 	add_child(main)
 	await _wait(0.6)
+	if quality >= 0:
+		Settings.quality = quality
+		Settings.apply()
 	player = Game.player
 	Game.director.set_process(false)
 	Game.hud._title_timer = 0.0
