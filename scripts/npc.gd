@@ -275,6 +275,7 @@ func take_hit(info: Dictionary) -> void:
 	_hit_flash = 0.12
 	if src == Game.player and dmg > 1.0:
 		Game.register_hit()
+		Game.fx.damage_number(global_position, dmg, dmg >= 50.0)
 	if src != null and is_instance_valid(src):
 		if src == Game.player or src.is_in_group("decoys") or (src.has_method("is_player_controlled") and src.is_player_controlled()):
 			_on_attacked_by_player()

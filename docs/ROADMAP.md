@@ -14,6 +14,13 @@ CHANGELOG.md when done.
 - [x] Infected ground around hives. (0.3.0) Next: zones that grow over time.
 - [x] Key rebinding in the settings menu. (0.3.0)
 
+## Ideas for 0.5
+- [ ] Infected zones that grow if hives are left alone, and shrink when cleansed.
+- [ ] A second military base and a lab district.
+- [ ] Lock-on for bosses (helps on controller).
+- [ ] Rooftop race leaderboards (best times saved).
+- [ ] Optional damage numbers.
+
 ## Later
 - [x] A finale built from the memories: Patient Zero. (0.4.0)
 - [ ] More story missions between memories.

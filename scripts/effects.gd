@@ -367,6 +367,27 @@ func burst_ring(pos: Vector3, color: Color, radius := 2.0) -> void:
 	shockwave(pos, radius, color, 0.3)
 
 
+func damage_number(pos: Vector3, amount: float, big := false) -> void:
+	if not Settings.damage_numbers or amount < 1.0:
+		return
+	var l := Label3D.new()
+	l.text = str(int(round(amount)))
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.fixed_size = true
+	l.pixel_size = 0.0015
+	l.font_size = 40 if big else 28
+	l.outline_size = 10
+	l.modulate = Color(1, 0.85, 0.3) if big else Color(1, 1, 1)
+	add_child(l)
+	l.global_position = pos + Vector3(randf_range(-0.4, 0.4), 1.2, randf_range(-0.4, 0.4))
+	l.reset_physics_interpolation()
+	var tw := l.create_tween().set_parallel()
+	tw.tween_property(l, "global_position:y", l.global_position.y + 1.5, 0.7)
+	tw.tween_property(l, "modulate:a", 0.0, 0.7).set_delay(0.2)
+	_auto_free(l, 0.75)
+
+
 func flash_light(pos: Vector3, color: Color, energy := 6.0, range_m := 12.0, life := 0.2) -> void:
 	var light := OmniLight3D.new()
 	light.light_color = color

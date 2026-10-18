@@ -197,6 +197,7 @@ func take_hit(info: Dictionary) -> void:
 	hp -= dmg
 	if src == Game.player and dmg > 1.0:
 		Game.register_hit()
+		Game.fx.damage_number(global_position + Vector3.UP, dmg, dmg >= 50.0)
 	Game.fx.debris(global_position + Vector3.UP * 2.0, 3, Color(0.3, 0.32, 0.22))
 	if kind == "truck" and not deployed:
 		_deploy_soldiers()

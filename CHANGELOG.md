@@ -14,7 +14,13 @@ All notable changes to BLACKVEIN. Newest first.
 - **Bone Spikes** — a 7th arm form (level 13): fire piercing bone spikes from your forearm,
   with light aim assist. Special: Spike Storm, a nine-spike fan. Key 7.
 - **Rooftop Races**: a new world event — a chain of glowing rings across the rooftops. Hit them
-  all before the clock runs out (each ring adds time; leftover time is bonus XP).
+  all before the clock runs out (each ring adds time; leftover time is bonus XP). Your best time
+  is saved, and beating it pays extra.
+- **Spreading infection**: the infected ground around a hive grows the longer it lives and turns
+  nearby civilians into infected. Destroy hives early.
+- **Damage numbers** (optional, in Settings).
+- The military base shows on the minimap and the city map.
+- A beginner's guide: docs/HOW_TO_PLAY.md.
 - **City ambience**: distant traffic, horns and sirens by day; crickets and wind at night.
 - **Coats**: you, scientists and Patient Zero wear long coats that flap when you run and glide.
 - A "What's new" note the first time you start a new version.
@@ -67,7 +73,7 @@ All notable changes to BLACKVEIN. Newest first.
   - **Juggernaut** — the military's prototype super-tank with triple-shell volleys and a
     machine gun. Weaken it below 25% and you can hijack it.
   - Boss health bar at the top of the screen.
-- **Military base** in the north-west of the city: walls, watchtowers, barracks, a helipad with a
+- **Military base** in the south-west of the city: walls, watchtowers, barracks, a helipad with a
   parked gunship, a parked tank, a garrison and a **base commander**. Walking in without a
   military disguise gets you noticed.
 - **Artillery Strike** (new skill, R / hold LB + RB): consume the base commander for the codes,

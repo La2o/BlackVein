@@ -591,10 +591,16 @@ func _update_race(e: Dictionary) -> void:
 		d["index"] = idx
 		if not d["started"]:
 			d["started"] = true
+			d["t0"] = Game.play_time
 		e["timer"] += 4.0
 		if idx >= points.size():
 			var bonus := int(maxf(0.0, e["timer"]) * 4.0)
-			_end_event(e, true, 220 + bonus, "Race complete (+%d time bonus)" % bonus)
+			var took: float = Game.play_time - float(d.get("t0", Game.play_time))
+			var best: float = float(Game.stats.get("race_best", 9999.0))
+			var record := took < best
+			if record:
+				Game.stats["race_best"] = took
+			_end_event(e, true, 220 + bonus + (100 if record else 0), "Race complete in %.1f s%s" % [took, "  NEW RECORD" if record else "  (best %.1f s)" % best])
 			Game.stat_add("races")
 			return
 		if is_instance_valid(rings[idx]):

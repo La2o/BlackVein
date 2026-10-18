@@ -589,6 +589,7 @@ func _build_settings() -> void:
 	_slider_row(v, "Camera shake", 0.0, 1.5, Settings.camera_shake, func(x): Settings.camera_shake = x)
 	_check_row(v, "Controller rumble", Settings.rumble, func(b): Settings.rumble = b)
 	_check_row(v, "Show FPS", Settings.show_fps, func(b): Settings.show_fps = b)
+	_check_row(v, "Damage numbers", Settings.damage_numbers, func(b): Settings.damage_numbers = b)
 	_slider_row(v, "Crowd density", 0.4, 1.2, Settings.crowd_density, func(x): Settings.crowd_density = x)
 	var row := HBoxContainer.new()
 	var l := _label("Graphics quality", 18)
@@ -617,7 +618,8 @@ const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW[/color][/b]
 [b]Patient Zero[/b] — the finale. Absorb 5 memories and reach level 18 to find the lab.
 [b]Bone Spikes[/b] — a ranged arm form (key 7 / D-pad).
 [b]Rooftop Races[/b] — hit every ring across the rooftops before time runs out.
-[b]Coats, city sounds and night crickets[/b], a crowd density setting, and more.
+[b]Spreading infection[/b] — hives grow and turn civilians the longer they live.
+[b]Coats, city sounds, damage numbers[/b] (Settings), race records, and more.
 
 Full list: CHANGELOG.md"""
 
@@ -1194,6 +1196,15 @@ func _draw_minimap() -> void:
 		])
 		var hcol := clampf(float(b["height"]) / 150.0, 0.0, 1.0)
 		minimap.draw_colored_polygon(pts, Color(0.32 + hcol * 0.2, 0.32 + hcol * 0.18, 0.34 + hcol * 0.15))
+	var br: Rect2 = Game.city.base_rect
+	if br.size != Vector2.ZERO:
+		var bpts := PackedVector2Array([
+			_to_map(Vector3(br.position.x, 0, br.position.y), c, yaw, scale, origin),
+			_to_map(Vector3(br.end.x, 0, br.position.y), c, yaw, scale, origin),
+			_to_map(Vector3(br.end.x, 0, br.end.y), c, yaw, scale, origin),
+			_to_map(Vector3(br.position.x, 0, br.end.y), c, yaw, scale, origin),
+		])
+		minimap.draw_colored_polygon(bpts, Color(0.35, 0.45, 0.25, 0.8))
 	if Game.alert_level != Game.Alert.HIDDEN:
 		var lk := _to_map(Game.last_known_pos, c, yaw, scale, origin)
 		var col := Color(1, 0.85, 0.3, 0.25) if Game.alert_level == Game.Alert.SEARCHING else Color(1, 0.2, 0.15, 0.25)
@@ -1248,6 +1259,12 @@ func _draw_big_map() -> void:
 		var p1: Vector2 = to2.call(a.end)
 		big_map.draw_rect(Rect2(Vector2(p0.x, p0.y), Vector2(p1.x - p0.x, p1.y - p0.y)), Color(0.3, 0.3, 0.33))
 	var font := ThemeDB.fallback_font
+	var br: Rect2 = Game.city.base_rect
+	if br.size != Vector2.ZERO:
+		var b0: Vector2 = to2.call(Vector3(br.position.x, 0, br.position.y))
+		var b1: Vector2 = to2.call(Vector3(br.end.x, 0, br.end.y))
+		big_map.draw_rect(Rect2(b0, b1 - b0), Color(0.35, 0.45, 0.25, 0.9))
+		big_map.draw_string(font, b0 + Vector2(4, (b1.y - b0.y) * 0.5), "MILITARY BASE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.8, 1, 0.6))
 	for n in get_tree().get_nodes_in_group("hives"):
 		big_map.draw_circle(to2.call((n as Node3D).global_position), 8.0, Color(1, 0.1, 0.1))
 	if Game.director:

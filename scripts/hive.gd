@@ -14,6 +14,9 @@ var _blobs: Array[MeshInstance3D] = []
 var _t := 0.0
 var _hum: AudioStreamPlayer3D
 var _zone_mat: ShaderMaterial
+var _zone: MeshInstance3D
+var _age := 0.0
+var _convert_timer := 8.0
 
 
 func setup(extra := {}) -> void:
@@ -74,7 +77,9 @@ func setup(extra := {}) -> void:
 	zone.material_override = _zone_mat
 	zone.position = Vector3(0, 0.2, 0)
 	zone.rotation.y = randf() * TAU
+	zone.scale = Vector3(0.4, 1, 0.4)
 	add_child(zone)
+	_zone = zone
 	add_to_group("hives")
 	_hum = Game.fx.make_loop_player("hive")
 	_hum.volume_db = -6.0
@@ -113,8 +118,23 @@ func _destroy(src: Node) -> void:
 
 func _physics_process(delta: float) -> void:
 	_t += delta
+	_age += delta
 	if _zone_mat:
 		_zone_mat.set_shader_parameter("pulse", _t)
+	# the infection spreads the longer the hive lives
+	var spread := clampf(0.4 + _age / 200.0, 0.4, 1.6)
+	if _zone:
+		_zone.scale = Vector3(spread, 1, spread)
+	_convert_timer -= delta
+	if _convert_timer <= 0.0:
+		_convert_timer = 10.0
+		var radius := 35.0 * spread
+		for c in get_tree().get_nodes_in_group("civilians"):
+			var civ := c as Node3D
+			if civ and civ.global_position.distance_to(global_position) < radius and randf() < 0.35:
+				civ.set("_infected_killer", true)
+				civ.take_hit(Game.hit_info(999.0, Vector3.UP * 2.0, self, "slash"))
+				break
 	for k in _blobs.size():
 		var b := _blobs[k]
 		var s := 1.0 + sin(_t * 2.5 + k * 1.3) * 0.06

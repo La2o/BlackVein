@@ -164,6 +164,7 @@ func take_hit(info: Dictionary) -> void:
 	parked = false
 	if src == Game.player and dmg > 1.0:
 		Game.register_hit()
+		Game.fx.damage_number(global_position + Vector3.UP, dmg, dmg >= 50.0)
 	if hp <= 0.0 and not falling:
 		_start_fall(src)
 

@@ -58,7 +58,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Pause menu | Esc | Start / Menu |
 | Map | M | — |
 
-Full list: [docs/CONTROLS.md](docs/CONTROLS.md)
+Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO_PLAY.md](docs/HOW_TO_PLAY.md)
 
 ## What's in the game
 
