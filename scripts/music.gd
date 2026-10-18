@@ -14,10 +14,13 @@ var _night: AudioStreamPlayer
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	for t in TRACKS:
-		var path := "res://music/%s.wav" % t
 		var p := AudioStreamPlayer.new()
-		if ResourceLoader.exists(path):
-			p.stream = load(path)   # loops via its .import settings
+		# CC0 tracks (credits in assets/CREDITS.md); they loop via their .import settings
+		for ext in ["ogg", "mp3", "wav"]:
+			var path := "res://music/%s.%s" % [t, ext]
+			if ResourceLoader.exists(path):
+				p.stream = load(path)
+				break
 		p.volume_db = -80.0
 		add_child(p)
 		_players[t] = p

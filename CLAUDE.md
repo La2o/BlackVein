@@ -84,7 +84,8 @@ See `docs/ARCHITECTURE.md` for the full map. Short version:
 
 ## Audio notes
 
-- Sounds: `tools/make_sounds.py` → `sfx/`. Music: `tools/make_music.py` → `music/`.
+- Sounds: `tools/make_sounds.py` → `sfx/`. Music: CC0 tracks in `music/` (`ambient`, `combat`, `boss`; any of
+  .ogg/.mp3/.wav, credited in assets/CREDITS.md). `tools/make_music.py` made the old generated loops.
 - Looping (music, rain, helicopter, hive) is set in each file's `.import` (`edit/loop_mode=2`).
   WAVs import as QOA-compressed, so never compute loop points from `data.size()`.
 

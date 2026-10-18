@@ -149,7 +149,7 @@ scenes/             main.tscn (the game) and player.tscn
 scripts/            all game code (one file per system, see docs/ARCHITECTURE.md)
 shaders/            buildings, roads, screen effects
 sfx/                generated sound effects (rebuild with tools/make_sounds.py)
-music/              generated music loops (rebuild with tools/make_music.py)
+music/              CC0 music: exploring, combat, boss (credits in assets/CREDITS.md)
 tests/              automated play-through test (165+ checks)
 tools/              helper scripts
 docs/               architecture, controls, roadmap

@@ -14,6 +14,9 @@ All notable changes to BLACKVEIN. Newest first.
   coats, rifles and rocket launchers. Infected glow with red veins; hunters carry bone spikes and
   claws; Patient Zero has glowing blue claws.
 - People far from the camera animate less often, so crowds stay fast.
+- **New music** (free CC0 from OpenGameArt): "Bleak Terminal" by ruskerdax while you explore,
+  "AI Fight" from the T&T Free Cyberpunk Pack 2 in combat, and Juhani Junkala's "Epic Boss Battle"
+  for bosses. The game still crossfades between them as the action changes.
 - **You too:** BLACKVEIN is now a rigged character, a hooded figure in a long dark coat with faint
   red veins on the face and hands. Every arm form, body form (shield, armour, wings, Light Body) and leg
   form rides on the animated skeleton; Musclemass, Hammerfist and Crusher legs bulk up the real arms

@@ -670,6 +670,19 @@ func _run_all() -> void:
 	Game.director.active_events.clear()
 	await _clear_units()
 
+	# ---------------- music: three CC0 tracks that loop
+	var music_node: Node = main.get_node("Music")
+	var tracks_ok := true
+	for tname in ["ambient", "combat", "boss"]:
+		var st: AudioStream = music_node._players[tname].stream
+		var loops := false
+		if st is AudioStreamOggVorbis or st is AudioStreamMP3:
+			loops = st.loop
+		elif st is AudioStreamWAV:
+			loops = (st as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED
+		tracks_ok = tracks_ok and st != null and loops
+	check("music tracks load and loop", tracks_ok)
+
 	# ---------------- bosses
 	Game.level = 20
 	for boss_type in ["leviathan", "juggernaut"]:
