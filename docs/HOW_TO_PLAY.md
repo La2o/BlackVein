@@ -6,7 +6,8 @@ A quick guide to your first hour.
 
 1. **Follow the GOAL line** under your health bar. The first few goals teach the basics and pay XP.
 2. **Sprint (Shift / RT) straight into a building** to run up it. At the top you vault onto the roof.
-3. **Hold jump** to charge a super jump. Jump off a roof and land hard for a shockwave.
+3. **Jump while running** keeps all your speed. **Keep holding jump** after take-off to leap
+   much higher. Jump off a roof and land hard for a shockwave.
 4. **Consume someone (F / LB).** It heals you, refills biomass and gives you their disguise.
 5. **Open Skills (Tab / Back)** whenever you level up. Good first picks: **Glide**, **Air Dash**,
    **Claws**, **Thermal Vision**, **Dive Bomb**.
@@ -43,6 +44,8 @@ A quick guide to your first hour.
 
 ## Tips
 
+- **Dominate** (level 5): grab a soldier or infected and press Special to brand them. Your
+  allies follow you and fight. Branded soldiers with rocket launchers are great against tanks.
 - Grab a car (E / RB) and throw it at a tank. Musclemass throws harder.
 - Tether (C / LT) at a helicopter to latch on and hijack it.
 - Thermal vision helps at night and in fog.

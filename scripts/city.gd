@@ -27,6 +27,9 @@ var buildings: Array[Dictionary] = []   # {aabb: AABB, height: float}
 var building_mats: Array[ShaderMaterial] = []
 var lamp_mat: StandardMaterial3D
 var pool_mat: ShaderMaterial
+var _night := 0.0
+var _neon_mats: Array[StandardMaterial3D] = []
+var _parapet_mat: StandardMaterial3D
 var road_mat: ShaderMaterial
 var nav_region: NavigationRegion3D
 var nav_ready := false
@@ -63,6 +66,8 @@ func build() -> void:
 				else:
 					_build_block(i, j, bx, bz, i == mid and j == mid - 1)
 	_build_street_lamps()
+	_build_traffic_signals()
+	_build_street_props()
 	_build_trees()
 	spawn_point = Vector3(street_x(mid), 1.2, street_z(mid))
 	spawn_yaw = 0.0
@@ -106,11 +111,14 @@ func _make_materials() -> void:
 
 
 func set_night(amount: float) -> void:
+	_night = amount
 	for m in building_mats:
 		m.set_shader_parameter("night", amount)
+	for m in _neon_mats:
+		m.emission_energy_multiplier = lerpf(0.6, 3.5, amount)
 	lamp_mat.emission_energy_multiplier = lerpf(0.2, 6.0, amount)
 	if pool_mat:
-		pool_mat.set_shader_parameter("strength", amount * 0.55)
+		pool_mat.set_shader_parameter("strength", amount * 0.85)
 
 
 # ------------------------------------------------------------------ geometry helpers
@@ -229,18 +237,133 @@ func _build_block(i: int, j: int, bx: float, bz: float, landmark: bool) -> void:
 		_make_building(block, Vector3(w, h, depth), Vector3(cx, 0.15, cz), landmark)
 
 
+func set_wetness(amount: float) -> void:
+	road_mat.set_shader_parameter("wetness", amount)
+	for m in building_mats:
+		m.set_shader_parameter("wetness", amount)
+
+
 func _make_building(parent: Node, size: Vector3, base: Vector3, landmark: bool) -> void:
 	var mat_index := rng.randi_range(0, building_mats.size() - 1)
 	if size.y > 75.0 and rng.randf() < 0.5:
 		mat_index = 3
 	if landmark:
 		mat_index = 3
-	var center := base + Vector3(0, size.y * 0.5, 0)
-	var body := _add_box(size, center, building_mats[mat_index], Game.LAYER_WORLD, parent, true)
-	body.add_to_group("buildings")
-	var aabb := AABB(base - Vector3(size.x * 0.5, 0, size.z * 0.5), size)
-	buildings.append({"aabb": aabb, "height": base.y + size.y})
-	_rooftop_props(parent, aabb, base.y + size.y, landmark)
+	var tint := rng.randf_range(-1.0, 1.0)
+	var bseed := rng.randf()
+	# tall towers step back once or twice as they rise (Manhattan-style setbacks)
+	var tiers: Array[Vector3] = []   # [size per tier], stacked
+	var min_side := minf(size.x, size.z)
+	if size.y > 55.0 and min_side > 14.0 and not landmark and rng.randf() < 0.75:
+		var lower := roundf(size.y * rng.randf_range(0.45, 0.65) / 3.5) * 3.5
+		var inset := rng.randf_range(2.5, minf(5.0, min_side * 0.2))
+		tiers.append(Vector3(size.x, lower, size.z))
+		var upper := size.y - lower
+		if upper > 40.0 and min_side - inset * 2.0 > 14.0 and rng.randf() < 0.5:
+			var mid := roundf(upper * 0.55 / 3.5) * 3.5
+			tiers.append(Vector3(size.x - inset * 2.0, mid, size.z - inset * 2.0))
+			tiers.append(Vector3(size.x - inset * 3.6, upper - mid, size.z - inset * 3.6))
+		else:
+			tiers.append(Vector3(size.x - inset * 2.0, upper, size.z - inset * 2.0))
+	elif landmark:
+		tiers.append(Vector3(size.x, 60.0, size.z))
+		tiers.append(Vector3(size.x - 8.0, 55.0, size.z - 8.0))
+		tiers.append(Vector3(size.x - 16.0, size.y - 115.0, size.z - 16.0))
+	else:
+		tiers.append(size)
+	var y := base.y
+	for k in tiers.size():
+		var t: Vector3 = tiers[k]
+		var center := Vector3(base.x, y + t.y * 0.5, base.z)
+		var body := _add_box(t, center, building_mats[mat_index], Game.LAYER_WORLD, parent, k == 0)
+		body.add_to_group("buildings")
+		var mi := body.get_child(1) as MeshInstance3D
+		mi.set_instance_shader_parameter("tint", tint)
+		mi.set_instance_shader_parameter("seed", bseed)
+		var aabb := AABB(Vector3(base.x - t.x * 0.5, y, base.z - t.z * 0.5), t)
+		buildings.append({"aabb": aabb, "height": y + t.y})
+		_parapet(body, t, k == tiers.size() - 1)
+		if k == tiers.size() - 1:
+			_rooftop_props(parent, aabb, y + t.y, landmark)
+		y += t.y
+	# a glowing billboard on some mid-height rooftops
+	if not landmark and size.y > 20.0 and size.y < 70.0 and tiers.size() == 1 and rng.randf() < 0.18:
+		_billboard(parent, base, size)
+
+
+## A low wall around the edge of a roof. Flush with the facade so wall running
+## flows straight over it.
+func _parapet(body: StaticBody3D, size: Vector3, top_tier: bool) -> void:
+	if _parapet_mat == null:
+		_parapet_mat = StandardMaterial3D.new()
+		_parapet_mat.albedo_color = Color(0.32, 0.31, 0.3)
+		_parapet_mat.roughness = 0.9
+	var h := 0.9 if top_tier else 0.7
+	var t := 0.35
+	var top := size.y * 0.5
+	var pieces := [
+		[Vector3(size.x, h, t), Vector3(0, top + h * 0.5, size.z * 0.5 - t * 0.5)],
+		[Vector3(size.x, h, t), Vector3(0, top + h * 0.5, -size.z * 0.5 + t * 0.5)],
+		[Vector3(t, h, size.z - t * 2.0), Vector3(size.x * 0.5 - t * 0.5, top + h * 0.5, 0)],
+		[Vector3(t, h, size.z - t * 2.0), Vector3(-size.x * 0.5 + t * 0.5, top + h * 0.5, 0)],
+	]
+	for pc in pieces:
+		var mesh := BoxMesh.new()
+		mesh.size = pc[0]
+		var mi := MeshInstance3D.new()
+		mi.mesh = mesh
+		mi.material_override = _parapet_mat
+		mi.position = pc[1]
+		body.add_child(mi)
+		var cs := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = pc[0]
+		cs.shape = box
+		cs.position = pc[1]
+		body.add_child(cs)
+
+
+func _billboard(parent: Node, base: Vector3, size: Vector3) -> void:
+	var colors := [Color(1, 0.2, 0.35), Color(0.2, 0.75, 1), Color(1, 0.75, 0.15), Color(0.5, 1, 0.4), Color(0.85, 0.3, 1)]
+	var c: Color = colors[rng.randi_range(0, colors.size() - 1)]
+	var neon := StandardMaterial3D.new()
+	neon.albedo_color = c * 0.5
+	neon.emission_enabled = true
+	neon.emission = c
+	neon.emission_energy_multiplier = 0.6
+	_neon_mats.append(neon)
+	var frame := StandardMaterial3D.new()
+	frame.albedo_color = Color(0.12, 0.12, 0.13)
+	frame.metallic = 0.6
+	var along_x := rng.randf() < 0.5
+	var w := minf(size.x if along_x else size.z, 16.0) * 0.8
+	var top := base.y + size.y
+	var edge := (size.z * 0.5 - 1.5) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var pos := Vector3(base.x, top + 4.6, base.z + edge) if along_x else Vector3(base.x + edge, top + 4.6, base.z)
+	var panel := MeshInstance3D.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(w, 4.5, 0.25) if along_x else Vector3(0.25, 4.5, w)
+	panel.mesh = pm
+	panel.material_override = neon
+	panel.position = pos
+	parent.add_child(panel)
+	# simple stripes so it reads as an ad, not a lamp
+	var stripe := MeshInstance3D.new()
+	var sm := BoxMesh.new()
+	sm.size = Vector3(w * 0.7, 0.5, 0.3) if along_x else Vector3(0.3, 0.5, w * 0.7)
+	stripe.mesh = sm
+	stripe.material_override = frame
+	stripe.position = pos + Vector3(0, -0.9, 0)
+	parent.add_child(stripe)
+	for side in [-1.0, 1.0]:
+		var leg := MeshInstance3D.new()
+		var lm := BoxMesh.new()
+		lm.size = Vector3(0.25, 3.0, 0.25)
+		leg.mesh = lm
+		leg.material_override = frame
+		var off := Vector3(side * w * 0.4, 0, 0) if along_x else Vector3(0, 0, side * w * 0.4)
+		leg.position = Vector3(pos.x, top + 1.3, pos.z) + off
+		parent.add_child(leg)
 
 
 func _rooftop_props(parent: Node, aabb: AABB, top: float, landmark: bool) -> void:
@@ -410,7 +533,7 @@ func _build_street_lamps() -> void:
 	_multimesh(bulb_mesh, bulbs)
 	# fake pools of light under the lamps (fade in at night)
 	var pool := PlaneMesh.new()
-	pool.size = Vector2(9, 9)
+	pool.size = Vector2(15, 15)
 	pool_mat = ShaderMaterial.new()
 	var sh := Shader.new()
 	sh.code = """shader_type spatial;
@@ -428,6 +551,152 @@ void fragment() {
 	for b in bulbs:
 		pools.append(Transform3D(Basis(), Vector3(b.origin.x, 0.17, b.origin.z)))
 	_multimesh(pool, pools)
+
+
+var _signal_mats: Array[StandardMaterial3D] = []   # [x-axis light, z-axis light]
+var _signal_timer := 0.0
+var _signal_phase := 0
+
+
+## Traffic signals on two corners of every intersection. Lights alternate
+## between the two directions every 12 seconds.
+func _build_traffic_signals() -> void:
+	var pole := CylinderMesh.new()
+	pole.top_radius = 0.09
+	pole.bottom_radius = 0.11
+	pole.height = 5.2
+	var dark := StandardMaterial3D.new()
+	dark.albedo_color = Color(0.12, 0.13, 0.12)
+	dark.metallic = 0.5
+	pole.material = dark
+	var arm := BoxMesh.new()
+	arm.size = Vector3(0.12, 0.12, 4.0)
+	arm.material = dark
+	var housing := BoxMesh.new()
+	housing.size = Vector3(0.45, 1.2, 0.4)
+	housing.material = dark
+	for k in 2:
+		var m := StandardMaterial3D.new()
+		m.albedo_color = Color(0.1, 0.1, 0.1)
+		m.emission_enabled = true
+		m.emission_energy_multiplier = 2.5
+		_signal_mats.append(m)
+	var lamp_x := BoxMesh.new()
+	lamp_x.size = Vector3(0.3, 0.3, 0.42)
+	lamp_x.material = _signal_mats[0]
+	var lamp_z := BoxMesh.new()
+	lamp_z.size = Vector3(0.3, 0.3, 0.42)
+	lamp_z.material = _signal_mats[1]
+	var poles: Array[Transform3D] = []
+	var arms: Array[Transform3D] = []
+	var housings: Array[Transform3D] = []
+	var lamps_x: Array[Transform3D] = []
+	var lamps_z: Array[Transform3D] = []
+	var hs := street_width * 0.5 + 0.8
+	for i in range(blocks + 1):
+		for j in range(blocks + 1):
+			var c := Vector3(street_x(i), 0, street_z(j))
+			if Vector2i(i, j) == base_cell or Vector2i(i, j) == base_cell + Vector2i(1, 0) \
+					or Vector2i(i, j) == base_cell + Vector2i(0, 1) or Vector2i(i, j) == base_cell + Vector2i(1, 1):
+				continue
+			# corner A faces traffic along Z, corner B faces traffic along X
+			for corner in [[Vector3(-hs, 0, -hs - 2.0), 0.0, true], [Vector3(hs, 0, hs + 2.0), PI, false]]:
+				var p: Vector3 = c + corner[0]
+				var yaw: float = corner[1]
+				var basis := Basis(Vector3.UP, yaw)
+				poles.append(Transform3D(Basis(), p + Vector3(0, 2.6, 0)))
+				var arm_dir := basis * Vector3(0, 0, 1)
+				if not corner[2]:
+					arm_dir = basis * Vector3(1, 0, 0)
+				var arm_basis := Basis.looking_at(arm_dir, Vector3.UP)
+				arms.append(Transform3D(arm_basis, p + Vector3(0, 5.1, 0) + arm_dir * 2.0))
+				var head := p + Vector3(0, 4.5, 0) + arm_dir * 3.6
+				housings.append(Transform3D(Basis(), head))
+				var lamp := Transform3D(Basis(), head + Vector3(0, 0.25, 0))
+				if corner[2]:
+					lamps_z.append(lamp)
+				else:
+					lamps_x.append(lamp)
+	_multimesh(pole, poles)
+	_multimesh(arm, arms)
+	_multimesh(housing, housings)
+	_multimesh(lamp_x, lamps_x)
+	_multimesh(lamp_z, lamps_z)
+	_update_signals()
+
+
+func _update_signals() -> void:
+	var green := Color(0.2, 1.0, 0.4)
+	var red := Color(1.0, 0.15, 0.1)
+	_signal_mats[0].emission = green if _signal_phase == 0 else red
+	_signal_mats[1].emission = red if _signal_phase == 0 else green
+
+
+func _process(delta: float) -> void:
+	if _signal_mats.is_empty():
+		return
+	_signal_timer += delta
+	if _signal_timer > 12.0:
+		_signal_timer = 0.0
+		_signal_phase = 1 - _signal_phase
+		_update_signals()
+
+
+## Fire hydrants, benches and trash cans along the sidewalks.
+func _build_street_props() -> void:
+	var hydrant := CylinderMesh.new()
+	hydrant.top_radius = 0.16
+	hydrant.bottom_radius = 0.2
+	hydrant.height = 0.75
+	var red := StandardMaterial3D.new()
+	red.albedo_color = Color(0.7, 0.08, 0.06)
+	red.roughness = 0.6
+	hydrant.material = red
+	var bin := CylinderMesh.new()
+	bin.top_radius = 0.3
+	bin.bottom_radius = 0.26
+	bin.height = 0.95
+	var green := StandardMaterial3D.new()
+	green.albedo_color = Color(0.15, 0.25, 0.18)
+	green.metallic = 0.4
+	bin.material = green
+	var bench := BoxMesh.new()
+	bench.size = Vector3(1.8, 0.45, 0.6)
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.35, 0.24, 0.15)
+	bench.material = wood
+	var hyd: Array[Transform3D] = []
+	var bins: Array[Transform3D] = []
+	var benches: Array[Transform3D] = []
+	for i in range(blocks):
+		for j in range(blocks):
+			if Vector2i(i, j) == base_cell:
+				continue
+			var bx := x0 + street_width + i * period
+			var bz := z0 + street_width + j * period
+			for side in 4:
+				var t := rng.randf_range(6.0, block_size - 6.0)
+				var p: Vector3
+				var yaw := 0.0
+				match side:
+					0: p = Vector3(bx + t, 0.15, bz + 0.6)
+					1: p = Vector3(bx + t, 0.15, bz + block_size - 0.6)
+					2:
+						p = Vector3(bx + 0.6, 0.15, bz + t)
+						yaw = PI * 0.5
+					_:
+						p = Vector3(bx + block_size - 0.6, 0.15, bz + t)
+						yaw = PI * 0.5
+				var r := rng.randf()
+				if r < 0.3:
+					hyd.append(Transform3D(Basis(), p + Vector3(0, 0.37, 0)))
+				elif r < 0.6:
+					bins.append(Transform3D(Basis(), p + Vector3(0, 0.47, 0)))
+				elif r < 0.8:
+					benches.append(Transform3D(Basis(Vector3.UP, yaw), p + Vector3(0, 0.22, 0)))
+	_multimesh(hydrant, hyd)
+	_multimesh(bin, bins)
+	_multimesh(bench, benches)
 
 
 func _build_trees() -> void:

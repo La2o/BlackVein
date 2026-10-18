@@ -2,6 +2,43 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.5.0] — 2026-10-18 — Dominate, better looks, working controllers, faster jumps
+
+### New
+- **Dominate** (new skill, level 5, 3 ranks): grab someone and press Special (right-click / Y)
+  to brand them. Branded allies glow red, follow you, and fight for you — soldiers shoot,
+  infected and hunters brawl. They attack the infected on sight and the military when it's
+  hunting you, and catch up if you leave them far behind. You can't hurt them by accident.
+  2 allies per rank (up to 6). Allies show as pink dots on the minimap.
+- Achievements: "Warlord" (brand 25 allies) and "Personal Army" (lead 6 at once).
+
+### Fixed
+- **Controllers now work.** The controls only listened to "controller #0", and on many PCs the
+  pad shows up with a different number, so it did nothing. Every binding now accepts any
+  controller. A message pops up when a controller connects, and Settings shows which one the
+  game sees.
+
+### Changed
+- **Jumping keeps your speed.** Jump happens the instant you press it — no crouch, no slowdown —
+  and running jumps go higher. Keep holding jump after take-off to keep rising: a tap is a hop,
+  a full hold is a ~30 m super jump (33 m+ when running).
+- Landing from a big jump no longer slows you down if you're still sprinting.
+
+### Graphics
+- New sky with drifting clouds, a glowing sun, and stars at night. Clouds thicken and darken
+  in storms.
+- Streets: worn lane markings, double yellow center lines, cracks and patches. In the rain they
+  turn dark and glossy with puddles.
+- Buildings: tall towers step back as they rise (and you can wall-run up each step), parapet
+  walls around every roof, shop windows and colored sign bands at street level, window frames,
+  blinds, pilasters, grime streaks, gravel roofs, and per-building color variety.
+- Glowing rooftop billboards, traffic lights that change, fire hydrants, benches and bins.
+- People have shoulders, hips, necks, shoes and eyes. You have glowing veins.
+- Lighting: screen-space reflections on glass and wet streets, extra ambient occlusion,
+  softer shadows, sun-scattering fog, a touch more contrast and color. (Lower the Graphics
+  quality setting if your PC struggles.)
+- Nights are less pitch-black and windows glow less harshly.
+
 ## [0.4.0] — 2026-10-18 — Patient Zero
 
 ### New

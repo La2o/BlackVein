@@ -13,7 +13,7 @@ and controller names depending on what you used last.
 | Run up a wall | Sprint into it | Sprint into it |
 | Run sideways on a wall | A / D while on it | Left stick |
 | Drop off a wall | Let go of Shift | Let go of RT |
-| Jump / super jump | Tap / hold Space | Tap / hold A |
+| Jump (hold to leap higher) | Space | A |
 | Double jump | Space in the air | A in the air |
 | Glide | Hold Space while falling | Hold A while falling |
 | Wall jump | Space on a wall | A on a wall |
@@ -30,7 +30,7 @@ and controller names depending on what you used last.
 | Choose arm form | 1–7, mouse wheel | D-pad left / right |
 | Shield / Armor / none | X | D-pad up |
 | Grab / throw | E | RB |
-| Drop what you hold | Right click | Y |
+| Drop what you hold (or brand them as an ally, with Dominate) | Right click | Y |
 | Consume | F | LB |
 | Groundspike | G | Hold LB + press X |
 | Tendril Barrage | T | Hold LB + press Y |

@@ -37,3 +37,6 @@ func _ready() -> void:
 		get_tree().create_timer(6.0, false).timeout.connect(func():
 			Game.feed("Tip: kill, consume and finish events to earn XP and unlock powers", Color(1, 0.85, 0.6)))
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	var pads := Input.get_connected_joypads()
+	if not pads.is_empty():
+		get_tree().create_timer(2.0, false).timeout.connect(Game.feed.bind("Controller ready: " + Input.get_joy_name(pads[0]), Color(0.6, 0.9, 1)))

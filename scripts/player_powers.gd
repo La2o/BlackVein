@@ -500,7 +500,7 @@ func _spike_shot(dir: Vector3, spread: float) -> void:
 	if spread == 0.0:
 		# light aim assist: snap to an enemy close to the crosshair
 		var flat := Vector3(d.x, 0, d.z).normalized()
-		var assist := _find_target(45.0, 14.0, flat, Game.LAYER_NPC | Game.LAYER_VEHICLE | Game.LAYER_HIVE)
+		var assist := _find_target(45.0, 18.0, flat, Game.LAYER_NPC | Game.LAYER_VEHICLE | Game.LAYER_HIVE)
 		if assist:
 			d = (assist.global_position + Vector3.UP * 0.3 - muzzle).normalized()
 	d = (d + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * spread).normalized()
@@ -508,8 +508,9 @@ func _spike_shot(dir: Vector3, spread: float) -> void:
 	player.model.swing(true, 0, 0.15)
 	violence_timer = 2.5
 	player.conspicuous_timer = 2.5
-	var from := muzzle
-	var end := muzzle + d * 120.0
+	# trace from the chest so enemies standing right on top of you still get hit
+	var from: Vector3 = player.global_position + Vector3.UP * 0.5
+	var end := from + d * 120.0
 	var exclude: Array[RID] = [player.get_rid()]
 	var pierced := 0
 	while pierced < 3:
@@ -549,7 +550,10 @@ func _shield_bash() -> void:
 
 func _special() -> void:
 	if held:
-		drop_held()
+		if held_kind == "npc" and Game.has_skill("dominate"):
+			_brand_held()
+		else:
+			drop_held()
 		return
 	if defense == Defense.SHIELD:
 		return
@@ -780,6 +784,54 @@ func _throw_held() -> void:
 	player.conspicuous_timer = 3.0
 	Game.fx.sound("whoosh", player.global_position, 2.0)
 	rumble(0.2, 0.5, 0.15)
+
+
+# ------------------------------------------------------------------ dominate (allies)
+
+func max_allies() -> int:
+	return Game.skill_rank("dominate") * 2
+
+
+func ally_count() -> int:
+	return get_tree().get_nodes_in_group("allies").size()
+
+
+func _brand_held() -> void:
+	var target := held
+	if target == null or not is_instance_valid(target) or not target.has_method("can_be_branded") or not target.can_be_branded():
+		Game.say("You can't brand that one", Color(1, 0.6, 0.5))
+		return
+	if ally_count() >= max_allies():
+		Game.say("Too many allies (%d/%d). Rank up Dominate for more" % [ally_count(), max_allies()], Color(1, 0.6, 0.5))
+		return
+	if player.biomass < 30.0:
+		Game.say("Branding needs 30 biomass", Color(1, 0.6, 0.5))
+		return
+	player.biomass -= 30.0
+	player.lock(0.75, "grabbed")
+	violence_timer = 2.0
+	Game.fx.sound("consume", player.global_position, 0.0, 0.3)
+	for k in 6:
+		var a := k * TAU / 6.0
+		Game.fx.tendril_flash(player.global_position + Vector3(cos(a) * 0.6, 0.6, sin(a) * 0.6), target.global_position + Vector3.UP * 0.4, 0.6, 0.06)
+	get_tree().create_timer(0.7, false).timeout.connect(_finish_brand.bind(target))
+
+
+func _finish_brand(target) -> void:
+	if not is_instance_valid(target) or held != target:
+		return
+	held = null
+	held_kind = ""
+	target.on_thrown(player.facing * 1.5 + Vector3.UP * 2.0, player)
+	target.make_ally()
+	Game.fx.burst_ring(target.global_position, Color(1, 0.12, 0.06, 0.8), 3.0)
+	Game.fx.sound("evolve", target.global_position, -4.0)
+	Game.stat_add("brands")
+	Game.stat_max("max_allies", ally_count())
+	Game.add_xp(15, "Branded " + str(target.label))
+	Game.say("%s is yours  (%d/%d allies)" % [str(target.label).capitalize(), ally_count(), max_allies()], Color(1, 0.4, 0.3))
+	if _witnessed(player.global_position):
+		Game.raise_alert(player.global_position, "Someone saw you brand a soldier" if target.kind in ["soldier", "rocket_soldier", "elite"] else "")
 
 
 func drop_held() -> void:

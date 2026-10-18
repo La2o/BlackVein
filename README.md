@@ -38,7 +38,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 |---|---|---|
 | Move / look | WASD / mouse | Left stick / right stick |
 | Sprint (run into walls to run up them) | Shift | RT |
-| Jump (hold to charge a super jump) | Space | A |
+| Jump (keeps your speed; hold to leap higher) | Space | A |
 | Double jump / glide (hold) in the air | Space | A |
 | Dash | Q | B |
 | Attack (dive bomb in the air) | Left click | X |
@@ -72,7 +72,8 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Grab & throw** people and cars. **Pick up** soldiers' rifles and rocket launchers.
 - **Hijack** tanks and gunships.
 - **Devastators:** Groundspike and Tendril Barrage.
-- **Original powers:** Tether, Focus (bullet time), Biomass Decoy.
+- **Original powers:** Tether, Focus (bullet time), Biomass Decoy, Tendril Wings, and
+  **Dominate** — brand enemies so they follow you and fight for you.
 - **Living city:** civilians, soldiers, rocket teams, elite strike teams, infected, hunters,
   tanks, trucks and gunships, plus a day/night cycle (the infected come out at night).
 - **Military alert system:** hidden → suspicious → alert → searching, with escalating heat

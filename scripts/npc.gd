@@ -7,7 +7,7 @@ const HUMANOID := preload("res://scripts/humanoid.gd")
 const PROJECTILE := preload("res://scripts/projectile.gd")
 const PICKUP := preload("res://scripts/pickup.gd")
 
-enum S { IDLE, WANDER, FLEE, COWER, PATROL, SEARCH, ENGAGE, CHASE, LEAP, LAUNCHED, GRABBED, CONSUMED, DEAD }
+enum S { IDLE, WANDER, FLEE, COWER, PATROL, SEARCH, ENGAGE, CHASE, LEAP, LAUNCHED, GRABBED, CONSUMED, DEAD, FOLLOW }
 
 const KINDS := {
 	"civilian": {"hp": 30.0, "walk": 1.7, "run": 6.5, "faction": "civilian", "label": "a civilian"},
@@ -39,6 +39,10 @@ var scale_factor := 1.0
 var patrol_center := Vector3.ZERO
 var event_tag := ""        # lets world events track their units
 var boss_name := ""
+var is_ally := false               # branded by the player's Dominate power
+var _brand_mark: MeshInstance3D
+var _ally_teleport_cd := 0.0
+static var _brand_mat: StandardMaterial3D
 var in_base := false
 var _pound_cooldown := 6.0
 var _adds_cooldown := 15.0
@@ -222,7 +226,7 @@ func can_see_point(p: Vector3) -> bool:
 
 
 func can_be_grabbed() -> bool:
-	if state in [S.GRABBED, S.CONSUMED]:
+	if state in [S.GRABBED, S.CONSUMED] or is_ally:
 		return false
 	if kind == "hunter":
 		return hp < max_hp * 0.3 and state != S.DEAD
@@ -264,6 +268,8 @@ func take_hit(info: Dictionary) -> void:
 	var src: Node = info["source"]
 	if state == S.GRABBED:
 		return
+	if is_ally and (src == Game.player or (src != null and is_instance_valid(src) and (src.get("is_ally") == true or src.is_in_group("decoys")))):
+		return
 	if state == S.DEAD:
 		if force.length() > 3.0:
 			velocity = force
@@ -276,6 +282,8 @@ func take_hit(info: Dictionary) -> void:
 	if src == Game.player and dmg > 1.0:
 		Game.register_hit()
 		Game.fx.damage_number(global_position, dmg, dmg >= 50.0)
+	elif src != null and is_instance_valid(src) and src.get("is_ally") == true and dmg > 1.0:
+		Game.fx.damage_number(global_position, dmg, false)
 	if src != null and is_instance_valid(src):
 		if src == Game.player or src.is_in_group("decoys") or (src.has_method("is_player_controlled") and src.is_player_controlled()):
 			_on_attacked_by_player()
@@ -401,7 +409,12 @@ func _die(info: Dictionary) -> void:
 	remove_from_group("hunters")
 	remove_from_group("warm")
 	var src: Node = info["source"]
-	var by_player: bool = src == Game.player or (src != null and is_instance_valid(src) and src.has_method("is_player_controlled") and src.is_player_controlled())
+	var by_ally: bool = src != null and is_instance_valid(src) and src.get("is_ally") == true
+	var by_player: bool = src == Game.player or by_ally or (src != null and is_instance_valid(src) and src.has_method("is_player_controlled") and src.is_player_controlled())
+	if is_ally:
+		by_player = false
+		Game.feed("Your ally %s fell" % label.replace("a ", "").replace("an ", ""), Color(1, 0.5, 0.4))
+		remove_from_group("allies")
 	if by_player:
 		match faction:
 			"military":
@@ -571,6 +584,98 @@ func _think() -> void:
 		"civilian": _think_civilian()
 		"military": _think_military()
 		"infected": _think_infected()
+		"ally": _think_ally()
+
+
+# ------------------------------------------------------------------ allies (Dominate power)
+
+## Can the player brand this person as an ally?
+func can_be_branded() -> bool:
+	if is_ally or state in [S.DEAD, S.CONSUMED] or hp <= 0.0:
+		return false
+	return not kind in ["leviathan", "patient_zero", "commander"]
+
+
+func make_ally() -> void:
+	is_ally = true
+	for g in ["civilians", "military", "infected", "hunters"]:
+		remove_from_group(g)
+	faction = "ally"
+	add_to_group("allies")
+	event_tag = ""
+	in_base = false
+	hp = max_hp
+	_target = null
+	state = S.FOLLOW
+	_path_target = Vector3.INF
+	if kind == "civilian" or kind == "scientist":
+		# a branded civilian becomes a brawler
+		walk_speed = 3.0
+		run_speed = 8.0
+		max_hp = 80.0
+		hp = max_hp
+	if _brand_mat == null:
+		_brand_mat = StandardMaterial3D.new()
+		_brand_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_brand_mat.albedo_color = Color(1, 0.1, 0.05, 0.22)
+		_brand_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	model.set_tint(_brand_mat)
+	# glowing brand ring floating over the head
+	_brand_mark = MeshInstance3D.new()
+	var t := TorusMesh.new()
+	t.inner_radius = 0.17
+	t.outer_radius = 0.23
+	t.rings = 16
+	t.ring_segments = 6
+	_brand_mark.mesh = t
+	_brand_mark.material_override = HUMANOID.mat(Color(1, 0.12, 0.06), 4.0)
+	_brand_mark.position = Vector3(0, 1.15, 0)
+	model.add_child(_brand_mark)
+
+
+func _think_ally() -> void:
+	var p := Game.player
+	if p == null:
+		return
+	var me := global_position
+	var ppos: Vector3 = p.global_position
+	var dist_p := Vector2(me.x - ppos.x, me.z - ppos.z).length()
+	# can't follow up walls: catch up when the player is far away
+	_ally_teleport_cd -= 0.3
+	if dist_p > 85.0 and _ally_teleport_cd <= 0.0 and not p.is_dead():
+		_ally_teleport_cd = 4.0
+		var spot: Vector3 = Game.city.random_sidewalk_point(ppos, 10.0, 22.0)
+		global_position = spot + Vector3.UP * 0.6
+		reset_physics_interpolation()
+		Game.fx.burst_ring(spot, Color(1, 0.15, 0.08, 0.6), 2.0)
+		_path_target = Vector3.INF
+		return
+	# pick a fight: infected always, the military when they're hunting you
+	var best: Node3D = null
+	var best_d := 35.0
+	var groups := ["infected"]
+	if Game.alert_level != Game.Alert.HIDDEN:
+		groups.append("military")
+	for g in groups:
+		var n := Game.nearest_in_group(g, me, best_d)
+		if n and n.global_position.distance_to(ppos) < 55.0:
+			var d := me.distance_to(n.global_position)
+			if d < best_d and (d < 10.0 or can_see_point(n.global_position + Vector3.UP * 0.5)):
+				best = n
+				best_d = d
+	if _target and is_instance_valid(_target) and _target.has_method("is_alive") and _target.is_alive() \
+			and me.distance_to(_target.global_position) < 40.0 and best == null:
+		best = _target
+	_target = best
+	if _target:
+		if KINDS[kind].has("weapon"):
+			if state != S.ENGAGE:
+				state = S.ENGAGE
+				_burst_timer = randf_range(0.2, 0.6)
+		else:
+			state = S.CHASE
+		return
+	state = S.FOLLOW
 
 
 func _think_civilian() -> void:
@@ -647,6 +752,11 @@ func _think_military() -> void:
 		if dd < 60.0 and dd * 0.5 < best and can_see_point(dn.global_position + Vector3.UP * 0.5):
 			new_target = dn
 			best = dd * 0.5
+	if Game.alert_level != Game.Alert.HIDDEN:
+		var al := Game.nearest_in_group("allies", me, 50.0)
+		if al and me.distance_to(al.global_position) * 0.9 < best and can_see_point(al.global_position + Vector3.UP * 0.5):
+			new_target = al
+			best = me.distance_to(al.global_position) * 0.9
 	var inf := Game.nearest_in_group("infected", me, 45.0)
 	if inf and me.distance_to(inf.global_position) < best and can_see_point(inf.global_position + Vector3.UP * 0.5):
 		new_target = inf
@@ -698,7 +808,7 @@ func _think_infected() -> void:
 		if d < best_d and (d < 12.0 or can_see_point(p.global_position)):
 			best = p
 			best_d = d * (0.6 if hunterish else 1.0)
-	for g in ["civilians", "military", "decoys"]:
+	for g in ["civilians", "military", "decoys", "allies"]:
 		var n := Game.nearest_in_group(g, me, best_d)
 		if n:
 			var d := me.distance_to(n.global_position)
@@ -749,6 +859,19 @@ func _act(delta: float) -> void:
 			_act_engage(delta)
 		S.CHASE:
 			_act_chase(delta)
+		S.FOLLOW:
+			var p := Game.player
+			if p == null:
+				_stop(delta)
+				return
+			var slot := float(get_instance_id() % 8) / 8.0 * TAU
+			var goal: Vector3 = p.global_position + Vector3(cos(slot), 0, sin(slot)) * 4.5
+			goal.y = global_position.y
+			var d := Vector2(goal.x - global_position.x, goal.z - global_position.z).length()
+			if d > 3.0:
+				_go(goal, run_speed if d > 10.0 else walk_speed * 1.6, delta)
+			else:
+				_stop(delta)
 
 
 func _go(goal: Vector3, speed: float, delta: float) -> void:
@@ -785,7 +908,7 @@ func _act_engage(delta: float) -> void:
 	if _target == null or not is_instance_valid(_target) or (_target.has_method("is_alive") and not _target.is_alive()) \
 			or (_target == Game.player and Game.player.is_dead()):
 		_target = null
-		state = S.PATROL
+		state = S.FOLLOW if is_ally else S.PATROL
 		_path_target = Vector3.INF
 		return
 	var tpos := _player_target_pos() if _target == Game.player else _target.global_position
@@ -848,7 +971,7 @@ func _fire_bullet(tpos: Vector3, dist: float) -> void:
 		end = hit["position"]
 		var c := hit["collider"] as Node
 		if c and c.has_method("take_hit"):
-			var is_friend := c.is_in_group("military")
+			var is_friend: bool = c.is_in_group("military") if not is_ally else (c == Game.player or c.is_in_group("allies"))
 			if not is_friend:
 				var dmg := 5.0 if kind == "elite" else 3.2
 				c.take_hit(Game.hit_info(dmg, dir * 1.5, self, "bullet"))
@@ -876,7 +999,7 @@ func _act_chase(delta: float) -> void:
 	if _target == null or not is_instance_valid(_target) or (_target.has_method("is_alive") and not _target.is_alive()) \
 			or (_target == Game.player and Game.player.is_dead()):
 		_target = null
-		state = S.WANDER
+		state = S.FOLLOW if is_ally else S.WANDER
 		_path_target = Vector3.INF
 		return
 	var tpos := _target.global_position
@@ -1107,7 +1230,7 @@ func _animate(delta: float) -> void:
 		set_meta("flashing", true)
 	elif has_meta("flashing"):
 		remove_meta("flashing")
-		model.set_tint(null)
+		model.set_tint(_brand_mat if is_ally else null)
 		model._thermal_on = false
 		if Game.player and Game.player.powers.thermal_on:
 			model.set_thermal(true)

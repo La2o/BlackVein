@@ -2,8 +2,17 @@ extends Node
 ## Sets up keyboard, mouse and gamepad controls when the game starts,
 ## so nothing has to be configured by hand in the editor.
 
+const ALL_DEVICES := -1
+
+var _pad_names := {}
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	Input.joy_connection_changed.connect(_on_joy_changed)
+	for id in Input.get_connected_joypads():
+		_pad_names[id] = Input.get_joy_name(id)
+		print("Controller found: ", Input.get_joy_name(id), " (device ", id, ")")
 	# Movement
 	_add("move_forward", [_k(KEY_W), _k(KEY_UP), _ja(JOY_AXIS_LEFT_Y, -1.0)])
 	_add("move_back", [_k(KEY_S), _k(KEY_DOWN), _ja(JOY_AXIS_LEFT_Y, 1.0)])
@@ -53,7 +62,30 @@ func _add(action: String, events: Array) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action, 0.25)
 	for e in events:
+		# -1 = any device. Without this only "device 0" works, and on many PCs the
+		# controller shows up as device 1 or higher, so the pad did nothing.
+		(e as InputEvent).device = ALL_DEVICES
 		InputMap.action_add_event(action, e)
+
+
+func _on_joy_changed(id: int, connected: bool) -> void:
+	var name := Input.get_joy_name(id) if connected else str(_pad_names.get(id, "Controller"))
+	if connected:
+		_pad_names[id] = name
+	if Game.has_method("say"):
+		Game.say(("Controller connected: " if connected else "Controller disconnected: ") + name,
+			Color(0.6, 0.9, 1) if connected else Color(1, 0.6, 0.5))
+
+
+## Names of the controllers Godot can see right now (shown in Settings).
+func pad_summary() -> String:
+	var ids := Input.get_connected_joypads()
+	if ids.is_empty():
+		return "No controller detected. Plug it in (or turn it on) — it works the moment it connects."
+	var names: Array[String] = []
+	for id in ids:
+		names.append(Input.get_joy_name(id))
+	return "Controller: " + ", ".join(names)
 
 
 func _k(code: Key) -> InputEventKey:

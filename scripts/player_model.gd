@@ -29,6 +29,17 @@ func build(new_outfit: Dictionary = {}) -> void:
 	_defense_parts.clear()
 	_whip_links.clear()
 	setup(outfit)
+	if new_outfit.is_empty():
+		# glowing veins running down the arms and across the chest
+		var vein := mat(Color(1, 0.14, 0.08), 2.2)
+		for arm in [arm_l, arm_r]:
+			var side := signf(arm.position.x)
+			_part(arm, box(Vector3(0.025, 0.55, 0.025)), vein, Vector3(side * 0.07, -0.33, -0.06)).rotation.z = side * 0.12
+			_part(arm, box(Vector3(0.02, 0.3, 0.02)), vein, Vector3(side * 0.03, -0.45, 0.07)).rotation.z = -side * 0.25
+		var c1 := _part(torso, box(Vector3(0.02, 0.4, 0.02)), vein, Vector3(-0.12, 0.12, -0.285))
+		c1.rotation.z = 0.5
+		var c2 := _part(torso, box(Vector3(0.02, 0.32, 0.02)), vein, Vector3(0.1, -0.05, -0.285))
+		c2.rotation.z = -0.6
 	_apply_form()
 	_apply_defense()
 

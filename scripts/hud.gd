@@ -48,6 +48,7 @@ var death_panel: Control
 var title_card: Control
 var settings_panel: PanelContainer
 var _settings_first: VBoxContainer
+var _pad_label: Label
 var rebind_panel: PanelContainer
 var ach_panel: PanelContainer
 var _ach_text: RichTextLabel
@@ -315,7 +316,7 @@ func _controls_text() -> String:
 [b]MOVE[/b]
 WASD move · Mouse look   |   [color=#9fd0ff]Left stick · Right stick[/color]
 Shift sprint — run into a wall to run up it   |   [color=#9fd0ff]RT[/color]
-Space tap jump, hold to charge a super jump   |   [color=#9fd0ff]A[/color]
+Space jump (keeps your speed) — keep holding to leap higher   |   [color=#9fd0ff]A[/color]
 Space in the air: double jump, hold to glide   |   [color=#9fd0ff]A[/color]
 Q dash (works in the air)   |   [color=#9fd0ff]B[/color]
 On a wall: W climbs, A/D runs sideways, Space wall jumps, let go of Shift to drop
@@ -327,6 +328,7 @@ Right click special move for your current form   |   [color=#9fd0ff]Y[/color]
 X cycle defense: Shield / Armor / none   |   [color=#9fd0ff]D-pad up[/color]
 E grab a person or car, press again to throw · hijack tanks and gunships · pick up guns   |   [color=#9fd0ff]RB[/color]
 F consume someone: heal, gain biomass and steal their disguise   |   [color=#9fd0ff]LB[/color]
+While holding someone: right-click brands them as your ally (Dominate skill)   |   [color=#9fd0ff]Y[/color]
 G Groundspike devastator (50 biomass)   |   [color=#9fd0ff]hold LB + X[/color]
 T Tendril Barrage devastator (80 biomass)   |   [color=#9fd0ff]hold LB + Y[/color]
 R Artillery strike (needs a military disguise)   |   [color=#9fd0ff]hold LB + RB[/color]
@@ -580,6 +582,8 @@ func _build_settings() -> void:
 	scroll.add_child(v)
 	_settings_first = v
 	v.add_child(_label("SETTINGS", 34, Color(1, 0.3, 0.25), 6))
+	_pad_label = _label("", 15, Color(0.6, 0.9, 1), 3)
+	v.add_child(_pad_label)
 	_slider_row(v, "Mouse sensitivity", 0.2, 3.0, Settings.mouse_sensitivity, func(x): Settings.mouse_sensitivity = x)
 	_slider_row(v, "Controller look speed", 0.3, 2.5, Settings.stick_sensitivity, func(x): Settings.stick_sensitivity = x)
 	_check_row(v, "Invert look up/down", Settings.invert_y, func(b): Settings.invert_y = b)
@@ -613,13 +617,13 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.5[/color][/b]
 
-[b]Patient Zero[/b] — the finale. Absorb 5 memories and reach level 18 to find the lab.
-[b]Bone Spikes[/b] — a ranged arm form (key 7 / D-pad).
-[b]Rooftop Races[/b] — hit every ring across the rooftops before time runs out.
-[b]Spreading infection[/b] — hives grow and turn civilians the longer they live.
-[b]Coats, city sounds, damage numbers[/b] (Settings), race records, and more.
+[b]Dominate[/b] — grab someone and press Special to brand them as your ally.
+[b]Controllers work[/b] — any gamepad, plugged in any time.
+[b]Jumping keeps your speed[/b] — press to jump instantly, keep holding to leap higher.
+[b]New look[/b] — cloudy sky with stars, stepped skyscrapers, shop fronts, billboards,
+traffic lights, wet glossy streets in the rain, reflections and softer shadows.
 
 Full list: CHANGELOG.md"""
 
@@ -786,9 +790,10 @@ func _check_row(parent: Control, text: String, value: bool, setter: Callable) ->
 
 func open_settings() -> void:
 	settings_panel.visible = true
+	_pad_label.text = Controls.pad_summary()
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var first := _settings_first.get_child(1).get_child(1) as Control
+	var first := _settings_first.get_child(2).get_child(1) as Control
 	first.grab_focus()
 
 
@@ -1054,6 +1059,8 @@ func _update_powers_text() -> void:
 		line2.append("%s spikes" % _k("spikes"))
 	if Game.has_skill("tendrils"):
 		line2.append("%s tendrils" % _k("tendrils"))
+	if Game.has_skill("dominate"):
+		line2.append("allies %d/%d" % [pw.ally_count(), pw.max_allies()])
 	if Game.has_skill("artillery"):
 		line2.append("%s artillery%s" % [_k("artillery"), "" if pw.artillery_cooldown <= 0.0 else " %ds" % int(ceil(pw.artillery_cooldown))])
 	if line2.is_empty():
@@ -1073,7 +1080,7 @@ func _update_prompt() -> void:
 		else:
 			text = "%s fire   %s boost   %s jump out" % [_k("attack"), _k("sprint"), _k("grab")]
 	elif pw.held:
-		text = "%s throw   %s drop" % [_k("attack"), _k("special")]
+		text = "%s throw   %s %s" % [_k("attack"), _k("special"), "brand as ally" if pw.held_kind == "npc" and Game.has_skill("dominate") else "drop"]
 		if pw.held_kind == "npc":
 			text += "   %s consume" % _k("consume")
 	else:
@@ -1216,6 +1223,9 @@ func _draw_minimap() -> void:
 		var p := _to_map((n as Node3D).global_position, c, yaw, scale, origin)
 		var big := (n as Node).is_in_group("hunters")
 		minimap.draw_circle(p, 4.5 if big else 2.0, Color(1, 0.55, 0.1))
+	for n in get_tree().get_nodes_in_group("allies"):
+		var ap := _to_map((n as Node3D).global_position, c, yaw, scale, origin)
+		minimap.draw_circle(ap, 3.2, Color(1, 0.35, 0.85))
 	for n in get_tree().get_nodes_in_group("military"):
 		var node := n as Node3D
 		var p := _to_map(node.global_position, c, yaw, scale, origin)

@@ -123,6 +123,20 @@ func setup(outfit: Dictionary) -> void:
 	leg_r = _pivot(self, Vector3(0.13, -0.24, 0))
 	_part(leg_l, capsule(0.105, 0.72), pants_m, Vector3(0, -0.31, 0))
 	_part(leg_r, capsule(0.105, 0.72), pants_m, Vector3(0, -0.31, 0))
+	# body shape details: broader flatter chest, hips, neck, shoulders, shoes, eyes
+	torso.scale = Vector3(1.12, 1.0, 0.8)
+	var hips := _part(self, sphere(0.2 * bulk), pants_m, Vector3(0, -0.22, 0))
+	hips.scale = Vector3(1.25, 0.7, 0.85)
+	_part(self, capsule(0.07, 0.2), skin_m, Vector3(0, 0.62, 0))
+	_part(arm_l, sphere(0.11 * bulk), shirt_m, Vector3(0, 0.0, 0))
+	_part(arm_r, sphere(0.11 * bulk), shirt_m, Vector3(0, 0.0, 0))
+	var shoe_m := mat(outfit.get("shoes", Color(0.08, 0.07, 0.07)), 0.0, 0.0, 0.6)
+	_part(leg_l, box(Vector3(0.15, 0.1, 0.3)), shoe_m, Vector3(0, -0.66, -0.05))
+	_part(leg_r, box(Vector3(0.15, 0.1, 0.3)), shoe_m, Vector3(0, -0.66, -0.05))
+	if outfit.get("gear", "none") != "hood":
+		var eye_m := mat(Color(0.05, 0.04, 0.04), 0.0, 0.0, 0.3)
+		_part(head, sphere(0.024), eye_m, Vector3(-0.065, 0.03, -0.168))
+		_part(head, sphere(0.024), eye_m, Vector3(0.065, 0.03, -0.168))
 	var gear: String = outfit.get("gear", "none")
 	match gear:
 		"helmet":

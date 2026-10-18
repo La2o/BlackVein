@@ -72,6 +72,8 @@ const ACHIEVEMENTS := [
 	["max_heat", "Most Wanted", "Reach the highest military alert", "max_heat", 5],
 	["events", "Busy Night", "Complete 25 world events", "events", 25],
 	["racer", "Free Runner", "Win 5 rooftop races", "races", 5],
+	["warlord", "Warlord", "Brand 25 allies", "brands", 25],
+	["army_of_six", "Personal Army", "Lead 6 allies at once", "max_allies", 6],
 	["evolved", "Apex", "Reach level 50", "level", 50],
 	["origin", "Origin", "Defeat Patient Zero", "patient_zero", 1],
 ]
@@ -79,7 +81,7 @@ const ACHIEVEMENTS := [
 ## Starter goals that teach the game and pay XP. [stat or check, target, text, xp]
 const GOALS := [
 	["wall_runs", 1, "Sprint into a building to run up it", 40],
-	["super_jumps", 1, "Hold jump to charge a super jump", 40],
+	["super_jumps", 1, "Hold jump to leap high (keep holding after take-off)", 40],
 	["consumes", 1, "Consume someone (F / LB)", 60],
 	["level", 2, "Reach level 2", 50],
 	["skills", 1, "Unlock a skill in the Skills menu (Tab / Back)", 60],
@@ -118,6 +120,7 @@ const SKILLS := {
 	"thermal": ["Thermal Vision", "See warm bodies through smoke and darkness", "Abilities", 1, 3, 1, ""],
 	"dive": ["Dive Bomb", "Attack in mid-air to slam down with a shockwave", "Abilities", 1, 3, 1, ""],
 	"focus": ["Focus", "Slow down time (drains biomass)", "Abilities", 2, 10, 1, ""],
+	"dominate": ["Dominate", "Grab someone and press Special to brand them: they follow you and fight for you. +2 allies per rank", "Abilities", 2, 5, 3, ""],
 	"decoy": ["Biomass Decoy", "A clone that draws enemy fire, then explodes", "Abilities", 2, 12, 1, ""],
 	"artillery": ["Artillery Strike", "While disguised as a soldier, call a barrage on where you aim. Needs codes from a base commander", "Abilities", 2, 8, 1, "flag:artillery_codes"],
 	"groundspike": ["Groundspike", "Devastator: rings of spikes erupt around you", "Devastators", 3, 14, 1, ""],

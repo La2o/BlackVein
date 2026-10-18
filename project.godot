@@ -13,7 +13,7 @@ config_version=5
 config/name="BLACKVEIN"
 config/description="An open-world super-power action game: shapeshifting powers, wall running, a military that hunts you, and a city full of events."
 run/main_scene="res://scenes/main.tscn"
-config/version="0.4.0"
+config/version="0.5.0"
 config/icon="res://icon.svg"
 config/features=PackedStringArray("4.5", "Forward Plus")
 
@@ -36,4 +36,10 @@ common/physics_interpolation=true
 [rendering]
 
 anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+lights_and_shadows/positional_shadow/soft_shadow_filter_quality=3
+environment/ssao/quality=3
+environment/ssil/quality=2
+anti_aliasing/screen_space_roughness_limiter/enabled=true
+textures/default_filters/anisotropic_filtering_level=3
 lights_and_shadows/directional_shadow/size=4096

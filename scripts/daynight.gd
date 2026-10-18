@@ -9,7 +9,11 @@ extends Node
 var hour := 16.0
 var sun: DirectionalLight3D
 var env: Environment
-var sky_mat: ProceduralSkyMaterial
+var sky_mat: ShaderMaterial
+var cloud_cover := 0.45
+var cloud_dark := 0.0
+var _top := Color(0.3, 0.45, 0.65)
+var _hor := Color(0.75, 0.75, 0.72)
 
 
 func _ready() -> void:
@@ -20,7 +24,13 @@ func _ready() -> void:
 func setup(sun_light: DirectionalLight3D, environment: Environment) -> void:
 	sun = sun_light
 	env = environment
-	sky_mat = env.sky.sky_material as ProceduralSkyMaterial
+	sky_mat = ShaderMaterial.new()
+	sky_mat.shader = preload("res://shaders/sky.gdshader")
+	env.sky.sky_material = sky_mat
+	env.sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
+	env.sky.radiance_size = Sky.RADIANCE_SIZE_128
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_BG
+	env.ambient_light_sky_contribution = 0.55
 	_apply()
 
 
@@ -58,30 +68,41 @@ func _apply() -> void:
 	if day < 0.0:
 		col = dusk_col.lerp(moon_col, clampf(-day * 4.0, 0.0, 1.0))
 	sun.light_color = col
-	sun.light_energy = lerpf(0.3, 1.35, light_amount)
+	sun.light_energy = lerpf(0.45, 1.35, light_amount)
 	sun.shadow_enabled = light_amount > 0.05 or day < -0.2
+	var top_day := Color(0.26, 0.42, 0.66)
+	var top_dusk := Color(0.3, 0.27, 0.45)
+	var top_night := Color(0.015, 0.02, 0.05)
+	var hor_day := Color(0.72, 0.78, 0.84)
+	var hor_dusk := Color(0.98, 0.55, 0.32)
+	var hor_night := Color(0.05, 0.06, 0.11)
+	var top := top_day.lerp(top_dusk, dusk)
+	var hor := hor_day.lerp(hor_dusk, dusk)
+	if day < 0.0:
+		top = top_dusk.lerp(top_night, clampf(-day * 3.0, 0.0, 1.0))
+		hor = hor_dusk.lerp(hor_night, clampf(-day * 3.0, 0.0, 1.0))
+	# grey the sky out under heavy clouds
+	var grey := clampf(cloud_dark, 0.0, 1.0) * 0.7
+	top = top.lerp(Color(0.32, 0.34, 0.37) * maxf(light_amount, 0.15), grey)
+	hor = hor.lerp(Color(0.45, 0.46, 0.48) * maxf(light_amount, 0.15), grey)
+	_top = top
+	_hor = hor
 	if sky_mat:
-		var top_day := Color(0.3, 0.45, 0.65)
-		var top_dusk := Color(0.35, 0.3, 0.45)
-		var top_night := Color(0.02, 0.03, 0.07)
-		var hor_day := Color(0.75, 0.75, 0.72)
-		var hor_dusk := Color(0.95, 0.55, 0.35)
-		var hor_night := Color(0.06, 0.07, 0.12)
-		var top := top_day.lerp(top_dusk, dusk)
-		var hor := hor_day.lerp(hor_dusk, dusk)
-		if day < 0.0:
-			top = top_dusk.lerp(top_night, clampf(-day * 3.0, 0.0, 1.0))
-			hor = hor_dusk.lerp(hor_night, clampf(-day * 3.0, 0.0, 1.0))
-		sky_mat.sky_top_color = top
-		sky_mat.sky_horizon_color = hor
-		sky_mat.ground_horizon_color = hor
-		sky_mat.ground_bottom_color = hor.darkened(0.6)
-		env.fog_light_color = hor.lerp(Color(0.5, 0.5, 0.5), 0.2)
-	# ambient: sky color by day, a cool moonlit blue at night so streets stay readable
-	var amb_day: Color = sky_mat.sky_horizon_color.lerp(sky_mat.sky_top_color, 0.5) if sky_mat else Color(0.6, 0.6, 0.65)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = amb_day.lerp(Color(0.16, 0.19, 0.3), night).lerp(Color(0.62, 0.62, 0.66), light_amount * 0.4)
-	env.ambient_light_energy = lerpf(1.1, 0.75, light_amount)
-	env.background_energy_multiplier = lerpf(0.4, 1.0, light_amount)
+		sky_mat.set_shader_parameter("top_color", top)
+		sky_mat.set_shader_parameter("horizon_color", hor)
+		sky_mat.set_shader_parameter("ground_color", hor.darkened(0.6))
+		sky_mat.set_shader_parameter("sun_color", col)
+		sky_mat.set_shader_parameter("night", night)
+		sky_mat.set_shader_parameter("cloud_cover", cloud_cover)
+		sky_mat.set_shader_parameter("cloud_dark", cloud_dark)
+		var cloud_col := Color(1, 1, 1).lerp(Color(1.0, 0.7, 0.55), dusk).lerp(Color(0.12, 0.13, 0.18), night)
+		sky_mat.set_shader_parameter("cloud_color", cloud_col)
+	env.fog_light_color = hor.lerp(Color(0.5, 0.5, 0.5), 0.2)
+	sun.light_energy *= 1.0 - cloud_dark * 0.45
+	env.tonemap_exposure = lerpf(1.0, 1.4, night)
+	env.ambient_light_color = hor.lerp(top, 0.5).lerp(Color(0.3, 0.34, 0.5), night).lerp(Color(0.62, 0.62, 0.66), light_amount * 0.3)
+	env.ambient_light_energy = lerpf(1.25, 0.8, light_amount)
+	env.ambient_light_sky_contribution = lerpf(0.15, 0.55, light_amount)
+	env.background_energy_multiplier = lerpf(0.45, 1.0, light_amount)
 	if Game.city:
 		Game.city.set_night(night)

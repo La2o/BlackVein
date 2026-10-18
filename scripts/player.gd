@@ -21,9 +21,12 @@ const STATE_NAMES := ["Ground", "Air", "Wall run", "Glide", "Dash", "Tether", "D
 
 @export_group("Jumping")
 @export var gravity := 38.0
-@export var min_jump_velocity := 13.0
-@export var max_jump_velocity := 46.0
-@export var jump_charge_time := 0.65
+## Jumping is instant and keeps all your speed. Keep holding jump to keep rising:
+## a tap is a hop, a full hold is a ~30 m super jump (more when running).
+@export var jump_velocity := 13.0
+@export var run_jump_velocity := 16.0
+@export var jump_boost_accel := 95.0
+@export var jump_boost_time := 0.42
 @export var double_jump_velocity := 20.0
 @export var double_jump_boost := 6.0
 @export var max_fall_speed := 75.0
@@ -65,8 +68,12 @@ const CAPSULE_RADIUS := 0.4
 var state: int = State.AIR
 var wish := Vector3.ZERO
 var sprinting := false
-var charging := false
+var charging := false      # true while a held jump is still pushing you up (HUD bar)
 var charge := 0.0
+var boost_timer := 0.0
+var boost_held := 0.0
+var _super_done := false
+var _takeoff := Vector3.ZERO
 var double_jump_ready := true
 var flaps_left := 0
 var _glide_accum := 0.0
@@ -271,7 +278,6 @@ func _state_ground(delta: float) -> void:
 		coyote += delta
 		velocity.y -= gravity * delta
 		if coyote > 0.12:
-			charging = false
 			state = State.AIR
 			return
 	else:
@@ -279,8 +285,6 @@ func _state_ground(delta: float) -> void:
 		velocity.y = -1.0
 	var target_speed := (sprint_speed * speed_mult) if sprinting else walk_speed
 	target_speed *= powers.speed_factor() if powers.has_method("speed_factor") else 1.0
-	if charging:
-		target_speed *= 0.35
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	var target := wish * target_speed
 	var rate := ground_accel if wish.length() > 0.1 else ground_decel
@@ -291,43 +295,62 @@ func _state_ground(delta: float) -> void:
 	velocity.z = hv.z
 
 	if Input.is_action_just_pressed("jump") and powers.can_move():
-		charging = true
-		charge = 0.0
-	if charging:
-		charge = minf(1.0, charge + delta / jump_charge_time)
-		if not Input.is_action_pressed("jump"):
-			_ground_jump()
-			return
+		_ground_jump()
+		return
 	if Input.is_action_just_pressed("dash") and dash_cooldown_timer <= 0.0 and powers.can_move():
 		_start_dash()
 		return
-	if sprinting and wall_cooldown <= 0.0 and not charging:
+	if sprinting and wall_cooldown <= 0.0:
 		var n := _wall_ahead(wish)
 		if n != Vector3.ZERO:
 			_enter_wall(n)
 
 
 func _ground_jump() -> void:
-	var c := charge
-	var v := lerpf(min_jump_velocity, max_jump_velocity * jump_mult, pow(c, 1.6))
-	velocity.y = v
+	var hspeed := Vector3(velocity.x, 0, velocity.z).length()
+	var running := hspeed > walk_speed * 1.3
+	# horizontal velocity is left untouched: jumping never slows you down
+	velocity.y = (run_jump_velocity if running else jump_velocity) * sqrt(jump_mult)
 	state = State.AIR
-	charging = false
 	air_press = false
 	double_jump_ready = true
 	dash_ready = true
-	model.scale = Vector3(0.75, 1.35, 0.75)
-	if c > 0.6:
-		Game.stat_add("super_jumps")
-		trauma = minf(1.0, trauma + 0.25)
-		conspicuous_timer = 2.0
-		Game.fx.shockwave(global_position + Vector3.DOWN * 0.9, 4.0, Color(1, 0.9, 0.8, 0.6), 0.3)
-		Game.fx.debris(global_position + Vector3.DOWN * 0.8, 10)
-		Game.fx.sound("land", global_position, -4.0)
+	boost_timer = jump_boost_time
+	boost_held = 0.0
+	_super_done = false
+	_takeoff = global_position + Vector3.DOWN * 0.9
+	model.scale = Vector3(0.8, 1.25, 0.8)
+	if running:
+		Game.fx.debris(_takeoff + Vector3.UP * 0.1, 5, Color(0.5, 0.48, 0.45))
 	Game.fx.sound("jump", global_position, -6.0)
 
 
+## While jump stays held right after take-off, keep pushing upward.
+func _jump_boost(delta: float) -> void:
+	if boost_timer <= 0.0:
+		charging = false
+		return
+	if not Input.is_action_pressed("jump"):
+		boost_timer = 0.0
+		charging = false
+		return
+	boost_timer -= delta
+	boost_held += delta
+	velocity.y += jump_boost_accel * jump_mult * delta
+	charging = true
+	charge = clampf(boost_held / jump_boost_time, 0.0, 1.0)
+	if not _super_done and boost_held > jump_boost_time * 0.6:
+		_super_done = true
+		Game.stat_add("super_jumps")
+		trauma = minf(1.0, trauma + 0.25)
+		conspicuous_timer = 2.0
+		Game.fx.shockwave(_takeoff, 4.0, Color(1, 0.9, 0.8, 0.6), 0.3)
+		Game.fx.debris(_takeoff + Vector3.UP * 0.1, 10)
+		Game.fx.sound("land", _takeoff, -4.0)
+
+
 func _state_air(delta: float) -> void:
+	_jump_boost(delta)
 	velocity.y = maxf(velocity.y - gravity * delta, -max_fall_speed)
 	_air_steer(delta)
 	if Input.is_action_just_pressed("jump"):
@@ -366,6 +389,8 @@ func _air_common() -> void:
 
 
 func _double_jump() -> void:
+	boost_timer = 0.0
+	charging = false
 	velocity.y = maxf(velocity.y, double_jump_velocity * sqrt(jump_mult))
 	if wish.length() > 0.1:
 		velocity += wish * double_jump_boost
@@ -405,6 +430,8 @@ func _state_glide(delta: float) -> void:
 
 
 func _start_dash() -> void:
+	boost_timer = 0.0
+	charging = false
 	dash_dir = wish.normalized() if wish.length() > 0.1 else Vector3.FORWARD.rotated(Vector3.UP, yaw)
 	dash_timer = dash_time
 	dash_cooldown_timer = dash_cooldown
@@ -457,6 +484,8 @@ func _wall_ahead(dir: Vector3) -> Vector3:
 
 func _enter_wall(n: Vector3) -> void:
 	state = State.WALL
+	boost_timer = 0.0
+	charging = false
 	flaps_left = Game.skill_rank("wings")
 	Game.stat_add("wall_runs")
 	wall_normal = n
@@ -651,6 +680,9 @@ func _state_pilot(_delta: float) -> void:
 func take_hit(info: Dictionary) -> void:
 	if state == State.DEAD or invuln_timer > 0.0:
 		return
+	var src: Node = info["source"]
+	if src != null and is_instance_valid(src) and src.get("is_ally") == true:
+		return
 	if state == State.PILOT and vehicle and is_instance_valid(vehicle):
 		vehicle.take_hit(info)
 		return
@@ -829,9 +861,11 @@ func _heavy_landing(impact: float, dive: bool) -> void:
 	Game.damage_area(feet + Vector3.UP * 0.5, radius, damage, force, self, "slam", Game.MASK_HITTABLE)
 	Game.panic_at(feet, radius * 3.0)
 	conspicuous_timer = 3.0
-	var hv := Vector3(velocity.x, 0, velocity.z) * 0.55
-	velocity.x = hv.x
-	velocity.z = hv.z
+	# land running if you're still holding a direction; otherwise the impact slows you
+	if not (sprinting and wish.length() > 0.3):
+		var hv := Vector3(velocity.x, 0, velocity.z) * 0.55
+		velocity.x = hv.x
+		velocity.z = hv.z
 	powers.on_heavy_landing(feet, strength, dive)
 
 
@@ -876,10 +910,7 @@ func _update_visual(delta: float) -> void:
 				target_offset = Vector3.DOWN * 0.6
 				mode = "dead"
 			_:
-				if charging:
-					mode = "crouch"
-					target_offset = Vector3.DOWN * 0.15 * charge
-				elif hspeed > walk_speed * 1.3:
+				if hspeed > walk_speed * 1.3:
 					mode = "run"
 					target_basis = target_basis.rotated(target_basis.x, -0.28)
 				elif hspeed > 0.8:
@@ -889,8 +920,6 @@ func _update_visual(delta: float) -> void:
 	visual.basis = Basis(q)
 	visual.position = visual.position.lerp(target_offset, k)
 	var scale_target := Vector3.ONE
-	if charging:
-		scale_target = Vector3(1.0 + 0.12 * charge, 1.0 - 0.15 * charge, 1.0 + 0.12 * charge)
 	model.scale = model.scale.lerp(scale_target, 1.0 - exp(-10.0 * delta))
 	var anim_speed := hspeed if state != State.WALL else velocity.length()
 	model.wings_visible = Game.has_skill("wings")

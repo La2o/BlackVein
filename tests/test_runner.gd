@@ -166,6 +166,36 @@ func _run_all() -> void:
 	check("charged super jump is high", max_y - y0 > 20.0, "%.1f m" % (max_y - y0))
 	await _wait(1.5)
 
+	# ---------------- running jump keeps speed
+	await _teleport(Game.city.spawn_point, PI * 0.5)
+	await _wait(0.5)
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await _wait(1.2)
+	var run_speed := Vector3(player.velocity.x, 0, player.velocity.z).length()
+	Input.action_press("jump")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var left_ground := player.state == Player.State.AIR
+	await _wait(0.15)
+	var air_speed := Vector3(player.velocity.x, 0, player.velocity.z).length()
+	_release_all()
+	check("jump while running leaves the ground instantly", left_ground)
+	check("jump while running keeps your speed", air_speed >= run_speed * 0.95, "%.1f -> %.1f m/s" % [run_speed, air_speed])
+	await _wait(3.0)
+
+	# ---------------- controller works on any device id
+	var joy := InputEventJoypadMotion.new()
+	joy.device = 3
+	joy.axis = JOY_AXIS_LEFT_Y
+	joy.axis_value = -1.0
+	Input.parse_input_event(joy)
+	await get_tree().physics_frame
+	check("controller stick moves you (any device)", Input.get_vector("move_left", "move_right", "move_forward", "move_back").length() > 0.5)
+	joy.axis_value = 0.0
+	Input.parse_input_event(joy)
+	await get_tree().physics_frame
+
 	# ---------------- tap jump is small
 	y0 = player.global_position.y
 	await _tap("jump")
@@ -236,6 +266,33 @@ func _run_all() -> void:
 	check("consume heals", player.health > 45.0, "hp %.0f" % player.health)
 	check("consume gives a disguise", player.disguise == "civilian")
 	await _wait(0.5)
+
+	# ---------------- Dominate: brand an ally
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	Game.skills["dominate"] = 1
+	player.biomass = player.max_biomass
+	var recruit: Node3D = Game.military.spawn_npc("soldier", player.global_position + Vector3(0, 0, -1.6))
+	await _wait(0.2)
+	await _tap("grab")
+	await _wait(0.2)
+	check("grab a soldier to brand", player.powers.held == recruit)
+	await _tap("special")
+	await _wait(1.2)
+	check("branding makes an ally", is_instance_valid(recruit) and recruit.is_ally and recruit.is_in_group("allies"))
+	var hp_ally: float = recruit.hp
+	await _tap("attack")
+	await _wait(0.5)
+	check("you can't hurt your allies", recruit.hp >= hp_ally)
+	var foe: Node3D = Game.military.spawn_npc("infected", player.global_position + Vector3(12, 0, 0))
+	await _wait(6.0)
+	check("allies fight the infected", not is_instance_valid(foe) or not foe.is_alive() or foe.hp < foe.max_hp)
+	player.global_position += Vector3(40, 0, 0)
+	await _wait(3.0)
+	check("allies follow you", recruit.global_position.distance_to(player.global_position) < 30.0,
+		"%.0f m away" % recruit.global_position.distance_to(player.global_position))
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
 
 	# ---------------- arm forms and specials
 	for f in PlayerPowers.FORM_NAMES.size():

@@ -12,7 +12,8 @@ var _blend := 0.0       # 0 clear .. 1 full effect
 var _rain: CPUParticles3D
 var _rain_sound: AudioStreamPlayer
 var _env: Environment
-var _base_fog := 0.0032
+var _base_fog := 0.0024
+var _wet := 0.0
 
 
 func _ready() -> void:
@@ -76,6 +77,24 @@ func _process(delta: float) -> void:
 		W.RAIN: fog_target = _base_fog * 2.6
 		W.FOG: fog_target = _base_fog * 5.0
 	_env.fog_density = lerpf(_env.fog_density, fog_target, delta * 0.3)
+	# clouds and wet streets
+	var dn: Node = Game.daynight
+	if dn:
+		var cover_t := 0.45
+		var dark_t := 0.0
+		match current:
+			W.RAIN:
+				cover_t = 0.9
+				dark_t = 0.75
+			W.FOG:
+				cover_t = 0.75
+				dark_t = 0.35
+		dn.cloud_cover = move_toward(dn.cloud_cover, cover_t, delta * 0.03)
+		dn.cloud_dark = move_toward(dn.cloud_dark, dark_t, delta * 0.04)
+	if Game.city:
+		var wet_t := 1.0 if rain_on else 0.0
+		_wet = move_toward(_wet, wet_t, delta * (0.08 if rain_on else 0.02))
+		Game.city.set_wetness(_wet)
 	if rain_on != _rain.emitting:
 		_rain.emitting = rain_on
 	if Game.player:

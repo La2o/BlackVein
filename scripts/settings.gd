@@ -59,10 +59,12 @@ func apply_bindings() -> void:
 		var b: Dictionary = bindings[a]
 		if b.has("key"):
 			var k := InputEventKey.new()
+			k.device = -1
 			k.physical_keycode = int(b["key"])
 			InputMap.action_add_event(a, k)
 		elif b.has("mouse"):
 			var m := InputEventMouseButton.new()
+			m.device = -1
 			m.button_index = int(b["mouse"])
 			InputMap.action_add_event(a, m)
 	changed.emit()
@@ -163,13 +165,15 @@ func apply() -> void:
 			vp.scaling_3d_scale = 0.9
 			RenderingServer.directional_shadow_atlas_set_size(2048, true)
 		_:
-			vp.msaa_3d = Viewport.MSAA_2X
+			vp.msaa_3d = Viewport.MSAA_4X
 			vp.scaling_3d_scale = 1.0
 			RenderingServer.directional_shadow_atlas_set_size(4096, true)
 	if Game.world:
 		var we := Game.world.get_node_or_null("WorldEnvironment") as WorldEnvironment
 		if we:
-			we.environment.ssao_enabled = quality >= 2
+			we.environment.ssao_enabled = quality >= 1
+			we.environment.ssil_enabled = quality >= 2
+			we.environment.ssr_enabled = quality >= 2
 			we.environment.glow_enabled = quality >= 1
 		var sun := Game.world.get_node_or_null("Sun") as DirectionalLight3D
 		if sun:
