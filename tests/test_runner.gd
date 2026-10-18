@@ -404,20 +404,28 @@ func _run_all() -> void:
 	pw.set_vision(PlayerPowers.Vision.NORMAL)
 	await _clear_units()
 
-	# ---------------- forms wheel (held open like a player would; letting go picks the form)
+	# ---------------- forms wheel, used like a player: hold the button, point, let go
 	Input.action_press("forms_wheel")
-	Game.hud.open_wheel()
-	await get_tree().process_frame
+	for f in 10:
+		await get_tree().physics_frame
+		if Game.hud.wheel_open:
+			break
 	check("forms wheel opens in slow motion", Game.hud.wheel_open and Engine.time_scale < 0.2,
 		"time %.2f open %s paused %s menu %s hitstop %.2f dead %s" % [Engine.time_scale, Game.hud.wheel_open,
 		get_tree().paused, Game.hud._any_menu_open(), Game.hit_stop_timer, player.is_dead()])
 	var wh: Control = Game.hud.wheel
 	for i in wh.entries.size():
 		if wh.entries[i]["part"] == "legs" and wh.entries[i]["index"] == PlayerPowers.Legs.LEAPER:
-			wh.hovered = i
-	wh.close_wheel(true)
-	Input.action_release("forms_wheel")
+			var a: float = wh._start_angle() + (i + 0.5) * wh._step()
+			wh._cursor = Vector2(cos(a), sin(a)) * 150.0   # what a mouse or stick does
 	await get_tree().process_frame
+	Input.action_release("forms_wheel")
+	for f in 120:
+		await get_tree().process_frame
+		if not Game.hud.wheel_open:
+			break
+	await get_tree().physics_frame
+	await get_tree().physics_frame
 	check("forms wheel switches forms", pw.legs == PlayerPowers.Legs.LEAPER and not Game.hud.wheel_open and Engine.time_scale > 0.9,
 		"legs %d open %s time %.2f hitstop %.2f focus %s" % [pw.legs, Game.hud.wheel_open, Engine.time_scale, Game.hit_stop_timer, Game.focus_active])
 	pw.set_legs(PlayerPowers.Legs.NORMAL)
@@ -744,7 +752,12 @@ func _run_all() -> void:
 	Game.set_alert(Game.Alert.HIDDEN)
 	var base_center: Vector3 = Game.city.base_points["center"]
 	await _teleport(Game.city.base_points["gate"] + Vector3(130, 0, 0), PI * 0.5)
-	await _wait(8.0)
+	var base_alarmed := false   # if the base spots you, its gunship rightly takes off
+	t = 0.0
+	while t < 8.0:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		base_alarmed = base_alarmed or Game.is_hunted()
 	var garrison := get_tree().get_nodes_in_group("military").filter(func(u): return str(u.get("event_tag")) == "base")
 	check("military base is garrisoned", garrison.size() >= 4, "%d units" % garrison.size())
 	var commander = null
@@ -752,8 +765,10 @@ func _run_all() -> void:
 		if u.get("kind") == "commander":
 			commander = u
 	check("base has a commander", commander != null)
-	var heli_parked := get_tree().get_nodes_in_group("helicopters").any(func(h): return h.get("parked") == true)
-	check("gunship parked on the helipad", heli_parked)
+	var base_helis := get_tree().get_nodes_in_group("helicopters").filter(func(h): return str(h.get("event_tag")) == "base")
+	var heli_parked := base_helis.any(func(h): return h.get("parked") == true)
+	check("gunship parked on the helipad", base_helis.size() > 0 and (heli_parked or base_alarmed),
+		"%d base gunships, parked %s, base alarmed %s" % [base_helis.size(), heli_parked, base_alarmed])
 	if commander:
 		await _teleport(Game.city.spawn_point)
 		commander.global_position = player.global_position + Vector3(0, 0.3, -1.4)

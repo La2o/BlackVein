@@ -97,7 +97,10 @@ The PCK is embedded, so each build is a single file. Smoke-test the Linux one wi
 
 ## Release checklist
 
-1. Tests pass (0 failed) locally **and on GitHub**. After every push, check the Actions run:
+Releases are made **only when the owner asks**. Day to day: test locally (fast loop above, one
+normal-speed run before committing), push to `main`, keep CHANGELOG.md and the version current.
+
+1. Tests pass (0 failed) locally **and on GitHub**. After pushing, check the Actions run:
    `gh run list -R La2o/BlackVein -L 1`, then read its annotations (failed checks are reported there,
    the raw log host is blocked from the cloud workspace):
    `gh api repos/La2o/BlackVein/check-runs/<job id>/annotations`. Fix anything that fails.
