@@ -59,6 +59,9 @@ and controller names depending on what you used last.
 | Action | Keyboard & mouse | Controller |
 |---|---|---|
 | Skills | Tab or U | Back / View |
+| Disguise wardrobe | I | Hold LB + press B |
+| Enter a building / use something | E at a glowing door | RB |
+| In menus: move / select / back | Mouse, Esc | D-pad or left stick / A / B |
 | Pause menu | Esc | Start / Menu |
 | Map | M | — |
 | Controls | F1 or H | — |

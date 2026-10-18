@@ -28,7 +28,7 @@ const REBINDABLE := [
 	["grab", "Grab / throw / hijack"], ["consume", "Consume"], ["tether", "Tether"], ["focus", "Focus"],
 	["thermal", "Thermal vision"], ["decoy", "Decoy"], ["cycle_defense", "Shield / armor"],
 	["devastator_spikes", "Groundspike"], ["devastator_tendrils", "Tendril Barrage"], ["artillery", "Artillery"],
-	["evolve_menu", "Skills menu"], ["map", "Map"],
+	["evolve_menu", "Skills menu"], ["map", "Map"], ["disguise_menu", "Disguise wardrobe"],
 ]
 var _defaults := {}
 

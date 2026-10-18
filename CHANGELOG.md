@@ -2,6 +2,38 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.6.0] — 2026-10-18 — Disguises and buildings you can enter
+
+### New
+- **Disguise wardrobe** (I, or hold LB + B): every identity you consume is kept, and you can
+  switch between them any time. Each disguise has a purpose:
+  - **Scientist** — walk freely through the research labs.
+  - **Soldier / rocket soldier / strike team** — walk into the military base and bunker; soldiers
+    get suspicious more slowly.
+  - **Base commander** — full military access, and lets you call Artillery.
+  - **Civilian** — blend into street crowds.
+  - **Your true form** — the hooded drifter.
+  Changing while nobody is watching makes the military lose you; changing in front of soldiers
+  blows your cover. Your wardrobe and current disguise are saved.
+- **Buildings you can enter** — glowing doors in the city (also marked on the minimap and map):
+  - **Origin Biotech Labs** (3): scientists, guards, specimen tanks, a vault with an
+    **Evolution Sample** (+1 skill point each) and a head scientist carrying a memory.
+    Restricted: you'll be noticed unless you're disguised as a scientist or soldier.
+  - **Military Bunker** under the base: armory with weapons, barracks, holding cells, and an intel
+    terminal (big XP, and a second way to get the artillery codes). Soldiers only.
+  - **Subway Nest**: an infested station full of infected, hunters, hives and a
+    **Hive Heart** — destroy it for XP and a mutation (+1 skill point, once).
+  - **Safehouse**: rest to heal, save and skip 8 hours; your wardrobe; a trophy wall with your stats.
+  Your allies follow you inside. The city pauses while you're indoors.
+- Achievements: "Thousand Faces", "Infiltrator", "Exterminator II".
+
+### Fixed
+- People no longer appear on rooftops: when no good street spot was found, new people could be
+  placed at your height (on the roof you were standing on). People who get thrown or blasted onto
+  a roof are cleaned up once you leave.
+- **Menus now work with a controller**: D-pad / left stick to move, A to select, B to go back.
+  (The built-in menu controls only listened to controller #0 and had no A/B buttons.)
+
 ## [0.5.1] — 2026-10-18
 
 ### Changed

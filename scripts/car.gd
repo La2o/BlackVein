@@ -131,7 +131,7 @@ func _physics_process(delta: float) -> void:
 		_fire_timer -= delta
 		if _fire_timer <= 0.0 and _fire:
 			_fire.emitting = false
-	if global_position.y < -50.0:
+	if Game.fell_out(global_position):
 		queue_free()
 
 

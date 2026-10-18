@@ -247,6 +247,9 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var mod := Input.is_action_pressed("devastator_mod")
+	if mod and Input.is_action_just_pressed("dash") and Game.hud:
+		Game.hud.open_wardrobe()
+		return
 	if Input.is_action_just_pressed("devastator_spikes") or (mod and Input.is_action_just_pressed("attack")):
 		if Game.has_skill("groundspike"):
 			_start_devastator("spikes")
@@ -685,6 +688,8 @@ func _tether() -> void:
 # ------------------------------------------------------------------ grab / throw
 
 func _grab_pressed() -> void:
+	if not held and Game.interiors and Game.interiors.try_interact():
+		return
 	if held:
 		_throw_held()
 		return
@@ -784,6 +789,42 @@ func _throw_held() -> void:
 	player.conspicuous_timer = 3.0
 	Game.fx.sound("whoosh", player.global_position, 2.0)
 	rumble(0.2, 0.5, 0.15)
+
+
+# ------------------------------------------------------------------ disguise wardrobe
+
+var _wardrobe_cd := 0.0
+
+
+## Put on a disguise from the wardrobe. index -1 = your true form.
+func wear_disguise(index: int) -> bool:
+	if consuming or player.state in [player.State.PILOT, player.State.DEAD]:
+		return false
+	var kind := "civilian"
+	var outfit: Dictionary = {}
+	var label := "your true form"
+	if index >= 0:
+		if index >= Game.disguises.size():
+			return false
+		var d: Dictionary = Game.disguises[index]
+		kind = d["kind"]
+		outfit = d["outfit"]
+		label = d["label"]
+	var witnessed := _witnessed(player.global_position)
+	player.disguise = kind
+	player.model.build(outfit)
+	player.model.set_form(form)
+	player.model.set_defense(defense)
+	if thermal_on:
+		player.model.set_thermal(false)
+	Game.fx.burst_ring(player.global_position, Color(0.8, 0.1, 0.06, 0.7), 2.2)
+	Game.fx.sound("consume", player.global_position, -6.0, 0.3)
+	if witnessed:
+		Game.raise_alert(player.global_position, "They saw you change shape!")
+	else:
+		Game.disguise_changed_unseen()
+		Game.say("Now disguised as %s" % label, Color(0.8, 0.9, 1))
+	return true
 
 
 # ------------------------------------------------------------------ dominate (allies)
@@ -923,6 +964,7 @@ func _finish_consume() -> void:
 	if info.has("outfit") and kind != "infected" and kind != "hunter":
 		player.disguise = kind
 		player.model.build(info["outfit"])
+		Game.add_disguise(kind, str(info.get("label", kind)), info["outfit"])
 		player.model.set_form(form)
 		player.model.set_defense(defense)
 		if thermal_on:
@@ -931,6 +973,8 @@ func _finish_consume() -> void:
 		Game.raise_alert(player.global_position, "Someone saw you consume")
 	else:
 		Game.disguise_changed_unseen()
+	if str(info.get("memory_flag", "")) != "":
+		Game.flags[info["memory_flag"]] = true
 	if info.get("memory", "") != "":
 		Game.say(info["memory"], Color(0.8, 0.9, 1.0))
 		Game.stat_add("memories")

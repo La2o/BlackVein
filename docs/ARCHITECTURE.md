@@ -56,6 +56,9 @@ only hold the node skeleton.
 - `hive.gd` — infection hives that spawn infected.
 - `pickup.gd` — dropped guns and supply caches.
 - `decoy.gd` — the Biomass Decoy clone.
+- `interiors.gd` — enterable buildings: places doors in the city and builds interiors on a 4 m
+  grid far below the streets when you go in (walls, lights, nav mesh, people, props), then removes
+  them when you leave.
 - `traffic.gd` — driving civilian cars; they swap themselves for `car.gd` physics cars when hit.
 
 ## Saved data

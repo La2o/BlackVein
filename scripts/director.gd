@@ -42,6 +42,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if Game.player == null or Game.city == null or not Game.city.nav_ready:
 		return
+	if Game.interiors and Game.interiors.is_inside():
+		return   # the city waits while you're indoors
 	_played_time += delta
 	_pop_timer -= delta
 	if _pop_timer <= 0.0:

@@ -40,6 +40,15 @@ func setup(k: String, amt: int) -> void:
 			c.height = 1.1
 			mi.mesh = c
 			mi.rotation.x = PI * 0.5
+		"sample":
+			var vial := CapsuleMesh.new()
+			vial.radius = 0.18
+			vial.height = 0.8
+			mi.mesh = vial
+			glow.albedo_color = Color(0.2, 0.05, 0.05)
+			glow.emission = Color(1.0, 0.15, 0.1)
+			glow.emission_energy_multiplier = 3.0
+			life = 99999.0
 		"supply":
 			var b2 := BoxMesh.new()
 			b2.size = Vector3(1.4, 1.0, 1.4)
@@ -61,13 +70,21 @@ func _process(delta: float) -> void:
 	if life <= 0.0:
 		queue_free()
 		return
-	if kind == "supply" and Game.player and not Game.player.is_dead() \
+	if (kind == "supply" or kind == "sample") and Game.player and not Game.player.is_dead() \
 			and Game.player.global_position.distance_to(global_position) < 2.8:
 		pick_up(Game.player)
 
 
 func pick_up(player: Node) -> void:
-	if kind == "supply":
+	if kind == "sample":
+		Game.skill_points += 1
+		Game.xp_changed.emit()
+		Game.flags[str(get_meta("flag", "sample"))] = true
+		Game.stat_add("samples")
+		Game.add_xp(150, "Evolution Sample")
+		Game.say("EVOLUTION SAMPLE  ·  +1 skill point", Color(0.7, 1, 0.6))
+		Game.fx.sound("evolve", global_position, 0.0)
+	elif kind == "supply":
 		player.heal(player.max_health)
 		player.biomass = player.max_biomass
 		Game.add_ep(amount, "Supply cache")

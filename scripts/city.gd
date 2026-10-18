@@ -910,7 +910,8 @@ func random_sidewalk_point(near: Vector3, min_d: float, max_d: float) -> Vector3
 		var d := p.distance_to(near)
 		if d >= min_d * 0.8 and d <= max_d * 1.3 and not is_inside_building(p, 0.6) and not in_base(p):
 			return p
-	return near + Vector3(randf_range(-5, 5), 0.2, randf_range(-5, 5))
+	# fallback: snap to the street, never to the height of whatever "near" is (a rooftop!)
+	return closest_nav_point(Vector3(near.x + randf_range(-5, 5), 0.2, near.z + randf_range(-5, 5)))
 
 
 func random_street_point(near: Vector3, min_d: float, max_d: float) -> Vector3:

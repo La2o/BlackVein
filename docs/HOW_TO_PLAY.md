@@ -42,6 +42,14 @@ A quick guide to your first hour.
 - **Hunters** leap across rooftops after you. Fight them in the open.
 - **Bosses**: the Leviathan (level 10+), the Juggernaut (level 12+), and Patient Zero (the finale).
 
+## Disguises and buildings
+
+- Every person you consume is saved in your **wardrobe** (I / hold LB + B). Switch while nobody is
+  looking. Scientists walk into labs; soldiers walk into the base and bunker.
+- **Glowing doors** (colored squares on the minimap) lead inside: three research labs (each has an
+  Evolution Sample worth a skill point, and a head scientist with a memory), the bunker under the
+  base, the subway nest, and your safehouse near the start (rest there to heal and save).
+
 ## Tips
 
 - **Dominate** (level 5): grab a soldier or infected and press Special to brand them. Your

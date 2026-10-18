@@ -40,6 +40,7 @@ var patrol_center := Vector3.ZERO
 var event_tag := ""        # lets world events track their units
 var boss_name := ""
 var is_ally := false               # branded by the player's Dominate power
+var patrol_points: Array = []      # if set (indoors), wander/patrol only between these spots
 var _brand_mark: MeshInstance3D
 var _ally_teleport_cd := 0.0
 static var _brand_mat: StandardMaterial3D
@@ -387,7 +388,8 @@ func on_consume_cancel() -> void:
 
 
 func on_consumed(_by: Node) -> Dictionary:
-	var info := {"kind": kind, "outfit": outfit, "label": label, "memory": memory, "tag": event_tag}
+	var info := {"kind": kind, "outfit": outfit, "label": label, "memory": memory, "tag": event_tag,
+		"memory_flag": str(get_meta("memory_flag", ""))}
 	if faction == "military" and is_alive():
 		Game.kills["military"] += 1
 	get_tree().call_group("event_listeners", "on_unit_removed", self, "consumed")
@@ -472,7 +474,23 @@ func _rise_infected() -> void:
 
 # ------------------------------------------------------------------ main loop
 
+var _roof_time := 0.0
+
+
+## People who end up stranded on a rooftop (thrown, blasted, knocked off a
+## building edge) get cleaned up once you're not around to see it.
+func _check_stranded(delta: float) -> void:
+	if global_position.y < 3.0 or global_position.y < -50.0 or is_ally or kind in ["hunter", "leviathan", "patient_zero"] \
+			or event_tag != "" or not is_on_floor():
+		_roof_time = 0.0
+		return
+	_roof_time += delta
+	if _roof_time > 4.0 and Game.player and global_position.distance_to(Game.player.global_position) > 45.0:
+		queue_free()
+
+
 func _physics_process(delta: float) -> void:
+	_check_stranded(delta)
 	if model == null:
 		return
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
@@ -525,7 +543,7 @@ func _dead_physics(delta: float) -> void:
 	if _dead_time > 1.5 and collision_layer != 0:
 		collision_layer = 0
 	var limit := 30.0 if Game.npc_count < 90 else 10.0
-	if _dead_time > limit or global_position.y < -40.0:
+	if _dead_time > limit or Game.fell_out(global_position):
 		queue_free()
 
 
@@ -573,7 +591,7 @@ func _launched_physics(delta: float) -> void:
 		_state_timer = 8.0
 		_flee_from = global_position - pre
 		velocity = Vector3.ZERO
-	if global_position.y < -40.0:
+	if Game.fell_out(global_position):
 		queue_free()
 
 
@@ -644,7 +662,8 @@ func _think_ally() -> void:
 	_ally_teleport_cd -= 0.3
 	if dist_p > 85.0 and _ally_teleport_cd <= 0.0 and not p.is_dead():
 		_ally_teleport_cd = 4.0
-		var spot: Vector3 = Game.city.random_sidewalk_point(ppos, 10.0, 22.0)
+		var spot: Vector3 = Game.interiors.random_floor_point() if Game.interiors and Game.interiors.is_inside() \
+			else Game.city.random_sidewalk_point(ppos, 10.0, 22.0)
 		global_position = spot + Vector3.UP * 0.6
 		reset_physics_interpolation()
 		Game.fx.burst_ring(spot, Color(1, 0.15, 0.08, 0.6), 2.0)
@@ -700,7 +719,7 @@ func _think_civilian() -> void:
 			state = S.IDLE
 			_state_timer = randf_range(2.0, 6.0)
 		else:
-			_move_goal = Game.city.random_sidewalk_point(global_position, 10.0, 45.0)
+			_move_goal = patrol_points.pick_random() if not patrol_points.is_empty() else Game.city.random_sidewalk_point(global_position, 10.0, 45.0)
 			_state_timer = 25.0
 			_path_target = Vector3.INF
 	elif state == S.IDLE and _state_timer <= 0.0:
@@ -736,7 +755,7 @@ func _think_military() -> void:
 			elif violent and p.vehicle != null and d < 70.0:
 				Game.raise_alert(pp, "They spotted the hijacked vehicle")
 			if p.vehicle == null:
-				var trespass: bool = Game.city.in_base(pp) and not str(p.disguise) in ["soldier", "rocket_soldier", "elite", "commander"]
+				var trespass: bool = Game.is_trespassing(pp)
 				Game.report_sighting(pp, p.is_conspicuous() or trespass, me, 0.3, thermal)
 			elif Game.is_hunted():
 				Game.report_sighting(pp, true, me, 0.3, thermal)
@@ -774,11 +793,11 @@ func _think_military() -> void:
 		if state != S.SEARCH or _search_point == Vector3.INF:
 			state = S.SEARCH
 			var lk := Game.last_known_pos
-			_search_point = Vector3(lk.x + randf_range(-14, 14), 0.2, lk.z + randf_range(-14, 14))
+			_search_point = Vector3(lk.x + randf_range(-14, 14), lk.y, lk.z + randf_range(-14, 14))
 			_path_target = Vector3.INF
 		elif me.distance_to(_search_point) < 3.0:
 			var lk2 := Game.last_known_pos
-			_search_point = Vector3(lk2.x + randf_range(-20, 20), 0.2, lk2.z + randf_range(-20, 20))
+			_search_point = Vector3(lk2.x + randf_range(-20, 20), lk2.y, lk2.z + randf_range(-20, 20))
 			_path_target = Vector3.INF
 		return
 	_search_point = Vector3.INF
@@ -793,7 +812,10 @@ func _think_military() -> void:
 			state = S.IDLE
 			_state_timer = randf_range(2.0, 5.0)
 		else:
-			_move_goal = Game.city.random_base_point() if in_base else Game.city.random_street_point(patrol_center, 5.0, 35.0)
+			if not patrol_points.is_empty():
+				_move_goal = patrol_points.pick_random()
+			else:
+				_move_goal = Game.city.random_base_point() if in_base else Game.city.random_street_point(patrol_center, 5.0, 35.0)
 			_path_target = Vector3.INF
 
 
@@ -829,7 +851,7 @@ func _think_infected() -> void:
 		state = S.CHASE
 	elif state == S.CHASE or (state == S.WANDER and (_path_target == Vector3.INF or me.distance_to(_move_goal) < 2.0)):
 		state = S.WANDER
-		_move_goal = Game.city.random_street_point(patrol_center, 3.0, 25.0)
+		_move_goal = patrol_points.pick_random() if not patrol_points.is_empty() else Game.city.random_street_point(patrol_center, 3.0, 25.0)
 		_path_target = Vector3.INF
 
 

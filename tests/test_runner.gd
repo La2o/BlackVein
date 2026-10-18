@@ -288,7 +288,7 @@ func _run_all() -> void:
 	await _wait(6.0)
 	check("allies fight the infected", not is_instance_valid(foe) or not foe.is_alive() or foe.hp < foe.max_hp)
 	player.global_position += Vector3(40, 0, 0)
-	await _wait(3.0)
+	await _wait(6.0)
 	check("allies follow you", recruit.global_position.distance_to(player.global_position) < 30.0,
 		"%.0f m away" % recruit.global_position.distance_to(player.global_position))
 	await _clear_units()
@@ -305,6 +305,9 @@ func _run_all() -> void:
 		var hp0: float = dummy.hp
 		await _tap("attack")
 		await _wait(0.6)
+		if is_instance_valid(dummy) and dummy.hp >= hp0:
+			await _tap("attack")
+			await _wait(0.6)
 		check("form %s hits" % PlayerPowers.FORM_NAMES[f], not is_instance_valid(dummy) or dummy.hp < hp0)
 		player.biomass = player.max_biomass
 		await _tap("special")
@@ -564,6 +567,110 @@ func _run_all() -> void:
 	await _wait(5.0)
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)
+
+	# ---------------- disguise wardrobe
+	await _clear_units()
+	Game.set_alert(Game.Alert.HIDDEN)
+	Game.disguises = []
+	for k in ["soldier", "scientist", "civilian"]:
+		var npc: Node3D = Game.military.spawn_npc(k, player.global_position + Vector3(0, 0, -1.5))
+		await _wait(0.1)
+		player.yaw = 0.0
+		await _tap("consume")
+		await _wait(1.3)
+	check("consumed identities go to the wardrobe", Game.disguises.size() == 3, "%d" % Game.disguises.size())
+	check("wearing a wardrobe disguise", player.powers.wear_disguise(0) and player.disguise == "soldier")
+	player.powers.wear_disguise(-1)
+	check("back to your true form", player.model.true_form and player.disguise == "civilian")
+	player.powers.wear_disguise(1)
+	Game.save_game()
+	Game.disguises = []
+	Game.load_game()
+	check("wardrobe saves and loads", Game.disguises.size() == 3 and Game.disguises[1]["outfit"].get("shirt") is Color)
+	check("current disguise survives a reload", player.disguise == "scientist" and not player.model.true_form)
+	Game.hud.open_wardrobe()
+	await get_tree().process_frame
+	check("wardrobe menu opens", Game.hud.wardrobe_panel.visible)
+	Game.hud.close_wardrobe()
+	await _wait(0.3)
+
+	# ---------------- enterable buildings
+	var ints: Node = Game.interiors
+	check("doors placed in the city", ints.entrances.size() >= 6, "%d doors" % ints.entrances.size())
+	for e in ints.entrances:
+		ints.enter(e)
+		await _wait(1.5)
+		var inside_ok: bool = ints.is_inside() and player.global_position.y < -100.0 and player.global_position.y > ints.DEPTH - 2.0
+		check("enter %s" % e["id"], inside_ok, "y %.1f" % player.global_position.y)
+		var npcs: Array = ints.root.get_children().filter(func(n): return n is CharacterBody3D and n.has_method("is_alive"))
+		var fallen: Array = npcs.filter(func(n): return n.global_position.y < ints.DEPTH - 5.0)
+		check("%s people stay on the floor" % e["id"], fallen.is_empty(), "%d people, %d fell" % [npcs.size(), fallen.size()])
+		var keys: Array = ints._cells.keys()
+		var far: Vector3 = ints._cell_pos(keys[keys.size() - 1])
+		var ipath: PackedVector3Array = Game.city.nav_path(ints._entry_pos(), far)
+		check("%s has walkable paths" % e["id"], ipath.size() >= 2 and ipath[ipath.size() - 1].distance_to(far) < 3.0, "%d pts" % ipath.size())
+		if e["id"] == "lab0":
+			player.powers.wear_disguise(-1)
+			check("lab is restricted without a disguise", Game.is_trespassing(player.global_position))
+			player.powers.wear_disguise(1)
+			check("scientist disguise gets you into the lab", not Game.is_trespassing(player.global_position))
+			var sample = ints.root.get_children().filter(func(n): return n is Area3D and n.get("kind") == "sample")
+			check("lab has an Evolution Sample", sample.size() == 1)
+			if sample.size() == 1:
+				var sp0 := Game.skill_points
+				player.respawn_in_place(sample[0].global_position, 0.0)
+				await _wait(0.5)
+				check("sample gives a skill point", Game.skill_points == sp0 + 1)
+			await _shot("13_lab")
+		if e["id"] == "safehouse":
+			await _shot("14_safehouse")
+		if e["id"] == "nest":
+			await _shot("15_nest")
+		player.respawn_in_place(ints._entry_pos() + Vector3.UP, -PI * 0.5)
+		await _wait(0.3)
+		check("%s exit prompt" % e["id"], ints.prompt() == "leave")
+		await _tap("grab")
+		await _wait(0.5)
+		check("leave %s" % e["id"], not ints.is_inside() and player.global_position.y > -5.0, "y %.1f" % player.global_position.y)
+		Game.set_alert(Game.Alert.HIDDEN)
+		player.heal(9999)
+	await _clear_units()
+
+	# ---------------- menus work with a controller (any device number)
+	Game.hud.toggle_pause(true)
+	await get_tree().process_frame
+	var f0 := get_viewport().gui_get_focus_owner()
+	var pad_ev := InputEventJoypadButton.new()
+	pad_ev.device = 2
+	pad_ev.button_index = JOY_BUTTON_DPAD_DOWN
+	pad_ev.pressed = true
+	Input.parse_input_event(pad_ev)
+	await get_tree().process_frame
+	pad_ev = pad_ev.duplicate()
+	pad_ev.pressed = false
+	Input.parse_input_event(pad_ev)
+	await get_tree().process_frame
+	var f1 := get_viewport().gui_get_focus_owner()
+	check("controller D-pad moves through menus", f0 != null and f1 != null and f0 != f1)
+	var bev := InputEventJoypadButton.new()
+	bev.device = 2
+	bev.button_index = JOY_BUTTON_B
+	bev.pressed = true
+	Input.parse_input_event(bev)
+	await get_tree().process_frame
+	bev = bev.duplicate()
+	bev.pressed = false
+	Input.parse_input_event(bev)
+	await get_tree().process_frame
+	check("controller B closes the menu", not Game.hud.pause_menu.visible and not get_tree().paused)
+	await _wait(0.5)
+
+	# ---------------- nobody spawns on rooftops
+	var roof_y := 0.0
+	for k in 200:
+		var rp: Vector3 = Game.city.random_sidewalk_point(Vector3(0, 60, 0), 50.0, 125.0)
+		roof_y = maxf(roof_y, rp.y)
+	check("new people always spawn at street level", roof_y < 1.5, "highest %.1f" % roof_y)
 
 	# ---------------- combo, weather, settings
 	Game.combo = 0

@@ -161,5 +161,8 @@ func _spawn() -> void:
 	n.global_position = global_position + Vector3(cos(a), 0, sin(a)) * 5.0 + Vector3.UP * 0.5
 	n.setup("infected", {"tag": event_tag})
 	n.patrol_center = global_position
+	if global_position.y < -60.0 and Game.interiors and Game.interiors.is_inside():
+		for k in 6:
+			n.patrol_points.append(Game.interiors.random_floor_point())
 	_children.append(n)
 	Game.fx.splat(n.global_position, Vector3.UP, Color(0.4, 0.03, 0.03), 10)

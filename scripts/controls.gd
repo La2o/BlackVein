@@ -52,9 +52,11 @@ func _ready() -> void:
 	# Menus
 	_add("evolve_menu", [_k(KEY_TAB), _k(KEY_U), _jb(JOY_BUTTON_BACK)])
 	_add("map", [_k(KEY_M)])
+	_add("disguise_menu", [_k(KEY_I)])   # controller: hold LB + press B
 	_add("pause", [_k(KEY_ESCAPE), _jb(JOY_BUTTON_START)])
 	_add("toggle_help", [_k(KEY_F1), _k(KEY_H)])
 	_add("respawn", [_k(KEY_F5)])
+	_fix_menu_controls()
 	_add("fullscreen", [_k(KEY_F11)])
 
 
@@ -66,6 +68,25 @@ func _add(action: String, events: Array) -> void:
 		# controller shows up as device 1 or higher, so the pad did nothing.
 		(e as InputEvent).device = ALL_DEVICES
 		InputMap.action_add_event(action, e)
+
+
+## Godot's built-in menu actions only listen to controller #0 and have no
+## A / B buttons at all, so menus ignored the pad. Rebuild them for any pad.
+func _fix_menu_controls() -> void:
+	for a in ["ui_up", "ui_down", "ui_left", "ui_right"]:
+		for e in InputMap.action_get_events(a):
+			if e is InputEventJoypadButton or e is InputEventJoypadMotion:
+				InputMap.action_erase_event(a, e)
+	_add("ui_up", [_jb(JOY_BUTTON_DPAD_UP), _ja(JOY_AXIS_LEFT_Y, -1.0)])
+	_add("ui_down", [_jb(JOY_BUTTON_DPAD_DOWN), _ja(JOY_AXIS_LEFT_Y, 1.0)])
+	_add("ui_left", [_jb(JOY_BUTTON_DPAD_LEFT), _ja(JOY_AXIS_LEFT_X, -1.0)])
+	_add("ui_right", [_jb(JOY_BUTTON_DPAD_RIGHT), _ja(JOY_AXIS_LEFT_X, 1.0)])
+	_add("ui_accept", [_jb(JOY_BUTTON_A)])
+	_add("ui_cancel", [_jb(JOY_BUTTON_B)])
+	InputMap.action_set_deadzone("ui_up", 0.5)
+	InputMap.action_set_deadzone("ui_down", 0.5)
+	InputMap.action_set_deadzone("ui_left", 0.5)
+	InputMap.action_set_deadzone("ui_right", 0.5)
 
 
 func _on_joy_changed(id: int, connected: bool) -> void:

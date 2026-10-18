@@ -11,7 +11,7 @@ const KEYS := {
 	"jump": ["Space", "A"], "dash": ["Q", "B"], "tether": ["C", "LT"], "focus": ["Z", "L3"],
 	"thermal": ["V", "R3"], "decoy": ["B", "D-pad Down"], "defense": ["X", "D-pad Up"],
 	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-7 / Wheel", "D-pad L/R"],
-	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"],
+	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"], "wardrobe": ["I", "LB+B"],
 }
 
 var player: Node
@@ -50,6 +50,8 @@ var settings_panel: PanelContainer
 var _settings_first: VBoxContainer
 var _pad_label: Label
 var rebind_panel: PanelContainer
+var wardrobe_panel: PanelContainer
+var _wardrobe_list: VBoxContainer
 var ach_panel: PanelContainer
 var _ach_text: RichTextLabel
 var _rebind_buttons := {}
@@ -94,6 +96,7 @@ func _ready() -> void:
 	_build_settings()
 	_build_extras()
 	_build_achievements()
+	_build_wardrobe()
 	Game.notify.connect(_on_notify)
 	Game.event_feed.connect(_on_feed)
 	Game.alert_changed.connect(_on_alert_changed)
@@ -328,6 +331,7 @@ Right click special move for your current form   |   [color=#9fd0ff]Y[/color]
 X cycle defense: Shield / Armor / none   |   [color=#9fd0ff]D-pad up[/color]
 E grab a person or car, press again to throw · hijack tanks and gunships · pick up guns   |   [color=#9fd0ff]RB[/color]
 F consume someone: heal, gain biomass and steal their disguise   |   [color=#9fd0ff]LB[/color]
+I disguise wardrobe: switch between every identity you've consumed   |   [color=#9fd0ff]hold LB + B[/color]
 While holding someone: right-click brands them as your ally (Dominate skill)   |   [color=#9fd0ff]Y[/color]
 G Groundspike devastator (50 biomass)   |   [color=#9fd0ff]hold LB + X[/color]
 T Tendril Barrage devastator (80 biomass)   |   [color=#9fd0ff]hold LB + Y[/color]
@@ -386,6 +390,9 @@ func _build_pause() -> void:
 	v.add_child(_menu_button("Settings", func():
 		pause_menu.visible = false
 		open_settings()))
+	v.add_child(_menu_button("Disguises", func():
+		toggle_pause(false)
+		open_wardrobe()))
 	v.add_child(_menu_button("Achievements & memories", func():
 		ach_panel.visible = not ach_panel.visible
 		_refresh_achievements()))
@@ -617,13 +624,12 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.5[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.6[/color][/b]
 
-[b]Dominate[/b] — grab someone and press Special to brand them as your ally.
-[b]Controllers work[/b] — any gamepad, plugged in any time.
-[b]Jumping keeps your speed[/b] — press to jump instantly, keep holding to leap higher.
-[b]New look[/b] — cloudy sky with stars, stepped skyscrapers, shop fronts, billboards,
-traffic lights, wet glossy streets in the rain, reflections and softer shadows.
+[b]Disguise wardrobe[/b] (I / hold LB + B) — switch between every identity you've consumed.
+[b]Buildings you can enter[/b] — research labs, the military bunker, a subway nest and your
+own safehouse. Look for the glowing doors (squares on the minimap).
+[b]Menus work with a controller[/b] — D-pad to move, A to select, B to go back.
 
 Full list: CHANGELOG.md"""
 
@@ -655,6 +661,102 @@ func _maybe_show_whats_new() -> void:
 	var ok := _menu_button("Let's go", func(): panel.queue_free())
 	v.add_child(ok)
 	get_tree().create_timer(14.0).timeout.connect(panel.queue_free)
+
+
+func _build_wardrobe() -> void:
+	wardrobe_panel = PanelContainer.new()
+	wardrobe_panel.add_theme_stylebox_override("panel", _panel_style(0.94))
+	wardrobe_panel.set_anchors_preset(Control.PRESET_CENTER)
+	wardrobe_panel.position = Vector2(-380, -330)
+	wardrobe_panel.custom_minimum_size = Vector2(760, 660)
+	wardrobe_panel.visible = false
+	root.add_child(wardrobe_panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	wardrobe_panel.add_child(v)
+	v.add_child(_label("DISGUISES", 34, Color(1, 0.3, 0.25), 6))
+	v.add_child(_label("Every identity you consume is kept here. Change while nobody is watching to lose the military;\nchange in front of soldiers and your cover is blown.", 14, Color(0.85, 0.85, 0.85), 3))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	v.add_child(scroll)
+	_wardrobe_list = VBoxContainer.new()
+	_wardrobe_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_wardrobe_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(_wardrobe_list)
+	v.add_child(_menu_button("Close", func(): close_wardrobe()))
+
+
+func _any_menu_open() -> bool:
+	return wardrobe_panel.visible or evolve_menu.visible or settings_panel.visible or rebind_panel.visible \
+		or pause_menu.visible or help_panel.visible or big_map.visible or ach_panel.visible
+
+
+func _back_out() -> void:
+	if wardrobe_panel.visible:
+		close_wardrobe()
+	elif rebind_panel.visible:
+		if _rebinding != "":
+			_rebinding = ""
+			_refresh_rebind()
+			return
+		rebind_panel.visible = false
+		open_settings()
+	elif settings_panel.visible:
+		close_settings()
+	elif evolve_menu.visible:
+		close_evolve()
+	elif ach_panel.visible or help_panel.visible or big_map.visible:
+		ach_panel.visible = false
+		help_panel.visible = false
+		big_map.visible = false
+		if pause_menu.visible:
+			(pause_menu.get_child(0).get_child(2) as Button).grab_focus()
+	elif pause_menu.visible:
+		toggle_pause(false)
+
+
+func open_wardrobe() -> void:
+	if player == null or player.is_dead() or pause_menu.visible or evolve_menu.visible:
+		return
+	for c in _wardrobe_list.get_children():
+		c.queue_free()
+	var entries: Array = [[-1, "true", "Your true form"]]
+	for i in Game.disguises.size():
+		var d: Dictionary = Game.disguises[i]
+		entries.append([i, d["kind"], str(d["label"])])
+	var first: Button = null
+	for e in entries:
+		var info: Array = Game.DISGUISE_INFO.get(e[1], ["?", ""])
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(0, 56)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 15)
+		var who: String = e[2]
+		var wearing: bool = (e[0] == -1 and player.model.true_form) or \
+			(e[0] >= 0 and not player.model.true_form and player.model.outfit == Game.disguises[e[0]]["outfit"])
+		b.text = "%s%s — %s\n%s" % ["▶ " if wearing else "", info[0], who.capitalize(), info[1]]
+		var idx: int = e[0]
+		b.pressed.connect(func():
+			close_wardrobe()
+			player.powers.wear_disguise(idx))
+		_wardrobe_list.add_child(b)
+		if first == null:
+			first = b
+	if Game.disguises.is_empty():
+		_wardrobe_list.add_child(_label("Consume someone (F / LB) to add their identity here.", 15, Color(0.9, 0.8, 0.6), 3))
+	wardrobe_panel.visible = true
+	get_tree().paused = true
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	first.grab_focus()
+
+
+func close_wardrobe() -> void:
+	wardrobe_panel.visible = false
+	get_tree().paused = pause_menu.visible or evolve_menu.visible
+	if not get_tree().paused:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _build_achievements() -> void:
@@ -859,8 +961,22 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# B / Esc backs out of whatever menu is open
+	if event.is_action_pressed("ui_cancel") and not event is InputEventKey and _any_menu_open():
+		_back_out()
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("disguise_menu"):
+		if wardrobe_panel.visible:
+			close_wardrobe()
+		else:
+			open_wardrobe()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("pause"):
-		if rebind_panel.visible:
+		if wardrobe_panel.visible:
+			close_wardrobe()
+		elif rebind_panel.visible:
 			rebind_panel.visible = false
 			open_settings()
 		elif settings_panel.visible:
@@ -1017,7 +1133,7 @@ const KEY_ACTIONS := {
 	"attack": "attack", "special": "special", "grab": "grab", "consume": "consume", "jump": "jump", "dash": "dash",
 	"tether": "tether", "focus": "focus", "thermal": "thermal", "decoy": "decoy", "defense": "cycle_defense",
 	"spikes": "devastator_spikes", "tendrils": "devastator_tendrils", "artillery": "artillery",
-	"evolve": "evolve_menu", "sprint": "sprint",
+	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu",
 }
 
 
@@ -1045,7 +1161,7 @@ func _update_powers_text() -> void:
 		parts.append("%s forms" % _k("forms"))
 	if pw.defense_unlocked(1) or pw.defense_unlocked(2):
 		parts.append("%s defense: %s" % [_k("defense"), pw.DEFENSE_NAMES[pw.defense]])
-	parts.append("%s grab   %s consume" % [_k("grab"), _k("consume")])
+	parts.append("%s grab   %s consume   %s disguises" % [_k("grab"), _k("consume"), _k("wardrobe")])
 	var line2: Array[String] = []
 	if Game.has_skill("tether"):
 		line2.append("%s tether" % _k("tether"))
@@ -1083,6 +1199,8 @@ func _update_prompt() -> void:
 		text = "%s throw   %s %s" % [_k("attack"), _k("special"), "brand as ally" if pw.held_kind == "npc" and Game.has_skill("dominate") else "drop"]
 		if pw.held_kind == "npc":
 			text += "   %s consume" % _k("consume")
+	elif Game.interiors and Game.interiors.prompt() != "":
+		text = "%s %s" % [_k("grab"), Game.interiors.prompt()]
 	else:
 		var pos: Vector3 = player.global_position
 		var v := Game.nearest_in_group("hijackable", pos, 9.0, func(n): return n.has_method("can_hijack") and n.can_hijack(player))
@@ -1190,6 +1308,27 @@ func _draw_minimap() -> void:
 	var c: Vector3 = player.global_position
 	var yaw: float = player.yaw
 	minimap.draw_rect(Rect2(Vector2.ZERO, size), Color(0.14, 0.14, 0.15, 0.9))
+	if Game.interiors and Game.interiors.is_inside():
+		# indoors: draw the floor plan instead of the city
+		minimap.draw_rect(Rect2(Vector2.ZERO, size), Color(0.05, 0.05, 0.06, 0.95))
+		for r in Game.interiors.map_cells():
+			var rr: Rect2 = r
+			var q := PackedVector2Array([
+				_to_map(Vector3(rr.position.x, 0, rr.position.y), c, yaw, scale * 2.5, origin),
+				_to_map(Vector3(rr.end.x, 0, rr.position.y), c, yaw, scale * 2.5, origin),
+				_to_map(Vector3(rr.end.x, 0, rr.end.y), c, yaw, scale * 2.5, origin),
+				_to_map(Vector3(rr.position.x, 0, rr.end.y), c, yaw, scale * 2.5, origin),
+			])
+			minimap.draw_colored_polygon(q, Color(0.32, 0.32, 0.36))
+		for n in get_tree().get_nodes_in_group("npcs"):
+			var node := n as Node3D
+			if node.global_position.y > c.y + 20.0 or not node.call("is_alive"):
+				continue
+			var col := Color(1, 0.25, 0.25) if node.is_in_group("military") else (Color(1, 0.55, 0.1) if node.is_in_group("infected") else (Color(1, 0.35, 0.85) if node.is_in_group("allies") else Color(0.8, 0.8, 0.8)))
+			minimap.draw_circle(_to_map(node.global_position, c, yaw, scale * 2.5, origin), 3.0, col)
+		var fa0 := wrapf(_bearing(player.facing) - yaw, -PI, PI)
+		minimap.draw_colored_polygon(PackedVector2Array([origin + Vector2(0, -9).rotated(-fa0), origin + Vector2(5, 6).rotated(-fa0), origin + Vector2(-5, 6).rotated(-fa0)]), Color.WHITE)
+		return
 	for b in Game.city.buildings:
 		var a: AABB = b["aabb"]
 		var mid := a.get_center()
@@ -1236,6 +1375,12 @@ func _draw_minimap() -> void:
 	for n in get_tree().get_nodes_in_group("pickups"):
 		var p := _to_map((n as Node3D).global_position, c, yaw, scale, origin)
 		minimap.draw_circle(p, 3.0, Color(0.4, 1, 0.5))
+	if Game.interiors:
+		for e in Game.interiors.entrances:
+			var ep := _to_map(e["pos"], c, yaw, scale, origin)
+			if (ep - origin).length() < size.x * 0.5:
+				minimap.draw_rect(Rect2(ep - Vector2(4, 4), Vector2(8, 8)), e["color"])
+				minimap.draw_rect(Rect2(ep - Vector2(4, 4), Vector2(8, 8)), Color(0, 0, 0), false, 1.5)
 	if Game.director:
 		for e in Game.director.active_events:
 			var p := _to_map(e["pos"], c, yaw, scale, origin)
@@ -1277,6 +1422,11 @@ func _draw_big_map() -> void:
 		big_map.draw_string(font, b0 + Vector2(4, (b1.y - b0.y) * 0.5), "MILITARY BASE", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.8, 1, 0.6))
 	for n in get_tree().get_nodes_in_group("hives"):
 		big_map.draw_circle(to2.call((n as Node3D).global_position), 8.0, Color(1, 0.1, 0.1))
+	if Game.interiors:
+		for e in Game.interiors.entrances:
+			var ep: Vector2 = to2.call(e["pos"])
+			big_map.draw_rect(Rect2(ep - Vector2(6, 6), Vector2(12, 12)), e["color"])
+			big_map.draw_string(font, ep + Vector2(10, 18), str(e["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, e["color"])
 	if Game.director:
 		for e in Game.director.active_events:
 			var p: Vector2 = to2.call(e["pos"])

@@ -83,6 +83,10 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Bosses:** the Leviathan, the Juggernaut super-tank, and the final boss, Patient Zero.
 - **A finale:** piece together 5 memories to find the lab where it all began.
 - **Military base** to raid in disguise, with a commander whose memories unlock artillery strikes.
+- **Disguise wardrobe:** keep every identity you consume and switch between them — scientists
+  get into labs, soldiers into the base.
+- **Buildings you can enter:** research labs (with Evolution Samples), the military bunker,
+  an infested subway nest with a Hive Heart, and your own safehouse.
 - **Traffic and weather:** cars that drive (and crash), rain storms and fog.
 - **Combo meter**, starter goals, 19 achievements, a memories log, a stats screen,
   a settings menu with key rebinding, and adaptive music.

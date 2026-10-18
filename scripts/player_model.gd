@@ -15,6 +15,7 @@ const DEFAULT_OUTFIT := {
 var form: int = Form.FISTS
 var defense: int = Defense.NONE
 var outfit: Dictionary = DEFAULT_OUTFIT
+var true_form := true
 var _form_parts: Array[MeshInstance3D] = []
 var _defense_parts: Array[MeshInstance3D] = []
 var _whip_links: Array[MeshInstance3D] = []
@@ -25,6 +26,7 @@ var wings_visible := false
 
 func build(new_outfit: Dictionary = {}) -> void:
 	outfit = DEFAULT_OUTFIT if new_outfit.is_empty() else new_outfit
+	true_form = new_outfit.is_empty()
 	_form_parts.clear()
 	_defense_parts.clear()
 	_whip_links.clear()

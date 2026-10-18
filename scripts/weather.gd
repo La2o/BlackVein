@@ -95,6 +95,8 @@ func _process(delta: float) -> void:
 		var wet_t := 1.0 if rain_on else 0.0
 		_wet = move_toward(_wet, wet_t, delta * (0.08 if rain_on else 0.02))
 		Game.city.set_wetness(_wet)
+	if Game.interiors and Game.interiors.is_inside():
+		rain_on = false
 	if rain_on != _rain.emitting:
 		_rain.emitting = rain_on
 	if Game.player:

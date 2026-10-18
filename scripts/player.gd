@@ -167,6 +167,18 @@ func respawn(at: Vector3) -> void:
 	health_changed.emit(health, max_health)
 
 
+## Move the player somewhere (doors, interiors) without healing or resetting anything.
+func respawn_in_place(at: Vector3, new_yaw: float) -> void:
+	global_position = at
+	velocity = Vector3.ZERO
+	yaw = new_yaw
+	facing = Vector3.FORWARD.rotated(Vector3.UP, new_yaw)
+	if state != State.DEAD:
+		state = State.AIR
+	reset_physics_interpolation()
+	pivot.global_position = at + Vector3.UP * camera_height
+
+
 func apply_upgrades() -> void:
 	var ratio := health / maxf(max_health, 1.0)
 	# levels make you a little tougher by themselves; skills do the rest
@@ -223,8 +235,14 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("respawn"):
 			respawn(Game.city.random_roof_point(global_position, 0.0, 200.0))
 			return
-		if global_position.y < -60.0:
-			respawn(spawn_point)
+		var floor_limit := -60.0
+		if Game.interiors and Game.interiors.is_inside():
+			floor_limit = Game.interiors.DEPTH - 25.0
+		if global_position.y < floor_limit:
+			if Game.interiors and Game.interiors.is_inside():
+				Game.interiors.leave()
+			else:
+				respawn(spawn_point)
 			return
 
 	match state:
@@ -297,7 +315,7 @@ func _state_ground(delta: float) -> void:
 	if Input.is_action_just_pressed("jump") and powers.can_move():
 		_ground_jump()
 		return
-	if Input.is_action_just_pressed("dash") and dash_cooldown_timer <= 0.0 and powers.can_move():
+	if (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and dash_cooldown_timer <= 0.0 and powers.can_move():
 		_start_dash()
 		return
 	if sprinting and wall_cooldown <= 0.0:
@@ -374,7 +392,7 @@ func _air_steer(delta: float) -> void:
 
 
 func _air_common() -> void:
-	if Input.is_action_just_pressed("dash") and dash_ready and dash_cooldown_timer <= 0.0 and powers.can_move():
+	if (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and dash_ready and dash_cooldown_timer <= 0.0 and powers.can_move():
 		if Game.has_skill("air_dash"):
 			_start_dash()
 			return
@@ -535,7 +553,7 @@ func _state_wall(delta: float) -> void:
 	conspicuous_timer = maxf(conspicuous_timer, 1.0)
 	if Input.is_action_just_pressed("jump"):
 		_wall_jump()
-	elif Input.is_action_just_pressed("dash") and powers.can_move() and Game.has_skill("air_dash"):
+	elif (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and powers.can_move() and Game.has_skill("air_dash"):
 		dash_ready = true
 		state = State.AIR
 		wall_cooldown = 0.3

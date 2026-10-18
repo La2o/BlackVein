@@ -25,6 +25,11 @@ func _ready() -> void:
 	military.units_parent = units
 	director.units_parent = units
 	city.build()
+	var interiors := Node3D.new()
+	interiors.name = "Interiors"
+	interiors.set_script(load("res://scripts/interiors.gd"))
+	add_child(interiors)
+	interiors.setup(city)
 	player.set_spawn(city.spawn_point, city.spawn_yaw)
 	daynight.setup(sun, world_env.environment)
 	weather.setup(world_env.environment)

@@ -56,6 +56,8 @@ func spawn_helicopter(pos: Vector3, extra := {}) -> CharacterBody3D:
 func _process(delta: float) -> void:
 	if Game.player == null or Game.city == null or not Game.city.nav_ready:
 		return
+	if Game.interiors and Game.interiors.is_inside():
+		return
 	_timer -= delta
 	if _timer > 0.0:
 		return

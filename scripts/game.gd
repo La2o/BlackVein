@@ -48,6 +48,20 @@ var skill_points := 1
 var skills := {}            # skill id -> rank
 var flags := {}             # story/unlock flags, e.g. "artillery_codes"
 var stats := {}             # counters: consumes, wall_runs, events, tanks, bosses...
+var disguises: Array = []   # wardrobe: [{kind, label, outfit}] of identities you've consumed
+var interiors: Node = null  # the enterable-buildings manager
+
+const MILITARY_DISGUISES := ["soldier", "rocket_soldier", "elite", "commander"]
+const DISGUISE_INFO := {
+	"civilian": ["Civilian", "Blend into crowds on the street. The military ignores you while you stay calm."],
+	"soldier": ["Soldier", "Walk into the military base and bunker. Soldiers get suspicious more slowly."],
+	"rocket_soldier": ["Rocket soldier", "Same access as a soldier: the base and the bunker."],
+	"elite": ["Strike team", "Military access, and other soldiers trust you most."],
+	"commander": ["Base commander", "Full military access. Lets you call Artillery strikes."],
+	"scientist": ["Scientist", "Walk freely through the research labs without raising alarms."],
+	"true": ["Your true form", "The hooded drifter. Fine on the street, but no access anywhere."],
+}
+const DISGUISE_LIMIT := 14
 var goal_index := 0
 var _goal_timer := 0.0
 
@@ -73,6 +87,9 @@ const ACHIEVEMENTS := [
 	["events", "Busy Night", "Complete 25 world events", "events", 25],
 	["racer", "Free Runner", "Win 5 rooftop races", "races", 5],
 	["warlord", "Warlord", "Brand 25 allies", "brands", 25],
+	["wardrobe", "Thousand Faces", "Collect 8 disguises in your wardrobe", "wardrobe", 8],
+	["infiltrator", "Infiltrator", "Steal an Evolution Sample from a lab", "samples", 1],
+	["nest", "Exterminator II", "Destroy the Hive Heart in the subway", "hive_hearts", 1],
 	["army_of_six", "Personal Army", "Lead 6 allies at once", "max_allies", 6],
 	["evolved", "Apex", "Reach level 50", "level", 50],
 	["origin", "Origin", "Defeat Patient Zero", "patient_zero", 1],
@@ -168,6 +185,7 @@ func reset_state() -> void:
 	skills = {}
 	flags = {}
 	stats = {}
+	disguises = []
 	goal_index = 0
 	play_time = 0.0
 	best_combo = 0
@@ -433,10 +451,12 @@ func save_game(announce := false) -> void:
 		"level": level, "xp": xp, "total_xp": total_xp, "skill_points": skill_points,
 		"skills": skills, "kills": kills, "play_time": play_time, "flags": flags, "best_combo": best_combo,
 		"stats": stats, "goal_index": goal_index,
+		"disguises": disguises.map(func(d): return {"kind": d["kind"], "label": d["label"], "outfit": outfit_to_json(d["outfit"])}),
 		"hour": daynight.hour if daynight else 16.0,
 		"player": {
-			"pos": [player.global_position.x, player.global_position.y, player.global_position.z],
+			"pos": _save_pos(),
 			"health": player.health, "biomass": player.biomass, "disguise": player.disguise,
+			"outfit": {} if player.model.true_form else outfit_to_json(player.model.outfit),
 			"form": pw.form, "defense": pw.defense,
 		},
 	}
@@ -475,6 +495,9 @@ func load_game() -> bool:
 		kills[k] = int(saved_kills[k])
 	play_time = float(d.get("play_time", 0.0))
 	flags = d.get("flags", {})
+	disguises = []
+	for dd in d.get("disguises", []):
+		disguises.append({"kind": str(dd.get("kind", "civilian")), "label": str(dd.get("label", "")), "outfit": outfit_from_json(dd.get("outfit", {}))})
 	stats = d.get("stats", {})
 	goal_index = int(d.get("goal_index", 0))
 	best_combo = int(d.get("best_combo", 0))
@@ -496,6 +519,11 @@ func load_game() -> bool:
 		var form_i := int(pd.get("form", 0))
 		if pw.form_unlocked(form_i):
 			pw.set_form(form_i, true)
+		var saved_outfit: Dictionary = pd.get("outfit", {})
+		if not saved_outfit.is_empty():
+			player.disguise = str(pd.get("disguise", "civilian"))
+			player.model.build(outfit_from_json(saved_outfit))
+			player.model.set_form(pw.form)
 		var def_i := int(pd.get("defense", 0))
 		if pw.defense_unlocked(def_i):
 			pw.defense = def_i
@@ -503,6 +531,62 @@ func load_game() -> bool:
 	xp_changed.emit()
 	say("Welcome back  ·  Level %d" % level, Color(1, 0.85, 0.6))
 	return true
+
+
+func _save_pos() -> Array:
+	var p: Vector3 = player.global_position
+	if interiors and interiors.has_method("is_inside") and interiors.is_inside():
+		p = interiors.return_position()
+	return [p.x, p.y, p.z]
+
+
+## Outfits hold Colors, which JSON can't store directly.
+func outfit_to_json(o: Dictionary) -> Dictionary:
+	var out := {}
+	for k in o:
+		var v = o[k]
+		out[k] = {"c": (v as Color).to_html()} if v is Color else v
+	return out
+
+
+func outfit_from_json(o: Dictionary) -> Dictionary:
+	var out := {}
+	for k in o:
+		var v = o[k]
+		if v is Dictionary and v.has("c"):
+			out[k] = Color.html(str(v["c"]))
+		else:
+			out[k] = v
+	return out
+
+
+## Remember an identity you consumed so you can wear it again later.
+func add_disguise(kind: String, label: String, outfit: Dictionary) -> void:
+	if not DISGUISE_INFO.has(kind):
+		return
+	# one slot per military/scientist kind (latest wins); civilians keep up to 4 looks
+	if kind != "civilian":
+		for k in disguises.size():
+			if disguises[k]["kind"] == kind:
+				disguises[k] = {"kind": kind, "label": label, "outfit": outfit}
+				return
+	else:
+		var civs := disguises.filter(func(d): return d["kind"] == "civilian")
+		if civs.size() >= 4:
+			disguises.erase(civs[0])
+	disguises.append({"kind": kind, "label": label, "outfit": outfit})
+	while disguises.size() > DISGUISE_LIMIT:
+		disguises.pop_front()
+	stat_max("wardrobe", disguises.size())
+
+
+func is_trespassing(pos: Vector3) -> bool:
+	var dis := str(player.disguise) if player else "civilian"
+	if city and city.in_base(pos) and not dis in MILITARY_DISGUISES:
+		return true
+	if interiors and interiors.has_method("restricted_for") and interiors.restricted_for(pos, dis):
+		return true
+	return false
 
 
 func delete_save() -> void:
@@ -617,6 +701,14 @@ func is_hunted() -> bool:
 # ---------------------------------------------------------------- damage helpers
 
 ## Builds a hit description passed to take_hit() on anything damageable.
+## True when something has fallen out of the world. Interiors sit far below the streets,
+## so "below the map" means below the interior floor while one is loaded.
+func fell_out(pos: Vector3) -> bool:
+	if interiors and interiors.is_inside() and pos.y < -60.0:
+		return pos.y < interiors.DEPTH - 25.0
+	return pos.y < -40.0
+
+
 func hit_info(damage: float, force: Vector3, source: Node, kind := "melee") -> Dictionary:
 	return {"damage": damage, "force": force, "source": source, "kind": kind}
 
