@@ -17,6 +17,8 @@ var quality := 2                 # 0 low, 1 medium, 2 high
 var camera_shake := 1.0
 var rumble := true
 var show_fps := false
+var crowd_density := 1.0         # 0.4 .. 1.2, scales people and traffic
+var last_seen_version := ""
 var bindings := {}               # action -> {"key": physical keycode} or {"mouse": button index}
 
 const REBINDABLE := [
@@ -119,6 +121,8 @@ func load_settings() -> void:
 	quality = cfg.get_value("video", "quality", quality)
 	camera_shake = cfg.get_value("video", "camera_shake", camera_shake)
 	show_fps = cfg.get_value("video", "show_fps", show_fps)
+	crowd_density = cfg.get_value("video", "crowd_density", crowd_density)
+	last_seen_version = cfg.get_value("meta", "last_seen_version", "")
 	volume = cfg.get_value("audio", "volume", volume)
 	music_volume = cfg.get_value("audio", "music_volume", music_volume)
 	bindings = cfg.get_value("controls", "bindings", {})
@@ -134,6 +138,8 @@ func save_settings() -> void:
 	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "camera_shake", camera_shake)
 	cfg.set_value("video", "show_fps", show_fps)
+	cfg.set_value("video", "crowd_density", crowd_density)
+	cfg.set_value("meta", "last_seen_version", last_seen_version)
 	cfg.set_value("audio", "volume", volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("controls", "bindings", bindings)

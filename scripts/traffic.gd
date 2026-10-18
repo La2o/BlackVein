@@ -18,6 +18,7 @@ var _converted := false
 
 func setup(start_cell: Vector2i, next_cell: Vector2i) -> void:
 	color_index = randi() % 8
+	reset_physics_interpolation()
 	collision_layer = Game.LAYER_PROPS
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_VEHICLE
 	var shared: Dictionary = CAR_SCRIPT._get_shared()

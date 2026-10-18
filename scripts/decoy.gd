@@ -13,6 +13,7 @@ var _turn_timer := 0.0
 
 func setup(direction: Vector3, outfit: Dictionary) -> void:
 	dir = direction.normalized()
+	reset_physics_interpolation()
 	collision_layer = Game.LAYER_NPC
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_PROPS
 	var shape := CollisionShape3D.new()

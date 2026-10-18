@@ -238,7 +238,7 @@ func _run_all() -> void:
 	await _wait(0.5)
 
 	# ---------------- arm forms and specials
-	for f in 6:
+	for f in PlayerPowers.FORM_NAMES.size():
 		player.powers.set_form(f)
 		await _wait(0.1)
 		check("form %s equips" % PlayerPowers.FORM_NAMES[f], player.powers.form == f)
@@ -416,8 +416,46 @@ func _run_all() -> void:
 			boss.take_hit(Game.hit_info(99999.0, Vector3.ZERO, player, "explosion"))
 			await _wait(1.0)
 			check("boss %s can be defeated" % boss_type, Game.director.active_events.filter(func(e): return e["type"] == boss_type).is_empty())
+	# Patient Zero finale
+	Game.stats["memory_log"] = ["a", "b", "c", "d", "e"]
+	Game.level = 20
+	check("finale unlocks with 5 memories", Game.director.origin_ready())
+	Game.director.active_events.clear()
+	Game.director.start_random_event("origin")
+	await _wait(1.0)
+	var pz = Game.boss
+	check("Patient Zero spawns", is_instance_valid(pz) and pz.kind == "patient_zero")
+	await _teleport(pz.global_position + Vector3(14, 0.5, 0))
+	var hp_pz := player.health
+	player.invuln_timer = 0.0
+	await _wait(6.0)
+	check("Patient Zero fights back", player.health < hp_pz or player.is_dead(), "hp %.0f -> %.0f" % [hp_pz, player.health])
+	if is_instance_valid(pz):
+		pz.take_hit(Game.hit_info(99999.0, Vector3.ZERO, player, "explosion"))
+	await _wait(1.0)
+	check("defeating Patient Zero completes the story", Game.flags.get("origin_done", false))
+	if player.is_dead():
+		await _wait(5.0)
+	player.heal(9999)
+	Game.stats["memory_log"] = []
 	await _clear_units()
 	Game.director.active_events.clear()
+
+	# Rooftop race
+	Game.director.active_events.clear()
+	Game.director.start_random_event("race")
+	await _wait(0.3)
+	var race: Array = Game.director.active_events.filter(func(e): return e["type"] == "race")
+	check("rooftop race starts", race.size() == 1)
+	if race.size() == 1:
+		var pts: Array = race[0]["data"]["points"]
+		for pt in pts:
+			player.global_position = pt
+			player.velocity = Vector3.ZERO
+			await _wait(0.15)
+		await _wait(0.3)
+		check("rooftop race can be won", Game.director.active_events.filter(func(e): return e["type"] == "race").is_empty() and Game.stat("races") >= 1)
+	await _clear_units()
 
 	# ---------------- traffic
 	Game.director._maintain_population()
@@ -452,7 +490,8 @@ func _run_all() -> void:
 	var heli_parked := get_tree().get_nodes_in_group("helicopters").any(func(h): return h.get("parked") == true)
 	check("gunship parked on the helipad", heli_parked)
 	if commander:
-		player.global_position = commander.global_position + Vector3(1.2, 0.3, 0)
+		await _teleport(Game.city.spawn_point)
+		commander.global_position = player.global_position + Vector3(0, 0.3, -1.4)
 		await get_tree().physics_frame
 		await _tap("consume")
 		await _wait(1.3)

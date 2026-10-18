@@ -27,7 +27,7 @@ and controller names depending on what you used last.
 | Attack (combo) | Left click | X |
 | Dive bomb | Left click in the air | X in the air |
 | Form special | Right click | Y |
-| Choose arm form | 1–6, mouse wheel | D-pad left / right |
+| Choose arm form | 1–7, mouse wheel | D-pad left / right |
 | Shield / Armor / none | X | D-pad up |
 | Grab / throw | E | RB |
 | Drop what you hold | Right click | Y |

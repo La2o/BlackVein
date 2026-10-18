@@ -12,6 +12,7 @@ var _t := 0.0
 func setup(k: String, amt: int) -> void:
 	kind = k
 	amount = amt
+	reset_physics_interpolation()
 	collision_layer = Game.LAYER_PICKUP
 	collision_mask = 0
 	monitoring = false

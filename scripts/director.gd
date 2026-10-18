@@ -21,6 +21,8 @@ const EVENT_TYPES := {
 	"gunship": {"name": "Gunship Patrol", "weight": 1.2, "color": Color(0.6, 0.8, 1)},
 	"leviathan": {"name": "BOSS: The Leviathan", "weight": 0.7, "color": Color(1, 0.3, 0.1)},
 	"juggernaut": {"name": "BOSS: Juggernaut", "weight": 0.7, "color": Color(0.9, 0.9, 0.95)},
+	"origin": {"name": "ORIGIN: Patient Zero", "weight": 0.3, "color": Color(0.35, 0.75, 1.0)},
+	"race": {"name": "Rooftop Race", "weight": 1.6, "color": Color(1, 0.85, 0.2)},
 }
 
 var active_events: Array[Dictionary] = []
@@ -49,7 +51,10 @@ func _process(delta: float) -> void:
 	if _event_timer <= 0.0:
 		_event_timer = randf_range(55.0, 100.0)
 		if active_events.size() < 2:
-			start_random_event()
+			if origin_ready() and not active_events.any(func(e): return e["type"] == "origin"):
+				start_random_event("origin")
+			else:
+				start_random_event()
 	for e in active_events.duplicate():
 		_update_event(e, delta)
 	if Game.daynight:
@@ -77,6 +82,7 @@ func _maintain_population() -> void:
 	var want_civs := 42
 	if Game.daynight and Game.daynight.is_night():
 		want_civs = 24
+	want_civs = int(want_civs * Settings.crowd_density)
 	if Game.military.crowded():
 		want_civs = mini(want_civs, civs)
 	for k in mini(4, want_civs - civs):
@@ -99,7 +105,7 @@ func _maintain_population() -> void:
 	for c in get_tree().get_nodes_in_group("traffic"):
 		if (c as Node3D).global_position.distance_to(ppos) < 160.0:
 			cars += 1
-	var want_cars := 4 if Game.is_hunted() else 14
+	var want_cars := int((4 if Game.is_hunted() else 14) * Settings.crowd_density)
 	if cars < want_cars:
 		var cell: Vector2i = Game.city.nearest_intersection(Game.city.random_street_point(ppos, 70.0, 150.0))
 		var dirs := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -140,6 +146,8 @@ func start_random_event(forced := "") -> void:
 			continue
 		if t == "juggernaut" and Game.level < 12:
 			continue
+		if t == "origin" and not Game.flags.get("origin_done", false):
+			continue
 		if t in ["leviathan", "juggernaut"] and (active_types.has("leviathan") or active_types.has("juggernaut")):
 			continue
 		options.append(t)
@@ -179,7 +187,7 @@ func _end_event(e: Dictionary, success: bool, reward := 0, text := "") -> void:
 	active_events.erase(e)
 	if success:
 		Game.stat_add("events")
-		if e["type"] in ["leviathan", "juggernaut"]:
+		if e["type"] in ["leviathan", "juggernaut", "origin"]:
 			Game.stat_add("bosses")
 	if success and reward > 0:
 		Game.add_ep(reward, text if text != "" else e["name"] + " complete")
@@ -227,11 +235,16 @@ func _update_event(e: Dictionary, delta: float) -> void:
 				e["timer"] = 180.0
 			else:
 				e["pos"] = hives[0].global_position
-		"leviathan", "juggernaut":
+		"leviathan", "juggernaut", "origin":
 			var boss = e["data"].get("boss")
 			if not is_instance_valid(boss) or not boss.is_alive():
 				Game.boss = null
-				_end_event(e, true, 400, "Boss defeated")
+				if e["type"] == "origin" and not Game.flags.get("origin_done", false):
+					Game.flags["origin_done"] = true
+					_end_event(e, true, 1000, "Patient Zero is gone")
+					_ending()
+				else:
+					_end_event(e, true, 400, "Boss defeated")
 				Game.fx.sound_ui("evolve", 2.0)
 			else:
 				e["pos"] = boss.global_position
@@ -285,6 +298,8 @@ func _update_event(e: Dictionary, delta: float) -> void:
 			if e["timer"] <= 0.0:
 				sci.queue_free()
 				_end_event(e, false, 0, "The target was evacuated")
+		"race":
+			_update_race(e)
 		"gunship":
 			if alive.is_empty():
 				_end_event(e, true, 120, "Gunship patrol destroyed")
@@ -453,6 +468,143 @@ func _start_juggernaut() -> void:
 	e["data"]["boss"] = boss
 	e["units"].append(boss)
 	Game.boss = boss
+
+
+## The finale unlocks once you have pieced together 5 memories at level 18+.
+func origin_ready() -> bool:
+	var mems: Array = Game.stats.get("memory_log", [])
+	return mems.size() >= 5 and Game.level >= 18 and not Game.flags.get("origin_done", false)
+
+
+func _start_origin() -> void:
+	var cell := Vector2i(Game.city.blocks / 2 + 1, Game.city.blocks / 2 + 2)
+	var pos: Vector3 = Game.city.intersection_pos(cell)
+	var first: bool = not Game.flags.get("origin_done", false)
+	var desc := "Your memories lead to a hidden lab under the city. Something is waiting." if first \
+		else "Patient Zero has regrown. End it again."
+	var e := _new_event("origin", pos, 999.0, desc)
+	# the lab hatch
+	var hatch := Node3D.new()
+	units_parent.add_child(hatch)
+	hatch.global_position = pos
+	hatch.reset_physics_interpolation()
+	var ring := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 5.0
+	cm.bottom_radius = 5.0
+	cm.height = 0.2
+	ring.mesh = cm
+	var blue := StandardMaterial3D.new()
+	blue.albedo_color = Color(0.05, 0.1, 0.15)
+	blue.emission_enabled = true
+	blue.emission = Color(0.2, 0.6, 1.0)
+	blue.emission_energy_multiplier = 1.5
+	ring.material_override = blue
+	ring.position = Vector3(0, 0.15, 0)
+	hatch.add_child(ring)
+	var light := OmniLight3D.new()
+	light.light_color = Color(0.3, 0.7, 1.0)
+	light.light_energy = 5.0
+	light.omni_range = 25.0
+	light.position = Vector3(0, 4, 0)
+	hatch.add_child(light)
+	Game.fx.smoke_column(pos, Color(0.3, 0.7, 1.0, 0.6), 120.0)
+	e["units"].append(hatch)
+	var boss: Node3D = Game.military.spawn_npc("patient_zero", pos + Vector3(0, 1.0, 0), {"tag": e["tag"]})
+	e["data"]["boss"] = boss
+	e["units"].append(boss)
+	Game.boss = boss
+	if first:
+		Game.feed("The memories fit together: BLACKVEIN was born in that lab. So were you.", Color(0.6, 0.85, 1))
+
+
+func _ending() -> void:
+	Game.say("PATIENT ZERO IS CONSUMED BY THE CITY", Color(0.5, 0.85, 1))
+	var lines := [
+		"The virus has only one host left that matters: you.",
+		"The military will keep coming. The infected will keep rising.",
+		"But the city belongs to BLACKVEIN now.",
+		"(Keep playing — everything keeps going, and Patient Zero may return.)",
+	]
+	for k in lines.size():
+		get_tree().create_timer(2.5 + k * 3.0, false).timeout.connect(Game.feed.bind(lines[k], Color(0.7, 0.9, 1)))
+
+
+## Rooftop Race: glowing rings across the rooftops, hit them all before time runs out.
+func _start_race() -> void:
+	var p: Vector3 = Game.player.global_position
+	var points: Array[Vector3] = []
+	var cur: Vector3 = Game.city.random_roof_point(p, 20.0, 70.0)
+	for k in 8:
+		points.append(cur + Vector3(0, 4.0, 0))
+		cur = Game.city.random_roof_point(cur, 35.0, 85.0)
+	var e := _new_event("race", points[0], 30.0 + points.size() * 11.0, "Reach every ring before time runs out. Sprint, jump, glide!")
+	e["data"]["points"] = points
+	e["data"]["index"] = 0
+	e["data"]["started"] = false
+	e["data"]["rings"] = []
+	for k in points.size():
+		var ring := MeshInstance3D.new()
+		var t := TorusMesh.new()
+		t.inner_radius = 3.6
+		t.outer_radius = 4.2
+		t.rings = 32
+		t.ring_segments = 8
+		ring.mesh = t
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(1, 0.85, 0.2, 0.9 if k == 0 else 0.35)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		ring.material_override = m
+		units_parent.add_child(ring)
+		ring.global_position = points[k]
+		var nxt: Vector3 = points[mini(k + 1, points.size() - 1)]
+		var dir := (nxt - points[k])
+		dir.y = 0
+		if dir.length() > 0.1:
+			ring.look_at(points[k] + dir, Vector3.UP)
+		ring.rotate_object_local(Vector3.RIGHT, PI * 0.5)
+		ring.reset_physics_interpolation()
+		e["data"]["rings"].append(ring)
+		e["units"].append(ring)
+
+
+func _update_race(e: Dictionary) -> void:
+	var d: Dictionary = e["data"]
+	var points: Array = d["points"]
+	var idx: int = d["index"]
+	if idx >= points.size():
+		return
+	var target: Vector3 = points[idx]
+	e["pos"] = target
+	var rings: Array = d["rings"]
+	for k in rings.size():
+		var r = rings[k]
+		if is_instance_valid(r):
+			r.rotate_object_local(Vector3.UP, 0.03)
+	if Game.player.global_position.distance_to(target) < 6.0:
+		if is_instance_valid(rings[idx]):
+			rings[idx].queue_free()
+		Game.fx.burst_ring(target, Color(1, 0.85, 0.2, 0.8), 6.0)
+		Game.fx.sound_ui("pickup", -2.0)
+		idx += 1
+		d["index"] = idx
+		if not d["started"]:
+			d["started"] = true
+		e["timer"] += 4.0
+		if idx >= points.size():
+			var bonus := int(maxf(0.0, e["timer"]) * 4.0)
+			_end_event(e, true, 220 + bonus, "Race complete (+%d time bonus)" % bonus)
+			Game.stat_add("races")
+			return
+		if is_instance_valid(rings[idx]):
+			(rings[idx].material_override as StandardMaterial3D).albedo_color.a = 0.9
+		Game.feed("Ring %d / %d" % [idx, points.size()], e["color"])
+	elif e["timer"] <= 0.0:
+		for r in rings:
+			if is_instance_valid(r):
+				r.queue_free()
+		_end_event(e, false, 0, "Out of time — the race is over")
 
 
 func _start_gunship() -> void:

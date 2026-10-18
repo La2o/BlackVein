@@ -40,6 +40,7 @@ var _fire: CPUParticles3D
 func setup(k: String, extra := {}) -> void:
 	kind = k
 	event_tag = extra.get("tag", "")
+	reset_physics_interpolation()
 	if extra.has("route"):
 		route.assign(extra["route"])
 	if kind == "tank":

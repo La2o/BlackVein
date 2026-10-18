@@ -146,6 +146,29 @@ def main():
         i = rng.integers(0, len(n) - 400)
         drops[i:i + 400] += hp(noise(400 / SR), 3000) * env(400, 0.001, 0.01) * rng.uniform(0.2, 0.8)
     save("rain", rain + drops, 0.5)
+    # city ambience: distant traffic rumble, horns and a far siren (20 s loop)
+    d = 20.0
+    n = int(SR * d)
+    city = lp(noise(d), 250) * 0.6 + bp(noise(d), 300, 1200) * 0.15
+    tt = t(d)
+    for k in range(5):
+        i = rng.integers(0, n - SR)
+        f = rng.uniform(300, 500)
+        horn = (np.sign(np.sin(2 * np.pi * f * t(0.4))) * 0.5 + np.sin(2 * np.pi * f * 1.26 * t(0.4)) * 0.5)
+        city[i:i + len(horn)] += lp(horn, 1500) * env(len(horn), 0.02, 0.3) * 0.08
+    i = rng.integers(0, n - SR * 6)
+    sl = int(SR * 5.5)
+    sf = 700 + 250 * np.sin(2 * np.pi * 0.6 * t(5.5))
+    siren = np.sin(2 * np.pi * np.cumsum(sf) / SR) * np.sin(np.linspace(0, np.pi, sl)) * 0.06
+    city[i:i + sl] += siren
+    save("city", city, 0.5)
+    # night ambience: crickets and wind (20 s loop)
+    night = lp(noise(d), 180) * 0.4 * (0.7 + 0.3 * np.sin(2 * np.pi * 0.07 * tt))
+    for k in range(70):
+        i = rng.integers(0, n - 4000)
+        chirp = np.sin(2 * np.pi * rng.uniform(4200, 5200) * t(0.18)) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 30 * t(0.18))))
+        night[i:i + len(chirp)] += chirp * env(len(chirp), 0.01, 0.1) * 0.05
+    save("night", night, 0.45)
     print("sounds written to", os.path.abspath(OUT))
 
 

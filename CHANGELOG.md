@@ -2,6 +2,36 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.4.0] — 2026-10-18 — Patient Zero
+
+### New
+- **A finale.** Absorb 5 different memories (from High-Value Target scientists and base
+  commanders) and reach level 18, and your memories lead you to a hidden lab under the city.
+  Waiting there is **Patient Zero** — a boss with your own powers: lightning dashes, claw combos,
+  telegraphed tendril volleys you have to dodge, spike rings, and three phases (it calls hunters
+  at half health and gets faster when it's desperate). Beat it for 3000 XP and an ending.
+  Afterwards it can come back as a rare boss.
+- **Bone Spikes** — a 7th arm form (level 13): fire piercing bone spikes from your forearm,
+  with light aim assist. Special: Spike Storm, a nine-spike fan. Key 7.
+- **Rooftop Races**: a new world event — a chain of glowing rings across the rooftops. Hit them
+  all before the clock runs out (each ring adds time; leftover time is bonus XP).
+- **City ambience**: distant traffic, horns and sirens by day; crickets and wind at night.
+- **Coats**: you, scientists and Patient Zero wear long coats that flap when you run and glide.
+- A "What's new" note the first time you start a new version.
+- New goals that lead you toward the finale, and "Origin" and "Free Runner" achievements.
+- **Crowd density** setting for slower PCs (fewer people and cars).
+
+### Fixed
+- Freshly spawned effects, rockets and people could flash at the middle of the map for a frame
+  (that's what the odd floating blobs near the start were).
+- A rare error when an enemy's attack landed after its target had already vanished.
+
+### Improved
+- The settings menu scrolls, so it fits on smaller screens.
+
+### Tests
+- 99 automated checks (finale, Patient Zero, Bone Spikes, rooftop races).
+
 ## [0.3.0] — 2026-10-18 — Music, achievements and a Windows build
 
 ### New

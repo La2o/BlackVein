@@ -34,6 +34,7 @@ var _yaw := 0.0
 func setup(extra := {}) -> void:
 	event_tag = extra.get("tag", "")
 	patrol_point = extra.get("patrol", global_position)
+	reset_physics_interpolation()
 	collision_layer = Game.LAYER_VEHICLE
 	collision_mask = Game.LAYER_WORLD
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING

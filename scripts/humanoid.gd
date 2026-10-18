@@ -13,6 +13,7 @@ var hand_l: Node3D
 var hand_r: Node3D
 var head_gear: MeshInstance3D
 var held_item: MeshInstance3D
+var coat: Node3D
 var all_meshes: Array[MeshInstance3D] = []
 
 var cycle := 0.0
@@ -146,6 +147,13 @@ func setup(outfit: Dictionary) -> void:
 		"launcher":
 			held_item = _part(hand_r, capsule(0.09, 1.1), mat(Color(0.2, 0.25, 0.15)), Vector3(0, 0.0, -0.1))
 			held_item.rotation.x = PI * 0.5
+	coat = null
+	if outfit.get("coat", false):
+		# long coat tails that flap behind when running
+		coat = _pivot(torso, Vector3(0, -0.3, 0.12))
+		var coat_m := mat(outfit.get("coat_color", shirt))
+		_part(coat, box(Vector3(0.24, 0.75, 0.05)), coat_m, Vector3(-0.13, -0.36, 0.08))
+		_part(coat, box(Vector3(0.24, 0.75, 0.05)), coat_m, Vector3(0.13, -0.36, 0.08))
 	if outfit.has("glow") and gear != "hood":
 		var g: Color = outfit["glow"]
 		_part(torso, box(Vector3(0.05, 0.5, 0.02)), mat(g, 2.5), Vector3(0.12, 0.05, -0.27 * bulk))
@@ -246,6 +254,13 @@ func animate(delta: float, speed: float, mode: String) -> void:
 		else:
 			la = Vector3(pose.x, -pose.y, -pose.z)
 			k = 1.0 - exp(-40.0 * delta)
+	if coat:
+		var flap := clampf(speed / 18.0, 0.0, 1.0)
+		# negative x swings the tails backwards
+		var target_x := -(flap * 0.9 + sin(cycle * 2.0) * 0.08 * flap)
+		if mode == "glide" or mode == "air":
+			target_x = -1.1
+		coat.rotation.x = lerpf(coat.rotation.x, target_x, 1.0 - exp(-8.0 * delta))
 	arm_l.rotation = arm_l.rotation.lerp(la, k)
 	arm_r.rotation = arm_r.rotation.lerp(ra, k)
 	leg_l.rotation = leg_l.rotation.lerp(ll, k)

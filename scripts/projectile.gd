@@ -21,6 +21,7 @@ var _exclude: Array[RID] = []
 func launch(pos: Vector3, vel: Vector3, src: Node, k: String, homing_target: Node3D = null) -> void:
 	global_position = pos
 	velocity = vel
+	reset_physics_interpolation()
 	source = src
 	kind = k
 	target = homing_target
@@ -29,6 +30,7 @@ func launch(pos: Vector3, vel: Vector3, src: Node, k: String, homing_target: Nod
 	if src is CollisionObject3D:
 		_exclude.append((src as CollisionObject3D).get_rid())
 	_build()
+	reset_physics_interpolation()
 
 
 func _build() -> void:

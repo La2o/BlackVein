@@ -50,6 +50,18 @@ func _ready() -> void:
 	jug.queue_free()
 	Game.director.active_events.clear()
 
+	# Patient Zero
+	Game.director.start_random_event("origin")
+	var pz: Node3D = Game.boss
+	pz.global_position = sp + Vector3(0, 1, -12)
+	pz.set_physics_process(false)
+	player.powers.set_form(6)
+	await _wait(1.0)
+	await _shot("boss_patient_zero")
+	pz.queue_free()
+	Game.director.active_events.clear()
+	player.powers.set_form(0)
+
 	# outbreak hive with infected ground
 	Game.director.start_random_event("outbreak")
 	await _wait(0.3)

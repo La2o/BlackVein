@@ -19,6 +19,7 @@ const KINDS := {
 	"infected": {"hp": 35.0, "walk": 2.0, "run": 7.2, "faction": "infected", "label": "an infected"},
 	"hunter": {"hp": 480.0, "walk": 4.0, "run": 15.0, "faction": "infected", "label": "a hunter"},
 	"leviathan": {"hp": 4200.0, "walk": 5.0, "run": 12.5, "faction": "infected", "label": "the Leviathan"},
+	"patient_zero": {"hp": 6500.0, "walk": 6.0, "run": 19.0, "faction": "infected", "label": "Patient Zero"},
 }
 const FIRST_NAMES := ["Dana", "Marcus", "Elena", "Victor", "Ruth", "Isaac", "Mara", "Owen", "Lena", "Samuel"]
 const LAST_NAMES := ["Kessler", "Okafor", "Vance", "Moreau", "Hale", "Ibarra", "Lindqvist", "Brandt", "Castell"]
@@ -41,6 +42,10 @@ var boss_name := ""
 var in_base := false
 var _pound_cooldown := 6.0
 var _adds_cooldown := 15.0
+var _dash_cooldown := 3.0
+var _volley_cooldown := 6.0
+var _dash_time := 0.0
+var _pz_phase := 0
 
 var _path := PackedVector3Array()
 var _path_index := 0
@@ -77,6 +82,7 @@ static var _flash_mat: StandardMaterial3D
 func setup(k: String, extra := {}) -> void:
 	kind = k
 	var data: Dictionary = KINDS[k]
+	reset_physics_interpolation()
 	faction = data["faction"]
 	max_hp = data["hp"]
 	hp = max_hp
@@ -87,6 +93,9 @@ func setup(k: String, extra := {}) -> void:
 	scale_factor = 1.7 if k == "hunter" else (3.2 if k == "leviathan" else 1.0)
 	if k == "leviathan":
 		boss_name = "THE LEVIATHAN"
+	if k == "patient_zero":
+		scale_factor = 1.15
+		boss_name = "PATIENT ZERO"
 	collision_layer = Game.LAYER_NPC
 	collision_mask = Game.LAYER_WORLD | Game.LAYER_PROPS | Game.LAYER_VEHICLE
 	floor_snap_length = 0.4
@@ -128,6 +137,17 @@ func setup(k: String, extra := {}) -> void:
 	if k == "commander":
 		label = "Colonel %s" % LAST_NAMES[randi() % LAST_NAMES.size()]
 		memory = "Memory absorbed: artillery codes. Disguised as a soldier, you can now call in strikes (unlock in Skills)."
+	if k == "patient_zero":
+		var blue: Material = HUMANOID.mat(Color(0.3, 0.75, 1.0), 2.5)
+		for hand in [model.hand_l, model.hand_r]:
+			for i in 3:
+				var claw := MeshInstance3D.new()
+				claw.mesh = HUMANOID.box(Vector3(0.02, 0.55, 0.05))
+				claw.material_override = blue
+				claw.position = Vector3((i - 1) * 0.05, -0.27, -0.03)
+				claw.rotation = Vector3(0.18, 0, (i - 1) * 0.12)
+				hand.add_child(claw)
+				model.all_meshes.append(claw)
 	if k == "scientist":
 		label = "Dr. %s %s" % [FIRST_NAMES[randi() % FIRST_NAMES.size()], LAST_NAMES[randi() % LAST_NAMES.size()]]
 		memory = extra.get("memory", "Memory absorbed: the outbreak started in a lab under the city.")
@@ -169,7 +189,7 @@ func _make_outfit(k: String) -> Dictionary:
 				"gear_color": Color(0.2, 0.22, 0.15), "item": "rifle", "glow": Color(1, 0.8, 0.2)}
 		"scientist":
 			return {"shirt": Color(0.92, 0.92, 0.9), "pants": Color(0.25, 0.27, 0.3), "skin": skin, "gear": "hair",
-				"gear_color": Color(0.5, 0.5, 0.5)}
+				"gear_color": Color(0.5, 0.5, 0.5), "coat": true}
 		"infected":
 			var rag: Color = Color(randf_range(0.15, 0.35), randf_range(0.12, 0.3), randf_range(0.1, 0.25))
 			return {"shirt": rag, "pants": rag.darkened(0.3), "skin": Color(0.45, 0.48, 0.38), "glow": Color(0.9, 0.12, 0.05)}
@@ -179,6 +199,9 @@ func _make_outfit(k: String) -> Dictionary:
 		"leviathan":
 			return {"shirt": Color(0.12, 0.03, 0.03), "pants": Color(0.1, 0.02, 0.02), "skin": Color(0.2, 0.04, 0.04),
 				"glow": Color(1, 0.35, 0.05), "bulk": 1.9}
+		"patient_zero":
+			return {"shirt": Color(0.85, 0.86, 0.88), "pants": Color(0.2, 0.21, 0.24), "skin": Color(0.7, 0.72, 0.75),
+				"gear": "hood", "gear_color": Color(0.9, 0.9, 0.92), "glow": Color(0.2, 0.7, 1.0), "coat": true}
 		_:
 			var shirts := [Color(0.7, 0.2, 0.2), Color(0.2, 0.35, 0.6), Color(0.85, 0.8, 0.7), Color(0.25, 0.25, 0.28),
 				Color(0.55, 0.45, 0.2), Color(0.3, 0.5, 0.35), Color(0.6, 0.3, 0.5), Color(0.9, 0.55, 0.2)]
@@ -203,7 +226,7 @@ func can_be_grabbed() -> bool:
 		return false
 	if kind == "hunter":
 		return hp < max_hp * 0.3 and state != S.DEAD
-	if kind == "leviathan":
+	if kind == "leviathan" or kind == "patient_zero":
 		return false
 	return true
 
@@ -215,8 +238,8 @@ func can_be_consumed() -> bool:
 		return _dead_time < 8.0 and kind != "hunter" and kind != "leviathan"
 	if kind == "hunter":
 		return hp < max_hp * 0.3
-	if kind == "leviathan":
-		return hp < max_hp * 0.1
+	if kind == "leviathan" or kind == "patient_zero":
+		return hp < max_hp * 0.08
 	return true
 
 
@@ -261,8 +284,8 @@ func take_hit(info: Dictionary) -> void:
 				_target = s3
 		if src.is_in_group("infected") and faction == "civilian":
 			_infected_killer = true
-	var launch_threshold := 30.0 if kind == "hunter" else (999.0 if kind == "leviathan" else 7.0)
-	if kind == "leviathan" and info["kind"] == "bullet":
+	var launch_threshold := 30.0 if kind == "hunter" else (999.0 if kind in ["leviathan", "patient_zero"] else 7.0)
+	if kind in ["leviathan", "patient_zero"] and info["kind"] == "bullet":
 		hp += dmg * 0.5
 	if force.length() > launch_threshold:
 		_launch(force * (0.4 if kind == "hunter" else 1.0), src)
@@ -334,7 +357,7 @@ func on_thrown(vel: Vector3, by: Node) -> void:
 	global_basis = Basis()
 
 
-func _end_exception(by: Node) -> void:
+func _end_exception(by) -> void:
 	if is_instance_valid(by):
 		remove_collision_exception_with(by)
 
@@ -386,7 +409,9 @@ func _die(info: Dictionary) -> void:
 				Game.add_xp(30 if kind == "elite" else (14 if kind == "rocket_soldier" else 12))
 			"infected":
 				Game.kills["infected"] += 1
-				Game.add_xp(150 if kind == "hunter" else (900 if kind == "leviathan" else 5))
+				Game.add_xp(150 if kind == "hunter" else (900 if kind == "leviathan" else (2000 if kind == "patient_zero" else 5)))
+				if kind == "patient_zero":
+					Game.stat_add("patient_zero")
 				if kind == "leviathan":
 					Game.say("THE LEVIATHAN IS DEAD", Color(1, 0.85, 0.3))
 					Game.stat_add("leviathan")
@@ -664,7 +689,7 @@ func _think_military() -> void:
 func _think_infected() -> void:
 	var me := global_position
 	var best: Node3D = null
-	var hunterish := kind == "hunter" or kind == "leviathan"
+	var hunterish := kind in ["hunter", "leviathan", "patient_zero"]
 	var best_d := 34.0 if not hunterish else 70.0
 	var p := Game.player
 	if p and not p.is_dead() and p.vehicle == null:
@@ -679,7 +704,7 @@ func _think_infected() -> void:
 			if d < best_d:
 				best = n
 				best_d = d
-	if kind == "leviathan" and p and not p.is_dead() and p.vehicle == null:
+	if (kind == "leviathan" or kind == "patient_zero") and p and not p.is_dead():
 		best = p
 	if best == null and hunterish and p and not p.is_dead():
 		# hunters always hunt the player when a hunter event is running
@@ -861,7 +886,10 @@ func _act_chase(delta: float) -> void:
 	var reach := 1.7 * scale_factor
 	if kind == "leviathan":
 		_boss_moves(delta, dist)
-	if (kind == "hunter" or kind == "leviathan") and _leap_cooldown <= 0.0 and is_on_floor():
+	elif kind == "patient_zero":
+		if _pz_moves(delta, dist, tpos):
+			return
+	if kind in ["hunter", "leviathan", "patient_zero"] and _leap_cooldown <= 0.0 and is_on_floor():
 		var height := to.y
 		if (dist > 6.0 and dist < 24.0) or (height > 5.0 and dist < 40.0):
 			_leap_at(tpos)
@@ -887,10 +915,14 @@ func _melee(t: Node3D) -> void:
 	elif kind == "leviathan":
 		dmg = 40.0
 		force = _face_dir * 30.0 + Vector3.UP * 12.0
+	elif kind == "patient_zero":
+		dmg = 20.0
+		force = _face_dir * 20.0 + Vector3.UP * 6.0
+		_attack_cooldown = 0.9
 	get_tree().create_timer(0.15, false).timeout.connect(_melee_hit.bind(t, dmg, force))
 
 
-func _melee_hit(t: Node3D, dmg: float, force: Vector3) -> void:
+func _melee_hit(t, dmg: float, force: Vector3) -> void:
 	if is_instance_valid(t) and is_alive() and t.global_position.distance_to(global_position) < 2.6 * scale_factor:
 		t.take_hit(Game.hit_info(dmg, force, self, "melee"))
 		Game.fx.splat(t.global_position + Vector3.UP * 0.4, _face_dir, Color(0.5, 0.02, 0.02), 6)
@@ -912,6 +944,78 @@ func _boss_moves(delta: float, dist: float) -> void:
 		get_tree().create_timer(0.55, false).timeout.connect(_pound_impact)
 	if _adds_cooldown <= 0.0:
 		_spawn_brood(enraged)
+
+
+## Patient Zero: dashes, tendril volleys, spike rings and phases. Returns true while dashing.
+func _pz_moves(delta: float, dist: float, tpos: Vector3) -> bool:
+	_dash_cooldown -= delta
+	_volley_cooldown -= delta
+	_pound_cooldown -= delta
+	var ratio := hp / max_hp
+	if _pz_phase == 0 and ratio < 0.5:
+		_pz_phase = 1
+		Game.say("PATIENT ZERO EVOLVES", Color(0.4, 0.8, 1))
+		for k in 2:
+			var n := CharacterBody3D.new()
+			n.set_script(load("res://scripts/npc.gd"))
+			get_parent().add_child(n)
+			n.global_position = global_position + Vector3(randf_range(-8, 8), 1.0, randf_range(-8, 8))
+			n.setup("hunter", {"tag": event_tag})
+	if _pz_phase == 1 and ratio < 0.25:
+		_pz_phase = 2
+		run_speed = 26.0
+		Game.say("PATIENT ZERO IS DESPERATE", Color(0.4, 0.8, 1))
+	if _dash_time > 0.0:
+		_dash_time -= delta
+		if _dash_time <= 0.0 or dist < 2.0:
+			_dash_time = 0.0
+			velocity.x *= 0.2
+			velocity.z *= 0.2
+			Game.damage_area(global_position, 3.5, 22.0, 18.0, self, "slash", Game.LAYER_PLAYER | Game.LAYER_PROPS)
+			Game.fx.tendril_flash(global_position, global_position + _face_dir * 4.0, 0.2, 0.15)
+		return true
+	if _dash_cooldown <= 0.0 and dist > 6.0 and dist < 34.0 and is_on_floor():
+		_dash_cooldown = randf_range(2.5, 4.5) / (1.0 + _pz_phase * 0.4)
+		var d := (tpos - global_position)
+		d.y = 0
+		velocity = d.normalized() * 48.0
+		_dash_time = minf(d.length() / 48.0, 0.6)
+		Game.fx.sound("dash", global_position, 2.0)
+		Game.fx.burst_ring(global_position, Color(0.3, 0.7, 1.0, 0.7), 2.5)
+		return true
+	if _volley_cooldown <= 0.0 and dist < 45.0 and can_see_point(tpos):
+		_volley_cooldown = 7.0 - _pz_phase * 1.5
+		_tendril_volley(tpos)
+	if _pound_cooldown <= 0.0 and dist < 12.0:
+		_pound_cooldown = 9.0 - _pz_phase * 2.0
+		var feet := global_position + Vector3.DOWN * 0.9 * scale_factor
+		for ring in 3:
+			for k in 12:
+				var a := k * TAU / 12.0 + ring * 0.25
+				Game.fx.spike(feet + Vector3(cos(a), 0, sin(a)) * (3.0 + ring * 3.5), 3.5, ring * 0.08, 0.6)
+		get_tree().create_timer(0.15, false).timeout.connect(_pz_spike_damage.bind(feet))
+	return false
+
+
+func _pz_spike_damage(feet: Vector3) -> void:
+	if is_alive():
+		Game.damage_area(feet + Vector3.UP, 12.0, 32.0, 22.0, self, "slash", Game.LAYER_PLAYER | Game.LAYER_PROPS | Game.LAYER_NPC, 1.5)
+
+
+func _tendril_volley(at: Vector3) -> void:
+	# telegraph: blue markers, then tendrils strike where you were standing
+	for k in 4:
+		var p := at + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3))
+		Game.fx.burst_ring(p + Vector3.DOWN * 0.8, Color(0.3, 0.7, 1.0, 0.8), 2.0)
+		get_tree().create_timer(0.7, false).timeout.connect(_volley_strike.bind(p))
+	Game.fx.sound("tendril", global_position, 2.0)
+
+
+func _volley_strike(p: Vector3) -> void:
+	if not is_alive():
+		return
+	Game.fx.tendril_flash(global_position + Vector3.UP * 1.2, p, 0.3, 0.18)
+	Game.damage_area(p, 2.4, 18.0, 12.0, self, "slash", Game.LAYER_PLAYER | Game.LAYER_PROPS | Game.LAYER_NPC)
 
 
 func _pound_impact() -> void:

@@ -6,14 +6,14 @@ extends Node
 ## devastators, picked-up guns, vehicle hijacking, and three original powers:
 ## Tether (zip / yank), Focus (slow motion) and Biomass Decoy.
 
-enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE }
+enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
 enum Defense { NONE, SHIELD, ARMOR }
 
-const FORM_NAMES := ["Fists", "Claws", "Hammerfist", "Blade", "Whipfist", "Musclemass"]
+const FORM_NAMES := ["Fists", "Claws", "Hammerfist", "Blade", "Whipfist", "Musclemass", "Bone Spikes"]
 const DEFENSE_NAMES := ["None", "Shield", "Armor"]
-const FORM_SKILLS := ["", "claws", "hammer", "blade", "whip", "muscle_form"]
+const FORM_SKILLS := ["", "claws", "hammer", "blade", "whip", "muscle_form", "spike_form"]
 const DEFENSE_SKILLS := ["", "shield", "armor"]
-const SPECIAL_NAMES := ["Uppercut", "Spike Line", "Ground Slam", "Whirlwind", "Whip Grab", "Thunderclap"]
+const SPECIAL_NAMES := ["Uppercut", "Spike Line", "Ground Slam", "Whirlwind", "Whip Grab", "Thunderclap", "Spike Storm"]
 const FORMS := {
 	Form.FISTS: {"damage": 12.0, "range": 2.4, "arc": 75.0, "interval": 0.3, "combo": 3, "knock": 6.0, "finisher": 16.0, "vehicle": 0.6, "styles": [0, 0, 3], "sound": "punch", "kind": "melee"},
 	Form.CLAWS: {"damage": 17.0, "range": 2.9, "arc": 110.0, "interval": 0.19, "combo": 4, "knock": 4.0, "finisher": 12.0, "vehicle": 0.9, "styles": [1, 1, 1, 2], "sound": "slash", "kind": "slash"},
@@ -21,6 +21,7 @@ const FORMS := {
 	Form.BLADE: {"damage": 52.0, "range": 3.9, "arc": 140.0, "interval": 0.42, "combo": 3, "knock": 9.0, "finisher": 18.0, "vehicle": 3.0, "styles": [1, 1, 2], "sound": "slash", "kind": "blade"},
 	Form.WHIP: {"damage": 30.0, "range": 17.0, "arc": 18.0, "interval": 0.5, "combo": 2, "knock": 12.0, "finisher": 22.0, "vehicle": 1.2, "styles": [1, 1], "sound": "slash", "kind": "slash"},
 	Form.MUSCLE: {"damage": 28.0, "range": 2.6, "arc": 85.0, "interval": 0.38, "combo": 3, "knock": 26.0, "finisher": 42.0, "vehicle": 1.5, "styles": [0, 0, 3], "sound": "heavy", "kind": "melee"},
+	Form.SPIKES: {"damage": 20.0, "range": 90.0, "arc": 10.0, "interval": 0.22, "combo": 1, "knock": 7.0, "finisher": 7.0, "vehicle": 1.0, "styles": [0], "sound": "spike", "kind": "slash"},
 }
 const DECOY_SCRIPT := preload("res://scripts/decoy.gd")
 const PROJECTILE_SCRIPT := preload("res://scripts/projectile.gd")
@@ -156,7 +157,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_cycle_form(1)
 	elif event.is_action_pressed("form_prev"):
 		_cycle_form(-1)
-	for k in 6:
+	for k in FORM_NAMES.size():
 		if event.is_action_pressed("form_%d" % (k + 1)):
 			set_form(k)
 
@@ -365,6 +366,10 @@ func _attack_pressed() -> void:
 	if form == Form.WHIP:
 		_whip_attack()
 		return
+	if form == Form.SPIKES:
+		_spike_shot(player.aim_direction(), 0.0)
+		attack_cooldown = FORMS[Form.SPIKES]["interval"]
+		return
 	var data: Dictionary = FORMS[form]
 	var dir := _aim_flat()
 	var target := _find_target(data["range"] + 7.0, 80.0, dir)
@@ -487,6 +492,48 @@ func _whip_attack() -> void:
 		rumble(0.2, 0.3, 0.1)
 
 
+## Bone Spikes form: fire a bone spike from the forearm. Pierces up to 3 targets.
+func _spike_shot(dir: Vector3, spread: float) -> void:
+	var aim: Dictionary = player.aim_point(120.0)
+	var muzzle: Vector3 = player.global_position + Vector3.UP * 0.5 + player.facing * 0.7
+	var d: Vector3 = (Vector3(aim["position"]) - muzzle).normalized() if spread == 0.0 else dir
+	if spread == 0.0:
+		# light aim assist: snap to an enemy close to the crosshair
+		var flat := Vector3(d.x, 0, d.z).normalized()
+		var assist := _find_target(45.0, 14.0, flat, Game.LAYER_NPC | Game.LAYER_VEHICLE | Game.LAYER_HIVE)
+		if assist:
+			d = (assist.global_position + Vector3.UP * 0.3 - muzzle).normalized()
+	d = (d + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * spread).normalized()
+	player.face(d, 0.4)
+	player.model.swing(true, 0, 0.15)
+	violence_timer = 2.5
+	player.conspicuous_timer = 2.5
+	var from := muzzle
+	var end := muzzle + d * 120.0
+	var exclude: Array[RID] = [player.get_rid()]
+	var pierced := 0
+	while pierced < 3:
+		var hit := Game.raycast(from, end, Game.LAYER_WORLD | Game.MASK_HITTABLE, exclude)
+		if hit.is_empty():
+			break
+		var c := hit["collider"] as Node
+		var p: Vector3 = hit["position"]
+		if c and c.has_method("take_hit"):
+			var dmg: float = FORMS[Form.SPIKES]["damage"] * player.damage_mult
+			c.take_hit(Game.hit_info(dmg, d * 7.0 + Vector3.UP * 2.0, player, "slash"))
+			Game.fx.splat(p, -d, Color(0.5, 0.02, 0.02), 6)
+			pierced += 1
+			if c is CollisionObject3D:
+				exclude.append((c as CollisionObject3D).get_rid())
+			from = p
+		else:
+			end = p
+			Game.fx.debris(p, 3, Color(0.85, 0.8, 0.7))
+			break
+	Game.fx.tracer(muzzle, end, Color(0.95, 0.9, 0.8), 0.06)
+	Game.fx.sound("spike", muzzle, -6.0, 0.2)
+
+
 func _shield_bash() -> void:
 	var dir := _aim_flat()
 	player.face(dir, 0.3)
@@ -506,7 +553,7 @@ func _special() -> void:
 		return
 	if defense == Defense.SHIELD:
 		return
-	var costs := [8.0, 14.0, 14.0, 12.0, 6.0, 14.0]
+	var costs := [8.0, 14.0, 14.0, 12.0, 6.0, 14.0, 16.0]
 	var cost: float = costs[form]
 	if player.biomass < cost:
 		Game.say("Not enough biomass", Color(1, 0.5, 0.4))
@@ -561,6 +608,12 @@ func _special() -> void:
 			Game.hit_stop(0.04)
 		Form.WHIP:
 			_whip_grab()
+		Form.SPIKES:
+			var aimd: Vector3 = player.aim_direction()
+			for k in 9:
+				var off := (k - 4) * 0.07
+				_spike_shot(aimd.rotated(Vector3.UP, off), 0.03)
+			player.add_trauma(0.25)
 		Form.MUSCLE:
 			player.model.swing(true, 0, 0.3)
 			player.model.swing(false, 0, 0.3)
@@ -669,7 +722,7 @@ func _hijack(v: Node3D) -> void:
 	Game.say("Hijacked! Press %s to jump out" % key, Color(1, 0.6, 0.4))
 
 
-func _grab_if_close(target: Node3D) -> void:
+func _grab_if_close(target) -> void:
 	if is_instance_valid(target) and held == null and target.global_position.distance_to(player.global_position) < 5.0:
 		_grab(target)
 

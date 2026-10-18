@@ -10,7 +10,7 @@ const KEYS := {
 	"attack": ["LMB", "X"], "special": ["RMB", "Y"], "grab": ["E", "RB"], "consume": ["F", "LB"],
 	"jump": ["Space", "A"], "dash": ["Q", "B"], "tether": ["C", "LT"], "focus": ["Z", "L3"],
 	"thermal": ["V", "R3"], "decoy": ["B", "D-pad Down"], "defense": ["X", "D-pad Up"],
-	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-6 / Wheel", "D-pad L/R"],
+	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-7 / Wheel", "D-pad L/R"],
 	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"],
 }
 
@@ -47,6 +47,7 @@ var big_map: Control
 var death_panel: Control
 var title_card: Control
 var settings_panel: PanelContainer
+var _settings_first: VBoxContainer
 var rebind_panel: PanelContainer
 var ach_panel: PanelContainer
 var _ach_text: RichTextLabel
@@ -97,6 +98,7 @@ func _ready() -> void:
 	Game.alert_changed.connect(_on_alert_changed)
 	Game.player_died.connect(func(): death_panel.visible = true)
 	Game.player_respawned.connect(func(): death_panel.visible = false)
+	_maybe_show_whats_new()
 
 
 # ------------------------------------------------------------------ builders
@@ -321,7 +323,7 @@ On a wall: W climbs, A/D runs sideways, Space wall jumps, let go of Shift to dro
 [b]FIGHT[/b]
 Left click attack (in the air: dive bomb)   |   [color=#9fd0ff]X[/color]
 Right click special move for your current form   |   [color=#9fd0ff]Y[/color]
-1–6 or mouse wheel: Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass   |   [color=#9fd0ff]D-pad left/right[/color]
+1–7 or mouse wheel: Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass, Bone Spikes   |   [color=#9fd0ff]D-pad left/right[/color]
 X cycle defense: Shield / Armor / none   |   [color=#9fd0ff]D-pad up[/color]
 E grab a person or car, press again to throw · hijack tanks and gunships · pick up guns   |   [color=#9fd0ff]RB[/color]
 F consume someone: heal, gain biomass and steal their disguise   |   [color=#9fd0ff]LB[/color]
@@ -564,13 +566,19 @@ func _build_settings() -> void:
 	settings_panel = PanelContainer.new()
 	settings_panel.add_theme_stylebox_override("panel", _panel_style(0.94))
 	settings_panel.set_anchors_preset(Control.PRESET_CENTER)
-	settings_panel.position = Vector2(-330, -300)
-	settings_panel.custom_minimum_size = Vector2(660, 0)
+	settings_panel.position = Vector2(-340, -330)
+	settings_panel.custom_minimum_size = Vector2(680, 660)
 	settings_panel.visible = false
 	root.add_child(settings_panel)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.follow_focus = true
+	settings_panel.add_child(scroll)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	settings_panel.add_child(v)
+	v.add_theme_constant_override("separation", 8)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(v)
+	_settings_first = v
 	v.add_child(_label("SETTINGS", 34, Color(1, 0.3, 0.25), 6))
 	_slider_row(v, "Mouse sensitivity", 0.2, 3.0, Settings.mouse_sensitivity, func(x): Settings.mouse_sensitivity = x)
 	_slider_row(v, "Controller look speed", 0.3, 2.5, Settings.stick_sensitivity, func(x): Settings.stick_sensitivity = x)
@@ -581,6 +589,7 @@ func _build_settings() -> void:
 	_slider_row(v, "Camera shake", 0.0, 1.5, Settings.camera_shake, func(x): Settings.camera_shake = x)
 	_check_row(v, "Controller rumble", Settings.rumble, func(b): Settings.rumble = b)
 	_check_row(v, "Show FPS", Settings.show_fps, func(b): Settings.show_fps = b)
+	_slider_row(v, "Crowd density", 0.4, 1.2, Settings.crowd_density, func(x): Settings.crowd_density = x)
 	var row := HBoxContainer.new()
 	var l := _label("Graphics quality", 18)
 	l.custom_minimum_size = Vector2(260, 0)
@@ -601,6 +610,45 @@ func _build_settings() -> void:
 		_open_rebind()))
 	v.add_child(_menu_button("Back", func(): close_settings()))
 	_build_rebind()
+
+
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW[/color][/b]
+
+[b]Patient Zero[/b] — the finale. Absorb 5 memories and reach level 18 to find the lab.
+[b]Bone Spikes[/b] — a ranged arm form (key 7 / D-pad).
+[b]Rooftop Races[/b] — hit every ring across the rooftops before time runs out.
+[b]Coats, city sounds and night crickets[/b], a crowd density setting, and more.
+
+Full list: CHANGELOG.md"""
+
+
+func _maybe_show_whats_new() -> void:
+	var version := str(ProjectSettings.get_setting("application/config/version", ""))
+	if Settings.last_seen_version == version:
+		return
+	var first_time := Settings.last_seen_version == ""
+	Settings.last_seen_version = version
+	Settings.save_settings()
+	if first_time:
+		return
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", _panel_style(0.92))
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.position = Vector2(-330, -160)
+	panel.custom_minimum_size = Vector2(660, 0)
+	root.add_child(panel)
+	var v := VBoxContainer.new()
+	panel.add_child(v)
+	var rt := RichTextLabel.new()
+	rt.bbcode_enabled = true
+	rt.fit_content = true
+	rt.custom_minimum_size = Vector2(620, 0)
+	rt.add_theme_font_size_override("normal_font_size", 16)
+	rt.text = WHATS_NEW
+	v.add_child(rt)
+	var ok := _menu_button("Let's go", func(): panel.queue_free())
+	v.add_child(ok)
+	get_tree().create_timer(14.0).timeout.connect(panel.queue_free)
 
 
 func _build_achievements() -> void:
@@ -738,7 +786,7 @@ func open_settings() -> void:
 	settings_panel.visible = true
 	get_tree().paused = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var first := settings_panel.get_child(0).get_child(1).get_child(1) as Control
+	var first := _settings_first.get_child(1).get_child(1) as Control
 	first.grab_focus()
 
 
@@ -983,7 +1031,7 @@ func _update_powers_text() -> void:
 	var parts: Array[String] = []
 	parts.append("%s %s" % [_k("special"), pw.SPECIAL_NAMES[f]])
 	var forms_owned := 0
-	for i in 6:
+	for i in pw.FORM_NAMES.size():
 		if pw.form_unlocked(i):
 			forms_owned += 1
 	if forms_owned > 1:
@@ -1050,7 +1098,7 @@ func _update_events() -> void:
 		var d := int(player.global_position.distance_to(e["pos"]))
 		var col: Color = e["color"]
 		var timer := ""
-		if e["timer"] < 900.0 and e["type"] in ["supply", "target", "outbreak", "gunship", "convoy"]:
+		if e["timer"] < 900.0 and e["type"] in ["supply", "target", "outbreak", "gunship", "convoy", "race"]:
 			timer = "  %d:%02d" % [int(e["timer"]) / 60, int(e["timer"]) % 60]
 		lines.append("[right][color=#%s][b]%s[/b]  %dm%s[/color]\n[color=#cccccc]%s[/color][/right]" % [col.to_html(false), e["name"], d, timer, e["desc"]])
 	events_label.text = "\n".join(lines)

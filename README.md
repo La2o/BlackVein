@@ -43,7 +43,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Dash | Q | B |
 | Attack (dive bomb in the air) | Left click | X |
 | Form special move | Right click | Y |
-| Switch arm form | 1–6 / mouse wheel | D-pad left / right |
+| Switch arm form | 1–7 / mouse wheel | D-pad left / right |
 | Shield / armor | X | D-pad up |
 | Grab, throw, hijack, pick up | E | RB |
 | Consume | F | LB |
@@ -64,8 +64,8 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md)
 
 - **Movement:** super sprint, vertical and sideways wall running, charged super jumps,
   double jump, gliding, air dash, tether zips, dive bombs, shockwave landings.
-- **Six arm forms:** Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass — each with its own
-  combo and special move.
+- **Seven arm forms:** Fists, Claws, Hammerfist, Blade, Whipfist, Musclemass, Bone Spikes —
+  each with its own combo and special move.
 - **Defense:** Shield and Armor.
 - **Consume & disguise:** eat anyone to heal and take their identity. Change disguise while unseen
   to make the military lose you.
@@ -79,13 +79,14 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md)
   (more soldiers, tanks, gunships, airstrikes).
 - **World events:** infection outbreaks with hives, armored convoys, hunter packs, street battles,
   supply drops, strike teams, bombing runs, high-value targets with secret memories, gunship patrols.
-- **Bosses:** the Leviathan and the Juggernaut super-tank.
+- **Bosses:** the Leviathan, the Juggernaut super-tank, and the final boss, Patient Zero.
+- **A finale:** piece together 5 memories to find the lab where it all began.
 - **Military base** to raid in disguise, with a commander whose memories unlock artillery strikes.
 - **Traffic and weather:** cars that drive (and crash), rain storms and fog.
 - **Combo meter**, starter goals, 19 achievements, a memories log, a stats screen,
   a settings menu with key rebinding, and adaptive music.
 - **Progression:** XP from kills, consumes and events → levels → skill points → a skill tree
-  of 23 powers and upgrades. Start weak, grind, get monstrous.
+  of 25 powers and upgrades. Start weak, grind, get monstrous.
 - **Save files:** automatic saves every 45 seconds, on level up, and when you quit.
 
 ## Project layout

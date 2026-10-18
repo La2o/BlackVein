@@ -15,9 +15,10 @@ CHANGELOG.md when done.
 - [x] Key rebinding in the settings menu. (0.3.0)
 
 ## Later
-- [ ] Story missions built from the High-Value Target memories.
+- [x] A finale built from the memories: Patient Zero. (0.4.0)
+- [ ] More story missions between memories.
 - [x] Tendril wings. (0.3.0)
-- [ ] A ranged form (bone spike shot).
+- [x] A ranged form: Bone Spikes. (0.4.0)
 - [ ] Infected zones that visibly spread across the map over time.
 - [x] Achievements and a stats screen. (0.3.0)
 - [x] Windows/Linux exports via the release workflow. (0.3.0)

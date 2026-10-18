@@ -2,14 +2,14 @@ extends "res://scripts/humanoid.gd"
 ## The player's body: hooded default look, disguises, arm transformations,
 ## shield and armor.
 
-enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE }
+enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
 enum Defense { NONE, SHIELD, ARMOR }
 
 const FLESH := Color(0.42, 0.04, 0.05)
 const DEFAULT_OUTFIT := {
 	"shirt": Color(0.11, 0.115, 0.13), "pants": Color(0.17, 0.17, 0.19),
 	"skin": Color(0.62, 0.48, 0.4), "gear": "hood", "gear_color": Color(0.09, 0.09, 0.1),
-	"glow": Color(1, 0.16, 0.1),
+	"glow": Color(1, 0.16, 0.1), "coat": true, "coat_color": Color(0.1, 0.1, 0.115),
 }
 
 var form: int = Form.FISTS
@@ -95,6 +95,13 @@ func _apply_form() -> void:
 				var link := _add(_form_parts, parent, sphere(0.09 - k * 0.006), flesh if k % 2 == 0 else dark, Vector3(0, -0.16, 0))
 				_whip_links.append(link)
 				parent = link
+		Form.SPIKES:
+			var bone := mat(Color(0.88, 0.84, 0.74), 0.0, 0.0, 0.5)
+			_add(_form_parts, arm_r, capsule(0.14, 0.62), flesh, Vector3(0, -0.42, 0))
+			for k in 5:
+				var a := k * TAU / 5.0
+				_add(_form_parts, arm_r, box(Vector3(0.04, 0.4, 0.04)), bone, Vector3(cos(a) * 0.12, -0.5, sin(a) * 0.12), Vector3(0.2 * cos(a), 0, 0.2 * sin(a)))
+			_add(_form_parts, hand_r, capsule(0.06, 0.35), bone, Vector3(0, -0.15, 0))
 		Form.MUSCLE:
 			arm_l.scale = Vector3(1.75, 1.12, 1.75)
 			arm_r.scale = Vector3(1.75, 1.12, 1.75)

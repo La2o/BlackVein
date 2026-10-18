@@ -19,6 +19,7 @@ var _zone_mat: ShaderMaterial
 func setup(extra := {}) -> void:
 	event_tag = extra.get("tag", "")
 	collision_layer = Game.LAYER_HIVE | Game.LAYER_WORLD
+	reset_physics_interpolation()
 	collision_mask = 0
 	var shape := CollisionShape3D.new()
 	var s := SphereShape3D.new()

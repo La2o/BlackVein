@@ -71,7 +71,9 @@ const ACHIEVEMENTS := [
 	["base_raider", "Base Raider", "Consume a base commander", "flag:artillery_codes", 1],
 	["max_heat", "Most Wanted", "Reach the highest military alert", "max_heat", 5],
 	["events", "Busy Night", "Complete 25 world events", "events", 25],
+	["racer", "Free Runner", "Win 5 rooftop races", "races", 5],
 	["evolved", "Apex", "Reach level 50", "level", 50],
+	["origin", "Origin", "Defeat Patient Zero", "patient_zero", 1],
 ]
 
 ## Starter goals that teach the game and pay XP. [stat or check, target, text, xp]
@@ -87,7 +89,10 @@ const GOALS := [
 	["flag:artillery_codes", 1, "Raid the military base and consume its commander", 250],
 	["level", 10, "Reach level 10", 300],
 	["bosses", 1, "Defeat a boss (they appear from level 10)", 500],
-	["level", 25, "Reach level 25", 800],
+	["level", 18, "Reach level 18", 500],
+	["memory_count", 5, "Absorb 5 different memories (scientists, commanders)", 400],
+	["flag:origin_done", 1, "Find the lab and defeat Patient Zero", 1500],
+	["level", 30, "Reach level 30", 1000],
 ]
 var play_time := 0.0
 var autosave_timer := 45.0
@@ -107,6 +112,7 @@ const SKILLS := {
 	"blade": ["Blade", "Long reach, cuts tanks apart. Special: Whirlwind", "Forms", 2, 7, 1, ""],
 	"whip": ["Whipfist", "Lash enemies from far away. Special: Whip Grab", "Forms", 2, 9, 1, ""],
 	"muscle_form": ["Musclemass", "Send people flying, throw farther. Special: Thunderclap", "Forms", 2, 11, 1, ""],
+	"spike_form": ["Bone Spikes", "Fire piercing bone spikes from your forearm. Special: Spike Storm", "Forms", 2, 13, 1, ""],
 	"shield": ["Shield", "Block bullets and rockets from the front", "Defense", 2, 6, 1, ""],
 	"armor": ["Armor", "Take less damage and ram through anything", "Defense", 2, 8, 1, ""],
 	"thermal": ["Thermal Vision", "See warm bodies through smoke and darkness", "Abilities", 1, 3, 1, ""],
@@ -239,6 +245,8 @@ func _goal_progress(g: Array) -> int:
 		return skills.size()
 	if key == "military_kills":
 		return int(kills.get("military", 0))
+	if key == "memory_count":
+		return (stats.get("memory_log", []) as Array).size()
 	if key.begins_with("flag:"):
 		return 1 if flags.get(key.substr(5), false) else 0
 	return stat(key)

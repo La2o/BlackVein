@@ -67,6 +67,7 @@ func sound(sound_name: String, pos: Vector3, volume_db := 0.0, pitch_spread := 0
 	p.volume_db = volume_db
 	p.pitch_scale = randf_range(1.0 - pitch_spread, 1.0 + pitch_spread) * maxf(Engine.time_scale, 0.5)
 	p.global_position = pos
+	p.reset_physics_interpolation()
 	p.play()
 
 
@@ -139,6 +140,7 @@ func orient_line(node: Node3D, a: Vector3, b: Vector3, width: float) -> void:
 		up = Vector3.RIGHT
 	var basis := Basis.looking_at(dir, up).scaled(Vector3(width, width, length))
 	node.global_transform = Transform3D(basis, (a + b) * 0.5)
+	node.reset_physics_interpolation()
 
 
 # ------------------------------------------------------------------ effects
@@ -156,6 +158,7 @@ func shockwave(pos: Vector3, radius: float, color := Color(1.0, 0.85, 0.7, 0.8),
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.global_position = pos + Vector3.UP * 0.2
+	mi.reset_physics_interpolation()
 	mi.scale = Vector3(0.5, 0.3, 0.5)
 	var tw := mi.create_tween().set_parallel()
 	tw.tween_property(mi, "scale", Vector3(radius, 0.5, radius), life).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
@@ -175,6 +178,7 @@ func shockwave(pos: Vector3, radius: float, color := Color(1.0, 0.85, 0.7, 0.8),
 	dust.scale_amount_max = 2.2
 	add_child(dust)
 	dust.global_position = pos + Vector3.UP * 0.3
+	dust.reset_physics_interpolation()
 	dust.emitting = true
 	_auto_free(dust, 1.2)
 
@@ -187,6 +191,7 @@ func explosion(pos: Vector3, radius: float) -> void:
 	ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ball)
 	ball.global_position = pos
+	ball.reset_physics_interpolation()
 	ball.scale = Vector3.ONE * 0.5
 	var tw := ball.create_tween().set_parallel()
 	tw.tween_property(ball, "scale", Vector3.ONE * radius * 1.4, 0.22).set_ease(Tween.EASE_OUT)
@@ -198,6 +203,7 @@ func explosion(pos: Vector3, radius: float) -> void:
 	light.omni_range = radius * 5.0
 	add_child(light)
 	light.global_position = pos + Vector3.UP
+	light.reset_physics_interpolation()
 	light.create_tween().tween_property(light, "light_energy", 0.0, 0.45)
 	_auto_free(light, 0.5)
 	var smoke := _particles(18, 2.6, _sphere, Color(0.25, 0.22, 0.2, 0.8), Color(0.3, 0.3, 0.3, 0.0))
@@ -212,6 +218,7 @@ func explosion(pos: Vector3, radius: float) -> void:
 	smoke.scale_amount_max = radius * 1.0
 	add_child(smoke)
 	smoke.global_position = pos
+	smoke.reset_physics_interpolation()
 	smoke.emitting = true
 	_auto_free(smoke, 2.8)
 	var sparks := _particles(24, 1.1, _cube, Color(1, 0.8, 0.3, 1), Color(0.3, 0.1, 0.05, 0.0))
@@ -223,6 +230,7 @@ func explosion(pos: Vector3, radius: float) -> void:
 	sparks.scale_amount_max = 0.35
 	add_child(sparks)
 	sparks.global_position = pos
+	sparks.reset_physics_interpolation()
 	sparks.emitting = true
 	_auto_free(sparks, 1.3)
 	shockwave(pos, radius * 1.6, Color(1, 0.7, 0.4, 0.6), 0.35)
@@ -239,6 +247,7 @@ func splat(pos: Vector3, dir: Vector3, color := Color(0.55, 0.02, 0.02), amount 
 	p.scale_amount_max = 0.25
 	add_child(p)
 	p.global_position = pos
+	p.reset_physics_interpolation()
 	p.emitting = true
 	_auto_free(p, 0.9)
 
@@ -253,6 +262,7 @@ func debris(pos: Vector3, amount := 12, color := Color(0.45, 0.43, 0.4)) -> void
 	p.scale_amount_max = 0.6
 	add_child(p)
 	p.global_position = pos
+	p.reset_physics_interpolation()
 	p.emitting = true
 	_auto_free(p, 1.6)
 
@@ -300,6 +310,7 @@ func spike(pos: Vector3, height := 3.5, delay := 0.0, hold := 0.7) -> void:
 	mi.material_override = _spike_mat
 	add_child(mi)
 	mi.global_position = pos + Vector3(0, -height * 0.5, 0)
+	mi.reset_physics_interpolation()
 	mi.rotation = Vector3(randf_range(-0.25, 0.25), randf() * TAU, randf_range(-0.25, 0.25))
 	mi.visible = delay <= 0.0
 	var tw := mi.create_tween()
@@ -345,6 +356,7 @@ func smoke_column(pos: Vector3, color: Color, duration: float) -> CPUParticles3D
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	add_child(p)
 	p.global_position = pos
+	p.reset_physics_interpolation()
 	p.emitting = true
 	get_tree().create_timer(duration, false).timeout.connect(p.set.bind("emitting", false))
 	_auto_free(p, duration + 3.2)
@@ -362,5 +374,6 @@ func flash_light(pos: Vector3, color: Color, energy := 6.0, range_m := 12.0, lif
 	light.omni_range = range_m
 	add_child(light)
 	light.global_position = pos
+	light.reset_physics_interpolation()
 	light.create_tween().tween_property(light, "light_energy", 0.0, life)
 	_auto_free(light, life + 0.05)
