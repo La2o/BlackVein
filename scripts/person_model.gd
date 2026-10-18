@@ -64,6 +64,9 @@ func setup(outfit: Dictionary) -> void:
 		"denim": not o["camo"] and (o["pants"] as Color).b > (o["pants"] as Color).r,
 		"height": (1.04 if sex == "m" else 0.97) * (1.0 + (float(o["bulk"]) - 1.0) * 0.3),
 	}
+	if o.get("shirtless", false):
+		new_look["shirtless"] = true
+	new_look["height"] = float(new_look["height"]) * float(o.get("scale_mult", 1.0))
 	if o["infected"] or o["veins"] or (o["has_glow"] and o["glow_style"] == "veins"):
 		new_look["glow"] = o["glow"]
 		new_look["vein_amount"] = 1.0 if o["infected"] else 0.4   # BLACKVEIN shows only a few

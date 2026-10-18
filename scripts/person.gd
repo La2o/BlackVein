@@ -88,6 +88,7 @@ func setup(new_look: Dictionary) -> void:
 	root.rotation.y = PI   # the models face +Z; the game's forward is -Z
 	anim = AnimationPlayer.new()
 	root.add_child(anim)
+	_current = ""   # a rebuilt body has a fresh player: whatever played before must start again
 	anim.add_animation_library("", library())
 	anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 	play("Idle")

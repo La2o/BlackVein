@@ -93,6 +93,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Head form (vision): Thermal / Night / Predator | V | R3 |
 | **Forms wheel** | Hold Alt or X | Hold D-pad up |
 | Biomass decoy | B | D-pad down |
+| Creature form (Brute / Stalker / Wraith) | N | Hold LB + D-pad down |
 | Artillery strike (in military disguise) | R | Hold LB + RB |
 | Groundspike devastator | G | Hold LB + X |
 | Tendril Barrage devastator | T | Hold LB + Y |
@@ -115,6 +116,10 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Prototype-style parkour:** flips, wall backflips, ledge flips, barrel-roll air dashes, landing
   rolls, superhero landings, vaults over cars, a leaning "ninja run" at top speed.
 - **Sculpted 3D people:** faces, hands, bending elbows and knees, and outfits for every kind of person.
+- **Creature forms:** turn your whole body into the hulking **Brute**, the wall-clinging **Stalker**
+  or the flying **Wraith**, fuelled by biomass.
+- **Stealth meter:** an eye that opens as soldiers grow suspicious, with markers over whoever has
+  noticed you.
 - **Consume & disguise:** eat anyone to heal and take their identity. Change disguise while unseen
   to make the military lose you. Parkour all you like in a disguise that fits; flying, powers and
   fights give you away. Consume unseen for bonus XP.

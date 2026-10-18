@@ -10,6 +10,11 @@ enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
 enum Defense { NONE, SHIELD, ARMOR, WINGS, LIGHT }
 enum Vision { NORMAL, THERMAL, NIGHT, PREDATOR }
 enum Legs { NORMAL, RUNNER, LEAPER, CRAWLER, CRUSHER }
+## Whole-body transformations, cycled with N / LB + D-pad Down. They drain biomass while worn.
+enum Creature { NONE, BRUTE, STALKER, WRAITH }
+const CREATURE_NAMES := ["Human", "Brute", "Stalker", "Wraith"]
+const CREATURE_SKILLS := ["", "brute_form", "stalker_form", "wraith_form"]
+const CREATURE_DRAIN := [0.0, 3.0, 2.5, 3.5]   # biomass per second
 
 const FORM_NAMES := ["Fists", "Claws", "Hammerfist", "Blade", "Whipfist", "Musclemass", "Bone Spikes"]
 const DEFENSE_NAMES := ["Normal body", "Shield", "Armor", "Wings", "Light Body"]
@@ -62,6 +67,7 @@ var devastator_cooldown := 0.0
 var violence_timer := 0.0
 var held: Node3D = null
 var held_kind := ""
+var creature: int = Creature.NONE
 var weapon := ""
 var ammo := 0
 var fire_cooldown := 0.0
@@ -96,6 +102,9 @@ func speed_factor() -> float:
 	var f := 1.0
 	if held_kind == "car":
 		f *= 0.65
+	match creature:
+		Creature.BRUTE: f *= 0.92
+		Creature.STALKER: f *= 1.4
 	if weapon == "mg":
 		f *= 0.75   # a heavy machine gun weighs you down
 	if defense == Defense.ARMOR:
@@ -113,7 +122,7 @@ func speed_factor() -> float:
 ## Something nobody human would be doing: a body form showing, carrying a person or a car, a
 ## devastator, or a gun when you're not dressed as a soldier.
 func looks_inhuman() -> bool:
-	if form != Form.FISTS or defense != Defense.NONE or legs != Legs.NORMAL or devastating != "":
+	if form != Form.FISTS or defense != Defense.NONE or legs != Legs.NORMAL or devastating != "" or creature != Creature.NONE:
 		return true
 	if held != null:
 		return true
@@ -127,6 +136,10 @@ func is_transformed() -> bool:
 ## multiplies jump strength (leg forms, Light Body)
 func jump_factor() -> float:
 	var f := LIGHT_JUMP if defense == Defense.LIGHT else 1.0
+	match creature:
+		Creature.BRUTE: f *= 1.1
+		Creature.STALKER: f *= 1.3
+		Creature.WRAITH: f *= 1.15
 	match legs:
 		Legs.LEAPER: return f * 1.5
 		Legs.RUNNER: return f * 1.1
@@ -144,11 +157,11 @@ func is_light() -> bool:
 
 
 func clings_to_walls() -> bool:
-	return legs == Legs.CRAWLER
+	return legs == Legs.CRAWLER or creature == Creature.STALKER
 
 
 func unstoppable() -> bool:
-	return legs == Legs.CRUSHER or defense == Defense.ARMOR
+	return legs == Legs.CRUSHER or defense == Defense.ARMOR or creature == Creature.BRUTE
 
 
 func is_armored() -> bool:
@@ -185,6 +198,8 @@ func modify_incoming(dmg: float, info: Dictionary) -> float:
 		dmg *= 0.45
 	elif defense == Defense.LIGHT:
 		dmg *= LIGHT_DAMAGE
+	if creature == Creature.BRUTE:
+		dmg *= 0.6
 	if consuming:
 		dmg *= 0.6
 	return dmg
@@ -276,7 +291,50 @@ func set_form(f: int, silent := false) -> void:
 	Game.say(FORM_NAMES[f], Color(1, 0.55, 0.45))
 
 
+## Next creature form you've learned, then back to human.
+func _cycle_creature() -> void:
+	var any := false
+	for c in range(1, CREATURE_NAMES.size()):
+		any = any or Game.has_skill(CREATURE_SKILLS[c])
+	if not any:
+		Game.locked_message("brute_form")
+		return
+	var c := creature
+	for k in CREATURE_NAMES.size():
+		c = (c + 1) % CREATURE_NAMES.size()
+		if c == Creature.NONE or Game.has_skill(CREATURE_SKILLS[c]):
+			break
+	if c != Creature.NONE and player.biomass < 15.0:
+		Game.say("Not enough biomass to transform", Color(1, 0.6, 0.5))
+		return
+	set_creature(c)
+
+
+func set_creature(c: int, silent := false) -> void:
+	if c != Creature.NONE and not Game.has_skill(CREATURE_SKILLS[c]):
+		Game.locked_message(CREATURE_SKILLS[c])
+		return
+	creature = c
+	player.model.set_creature(c)
+	_attach_weapon_mesh()
+	player.apply_upgrades()
+	if silent:
+		return
+	Game.say(CREATURE_NAMES[c] if c != Creature.NONE else "Human form", Color(1, 0.45, 0.35))
+	Game.fx.sound("evolve" if c != Creature.NONE else "consume", player.global_position, -2.0)
+	Game.fx.burst_ring(player.global_position, Color(0.8, 0.08, 0.05, 0.7), 3.5)
+	Game.fx.splat(player.global_position + Vector3.UP * 0.5, Vector3.UP, Color(0.45, 0.02, 0.02), 20)
+	player.add_trauma(0.35)
+	player.conspicuous_timer = maxf(player.conspicuous_timer, 3.0)
+
+
 func _physics_process(delta: float) -> void:
+	if creature != Creature.NONE and not player.is_dead():
+		player.biomass -= CREATURE_DRAIN[creature] * delta
+		if player.biomass <= 0.0:
+			player.biomass = 0.0
+			Game.say("Out of biomass: back to human form", Color(1, 0.6, 0.5))
+			set_creature(Creature.NONE, true)
 	attack_cooldown = maxf(0.0, attack_cooldown - delta)
 	special_cooldown = maxf(0.0, special_cooldown - delta)
 	tether_cooldown = maxf(0.0, tether_cooldown - delta)
@@ -369,7 +427,10 @@ func _physics_process(delta: float) -> void:
 			_set_focus(not focus_on)
 		else:
 			Game.locked_message("focus")
-	if Input.is_action_just_pressed("decoy"):
+	if Input.is_action_just_pressed("creature_form") or (mod and Input.is_action_just_pressed("decoy")):
+		_cycle_creature()
+		return
+	if Input.is_action_just_pressed("decoy") and not mod:
 		if Game.has_skill("decoy"):
 			_spawn_decoy()
 		else:

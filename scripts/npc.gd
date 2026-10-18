@@ -84,6 +84,8 @@ var _leap_cooldown := 0.0
 var _scream_cooldown := 0.0
 var _search_point := Vector3.INF
 var _last_seen_player := 99.0
+var noticing := false              # a soldier who can see you and finds you suspicious (stealth meter)
+var _marker: Label3D               # "?" while they're suspicious, "!" once they're after you
 var _grabbed_by: Node = null
 var _collision: CollisionShape3D
 
@@ -842,6 +844,7 @@ func _think_military() -> void:
 	var me := global_position
 	var thermal := kind == "elite"
 	var sees_player := false
+	noticing = false
 	if p and not p.is_dead():
 		var pp := _player_target_pos()
 		var d := me.distance_to(pp)
@@ -859,6 +862,7 @@ func _think_military() -> void:
 				Game.raise_alert(pp, "They spotted the hijacked vehicle")
 			if p.vehicle == null:
 				var trespass: bool = Game.is_trespassing(pp)
+				noticing = Game.is_hunted() or p.is_conspicuous() or trespass or thermal
 				Game.report_sighting(pp, p.is_conspicuous() or trespass, me, 0.3, thermal)
 			elif Game.is_hunted():
 				Game.report_sighting(pp, true, me, 0.3, thermal)
@@ -1351,6 +1355,29 @@ func _land_from_leap() -> void:
 
 # ------------------------------------------------------------------ animation
 
+## The "?" / "!" over a soldier's head while they're noticing you.
+func _update_marker() -> void:
+	var show := noticing and faction == "military" and not is_ally and _last_seen_player < 1.0
+	if not show:
+		if _marker:
+			_marker.visible = false
+		return
+	if _marker == null:
+		_marker = Label3D.new()
+		_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_marker.no_depth_test = true
+		_marker.fixed_size = true
+		_marker.pixel_size = 0.0018
+		_marker.font_size = 30
+		_marker.outline_size = 8
+		_marker.position = Vector3(0, 1.45 * scale_factor, 0)
+		add_child(_marker)
+	_marker.visible = true
+	var hunted := Game.is_hunted()
+	_marker.text = "!" if hunted else "?"
+	_marker.modulate = Color(1, 0.25, 0.2) if hunted else Color(1, 0.8, 0.3)
+
+
 func _animate(delta: float) -> void:
 	var hv := Vector3(velocity.x, 0, velocity.z)
 	var spd := hv.length()
@@ -1372,6 +1399,7 @@ func _animate(delta: float) -> void:
 	elif spd > 0.3:
 		mode = "walk"
 	model.animate(delta, spd, mode)
+	_update_marker()
 	if _hit_flash > 0.0:
 		if _flash_mat == null:
 			_flash_mat = StandardMaterial3D.new()

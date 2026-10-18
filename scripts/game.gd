@@ -133,6 +133,9 @@ const SKILLS := {
 	"leaper_legs": ["Leaper Legs", "Leg form: huge jumps, and every hard landing becomes a stomp", "Movement", 2, 6, 1, ""],
 	"crawler_legs": ["Crawler Legs", "Leg form: cling to walls without sprinting, run along buildings as long as you like", "Movement", 2, 8, 1, ""],
 	"light_body": ["Light Body", "Body form: a lean, stripped-down body built for running. 25% faster sprint and wall runs, higher jumps, sharper air control, but you take 30% more damage", "Movement", 2, 5, 1, ""],
+	"brute_form": ["Brute", "Creature form (N / LB+D-pad Down): a hulking mass of flesh and bone. +60% damage, +50% health, takes 40% less damage, can't be knocked back, but slower. Drains biomass", "Creatures", 3, 12, 1, ""],
+	"stalker_form": ["Stalker", "Creature form: a lean black hunter with glowing eyes. +40% sprint, +30% jumps, clings to walls, prowls low. Drains biomass", "Creatures", 3, 14, 1, ""],
+	"wraith_form": ["Wraith", "Creature form: a pale winged horror that truly flies (unlimited wing beats) and glides fast, but is frail. Drains biomass", "Creatures", 3, 16, 1, "glide"],
 	"crusher_legs": ["Crusher Legs", "Leg form: sprint through people and cars, can't be knocked back, brutal landings", "Movement", 2, 10, 1, ""],
 	"agility": ["Agility", "+10% sprint and wall-run speed per rank", "Movement", 1, 1, 5, ""],
 	"leap": ["Leap", "Higher super jumps and longer glides per rank", "Movement", 1, 1, 5, ""],
@@ -159,7 +162,7 @@ const SKILLS := {
 	"muscle": ["Muscle", "+15% damage per rank", "Body", 1, 1, 5, ""],
 	"regen": ["Regeneration", "Heal faster and to a higher level per rank", "Body", 1, 1, 5, ""],
 }
-const CATEGORIES := ["Movement", "Forms", "Defense", "Abilities", "Devastators", "Body"]
+const CATEGORIES := ["Movement", "Forms", "Defense", "Abilities", "Devastators", "Body", "Creatures"]
 
 var kills := {"military": 0, "infected": 0, "civilian": 0}
 var combo := 0

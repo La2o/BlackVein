@@ -14,6 +14,7 @@ const KEYS := {
 	"wheel": ["Alt / hold X", "Hold D-pad Up"],
 	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-7 / Wheel", "D-pad L/R"],
 	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"], "wardrobe": ["I", "LB+B"],
+	"creature": ["N", "LB+D-pad Down"],
 }
 
 var player: Node
@@ -48,6 +49,7 @@ var events_label: RichTextLabel
 var alert_label: Label
 var suspicion_bar: ProgressBar
 var stealth_label: Label   # "Blending in" / "Standing out: flying" while soldiers are near
+var stealth_meter: Control  # the eye at the top of the screen (stealth_meter.gd)
 var compass: Control
 var minimap: Control
 var crosshair: Control
@@ -277,6 +279,9 @@ func _build_right() -> void:
 	suspicion_bar.position = Vector2(-207, 264)
 	suspicion_bar.visible = false
 	root.add_child(suspicion_bar)
+	stealth_meter = Control.new()
+	stealth_meter.set_script(preload("res://scripts/stealth_meter.gd"))
+	root.add_child(stealth_meter)
 	stealth_label = _label("", 13, Color(0.6, 0.9, 1.0), 3)
 	stealth_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	stealth_label.position = Vector2(-232, 270)
@@ -1199,7 +1204,7 @@ func _update_alert() -> void:
 		Game.Alert.ALERT:
 			alert_label.text = "ALERT  " + "◆".repeat(int(ceil(Game.heat))) + "◇".repeat(5 - int(ceil(Game.heat)))
 			alert_label.add_theme_color_override("font_color", Color(1, 0.3, 0.25))
-	suspicion_bar.visible = Game.alert_level == Game.Alert.HIDDEN and Game.suspicion > 0.02
+	suspicion_bar.visible = false   # the stealth meter's eye shows suspicion now
 	_update_stealth_label()
 	suspicion_bar.value = Game.suspicion * 100.0
 
@@ -1208,7 +1213,7 @@ const KEY_ACTIONS := {
 	"attack": "attack", "special": "special", "grab": "grab", "consume": "consume", "jump": "jump", "dash": "dash",
 	"tether": "tether", "focus": "focus", "thermal": "thermal", "decoy": "decoy", "defense": "cycle_defense",
 	"spikes": "devastator_spikes", "tendrils": "devastator_tendrils", "artillery": "artillery",
-	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu",
+	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu", "creature": "creature_form",
 }
 
 
@@ -1242,6 +1247,8 @@ func _update_powers_text() -> void:
 	var pw: Node = player.powers
 	var f: int = pw.form
 	form_label.text = "%s" % pw.FORM_NAMES[f].to_upper()
+	if pw.creature != 0:
+		form_label.text = "%s  ·  %s" % [pw.CREATURE_NAMES[pw.creature].to_upper(), form_label.text]
 	if pw.weapon != "":
 		form_label.text = "%s  (%d)" % [str(pw.WEAPONS[pw.weapon]["name"]).to_upper(), pw.ammo]
 		if pw.weapon == "launcher":
@@ -1270,6 +1277,8 @@ func _update_powers_text() -> void:
 	if not loadout.is_empty():
 		parts.append("[%s]" % " · ".join(loadout))
 	parts.append("%s grab   %s consume   %s disguises" % [_k("grab"), _k("consume"), _k("wardrobe")])
+	if Game.has_skill("brute_form") or Game.has_skill("stalker_form") or Game.has_skill("wraith_form"):
+		parts.append("%s creature form" % _k("creature"))
 	var line2: Array[String] = []
 	if Game.has_skill("tether"):
 		line2.append("%s tether" % _k("tether"))

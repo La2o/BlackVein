@@ -31,16 +31,58 @@ var _leg_parts: Array[MeshInstance3D] = []
 var _crawler: Array[Node3D] = []
 var _flap := 0.0
 var _wing_open := 0.0
+var creature := 0                 # PlayerPowers.Creature
+var _human_outfit: Dictionary = {}
+var _human_true := true
+
+## The creature forms' bodies (humanoid outfit keys, plus shirtless / scale_mult for person_model.gd).
+const CREATURE_OUTFITS := [
+	{},
+	{"body": "m", "skin": Color(0.5, 0.16, 0.12), "pants": Color(0.12, 0.08, 0.07), "shoes": Color(0.2, 0.06, 0.05),
+		"gear": "none", "hair": "bald", "infected": true, "glow": Color(1, 0.25, 0.08), "shirtless": true,
+		"scale_mult": 1.35},
+	{"body": "m", "skin": Color(0.17, 0.16, 0.19), "pants": Color(0.06, 0.06, 0.07), "shoes": Color(0.05, 0.05, 0.06),
+		"gear": "none", "hair": "bald", "veins": true, "glow": Color(0.3, 0.9, 1.0), "shirtless": true, "scale_mult": 1.06},
+	{"body": "m", "skin": Color(0.78, 0.76, 0.8), "pants": Color(0.25, 0.22, 0.24), "shoes": Color(0.2, 0.18, 0.2),
+		"gear": "none", "hair": "bald", "veins": true, "glow": Color(0.85, 0.2, 1.0), "shirtless": true, "scale_mult": 1.0},
+]
 
 
 func build(new_outfit: Dictionary = {}) -> void:
 	outfit = DEFAULT_OUTFIT if new_outfit.is_empty() else new_outfit
 	true_form = new_outfit.is_empty()
+	if creature != 0:
+		# a disguise or outfit change while transformed applies when you turn back
+		_human_outfit = outfit
+		_human_true = true_form
+		_build_body(CREATURE_OUTFITS[creature])
+		return
+	_build_body(outfit)
+
+
+## Whole-body change: becomes the creature (keeping arm, body and leg forms), or back to the
+## human body you had before.
+func set_creature(c: int) -> void:
+	if c == creature:
+		return
+	if creature == 0:
+		_human_outfit = outfit
+		_human_true = true_form
+	creature = c
+	if c == 0:
+		outfit = _human_outfit if not _human_outfit.is_empty() else DEFAULT_OUTFIT
+		true_form = _human_true
+		_build_body(outfit)
+	else:
+		_build_body(CREATURE_OUTFITS[c])
+
+
+func _build_body(look_outfit: Dictionary) -> void:
 	_form_parts.clear()
 	_defense_parts.clear()
 	_whip_links.clear()
 	# a disguise copies the outfit, not the victim's prop gun: only weapons you pick up are shown
-	var worn := outfit.duplicate()
+	var worn := look_outfit.duplicate()
 	worn["item"] = "none"
 	foot_offset = -0.9
 	needs_pivots = true
@@ -51,6 +93,61 @@ func build(new_outfit: Dictionary = {}) -> void:
 	_apply_form()
 	_apply_defense()
 	_apply_legs()
+	_apply_creature()
+
+
+var _creature_parts: Array[MeshInstance3D] = []
+
+## Bone spikes, claws and glowing eyes for the creature forms; bulk comes from scaling bones.
+func _apply_creature() -> void:
+	_clear(_creature_parts)
+	if creature == 0 or arm_l == null:
+		return
+	var bone := mat(Color(0.86, 0.8, 0.7), 0.0, 0.0, 0.45)
+	var dark := mat(Color(0.06, 0.02, 0.02), 0.0, 0.3, 0.25)
+	match creature:
+		1:   # Brute: spikes down the back and on the shoulders, huge claws, bulging arms and chest
+			for b in ["upperarm_l", "upperarm_r"]:
+				set_bone_scale(b, Vector3(1.5, 1.05, 1.5))
+			for b in ["lowerarm_l", "lowerarm_r"]:
+				set_bone_scale(b, Vector3(1.4, 1.0, 1.4))
+			set_bone_scale("spine_03", Vector3(1.25, 1.1, 1.25))
+			for i in 6:
+				var cone := CylinderMesh.new()
+				cone.top_radius = 0.0
+				cone.bottom_radius = 0.06
+				cone.height = 0.42 - i * 0.04
+				var spike := MeshInstance3D.new()
+				spike.mesh = cone
+				spike.material_override = bone
+				attach_to_body("spine_03" if i < 3 else "spine_01", spike,
+					Vector3((i % 2) * 0.13 - 0.065, 0.14 - (i % 3) * 0.1, -0.17), Vector3(-0.9, 0, 0))
+				_creature_parts.append(spike)
+			for arm in [arm_l, arm_r]:
+				var sc := CylinderMesh.new()
+				sc.top_radius = 0.0
+				sc.bottom_radius = 0.05
+				sc.height = 0.3
+				_add(_creature_parts, arm, sc, bone, Vector3(0, 0.02, 0.0), Vector3(0, 0, 0))
+			for hand in [hand_l, hand_r]:
+				for i in 3:
+					_add(_creature_parts, hand, box(Vector3(0.03, 0.3, 0.05)), dark, Vector3((i - 1) * 0.055, -0.17, -0.07), Vector3(0.7, 0, (i - 1) * 0.15))
+		2:   # Stalker: long thin claws and two glowing eyes
+			for hand in [hand_l, hand_r]:
+				for i in 2:
+					_add(_creature_parts, hand, box(Vector3(0.015, 0.5, 0.03)), dark, Vector3((i - 0.5) * 0.05, -0.26, -0.03), Vector3(0.2, 0, (i - 0.5) * 0.12))
+		3:   # Wraith: bony claws; the wings stay open (see animate)
+			for hand in [hand_l, hand_r]:
+				for i in 3:
+					_add(_creature_parts, hand, box(Vector3(0.012, 0.3, 0.025)), bone, Vector3((i - 1) * 0.04, -0.17, -0.02), Vector3(0.2, 0, (i - 1) * 0.12))
+	if creature in [2, 3]:
+		var eye := mat(Color(0.3, 0.9, 1.0) if creature == 2 else Color(0.85, 0.3, 1.0), 4.0)
+		for side in [-1.0, 1.0]:
+			var e := MeshInstance3D.new()
+			e.mesh = sphere(0.016)
+			e.material_override = eye
+			attach_to_body("Head", e, Vector3(side * 0.033, 0.075, 0.085))
+			_creature_parts.append(e)
 
 
 func set_form(f: int) -> void:
@@ -311,7 +408,11 @@ func _pose_anim(pose: Dictionary) -> String:
 
 func animate(delta: float, speed: float, mode: String) -> void:
 	var armed := hand_r != null and hand_r.get_children().any(func(c): return c.has_meta("weapon"))
-	if not pose_override.is_empty() and _oneshot_t <= 0.0:
+	if creature == 2 and pose_override.is_empty() and _oneshot_t <= 0.0 and mode in ["idle", "walk"]:
+		# the Stalker prowls low
+		play("Crouch_Fwd" if mode == "walk" else "Crouch_Idle", 0.2, clampf(speed / 1.6, 0.7, 2.0))
+		pose_override = {}
+	elif not pose_override.is_empty() and _oneshot_t <= 0.0:
 		play(_pose_anim(pose_override), 0.12, 1.4 if pose_override == Player.POSE_NINJA else 1.0)
 		swing_timer = maxf(0.0, swing_timer - delta)
 	elif armed and mode in ["idle", "walk"] and _oneshot_t <= 0.0:
@@ -320,7 +421,7 @@ func animate(delta: float, speed: float, mode: String) -> void:
 		super(delta, speed, mode)
 	pose_override = {}
 	_t += delta
-	var wing_form := defense == Defense.WINGS
+	var wing_form := defense == Defense.WINGS or creature == 3
 	var show := wing_form or (wings_visible and (mode == "glide" or _flap > 0.0))
 	if show or not _wing_pivots.is_empty():
 		_ensure_wings()

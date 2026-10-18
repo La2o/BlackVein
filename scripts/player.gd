@@ -211,6 +211,17 @@ func apply_upgrades() -> void:
 	health = max_health * ratio
 	max_biomass = 100.0 + 30.0 * Game.skill_rank("biomass")
 	damage_mult = 1.0 + 0.15 * Game.skill_rank("muscle") + lvl_bonus
+	# creature forms change the whole body
+	match powers.creature:
+		PlayerPowers.Creature.BRUTE:
+			damage_mult *= 1.6
+			max_health *= 1.5
+		PlayerPowers.Creature.STALKER:
+			damage_mult *= 1.15
+		PlayerPowers.Creature.WRAITH:
+			damage_mult *= 0.85
+			max_health *= 0.85
+	health = minf(health, max_health)
 	speed_mult = 1.0 + 0.1 * Game.skill_rank("agility")
 	jump_mult = 1.0 + 0.1 * Game.skill_rank("leap")
 	regen_cap = 0.7 + 0.06 * Game.skill_rank("regen")
@@ -579,7 +590,7 @@ func _state_glide(delta: float) -> void:
 	conspicuous_timer = maxf(conspicuous_timer, 1.5)   # nobody forgets seeing a man fly
 	if Input.is_action_just_pressed("jump") and flaps_left > 0:
 		flaps_left -= 1
-		velocity.y = 14.0 * (1.3 if powers.defense == PlayerPowers.Defense.WINGS else 1.0)
+		velocity.y = 14.0 * (1.3 if powers.defense == PlayerPowers.Defense.WINGS or powers.creature == PlayerPowers.Creature.WRAITH else 1.0)
 		model.flap()
 		model.scale = Vector3(1.3, 0.8, 1.3)
 		Game.fx.burst_ring(global_position, Color(0.8, 0.1, 0.06, 0.6), 3.0)
@@ -594,7 +605,7 @@ func _state_glide(delta: float) -> void:
 	var target_dir := wish.normalized() if wish.length() > 0.1 else dir
 	var ang := dir.signed_angle_to(target_dir, Vector3.UP)
 	dir = dir.rotated(Vector3.UP, clampf(ang, -glide_turn * delta, glide_turn * delta))
-	var wing_form := powers.defense == PlayerPowers.Defense.WINGS
+	var wing_form := powers.defense == PlayerPowers.Defense.WINGS or powers.creature == PlayerPowers.Creature.WRAITH
 	var gs := glide_speed * jump_mult * (1.55 if wing_form else 1.0)
 	if speed < gs:
 		speed = move_toward(speed, gs, 14.0 * delta)
@@ -607,6 +618,8 @@ func _state_glide(delta: float) -> void:
 
 
 func max_flaps() -> int:
+	if powers.creature == PlayerPowers.Creature.WRAITH:
+		return 999   # the Wraith really flies
 	return Game.skill_rank("wings") + (3 if powers.defense == PlayerPowers.Defense.WINGS else 0)
 
 

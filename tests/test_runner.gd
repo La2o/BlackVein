@@ -386,6 +386,37 @@ func _run_all() -> void:
 	pw.set_defense(PlayerPowers.Defense.NONE)
 	await _wait(3.0)
 
+	# ---------------- creature forms: whole-body transformations
+	Game.skills.erase("brute_form")
+	pw.set_creature(PlayerPowers.Creature.BRUTE, true)
+	check("creature forms are locked until learned", pw.creature == PlayerPowers.Creature.NONE)
+	for cid in ["brute_form", "stalker_form", "wraith_form"]:
+		Game.skills[cid] = 1
+	player.biomass = player.max_biomass
+	var human_hp := player.max_health
+	var human_dmg := player.damage_mult
+	var human_h: float = player.model.skeleton.get_parent().get_parent().scale.y
+	await _tap("creature_form")
+	check("N turns you into the Brute", pw.creature == PlayerPowers.Creature.BRUTE, PlayerPowers.CREATURE_NAMES[pw.creature])
+	var brute_h: float = player.model.skeleton.get_parent().get_parent().scale.y
+	check("a rebuilt body keeps animating", player.model.anim.is_playing(), player.model.anim.current_animation)
+	check("the Brute is huge, hits harder and has more health", brute_h > human_h * 1.2
+		and player.damage_mult > human_dmg * 1.4 and player.max_health > human_hp * 1.3 and pw.unstoppable(),
+		"size %.2f->%.2f, damage %.2f->%.2f, health %.0f->%.0f" % [human_h, brute_h, human_dmg, player.damage_mult, human_hp, player.max_health])
+	check("a creature always stands out", player.is_conspicuous())
+	await _tap("creature_form")
+	check("the Stalker is fast and clings to walls", pw.creature == PlayerPowers.Creature.STALKER
+		and pw.speed_factor() > 1.3 and pw.clings_to_walls())
+	await _tap("creature_form")
+	check("the Wraith flies", pw.creature == PlayerPowers.Creature.WRAITH and player.max_flaps() > 100)
+	await _tap("creature_form")
+	check("and back to human", pw.creature == PlayerPowers.Creature.NONE and absf(player.max_health - human_hp) < 1.0)
+	pw.set_creature(PlayerPowers.Creature.BRUTE, true)
+	player.biomass = 0.5
+	await _wait(0.5)
+	check("running out of biomass turns you back", pw.creature == PlayerPowers.Creature.NONE)
+	player.biomass = player.max_biomass
+
 	# ---------------- Light Body: faster running and jumping, more damage taken
 	Game.skills.erase("light_body")
 	pw.set_defense(PlayerPowers.Defense.LIGHT, true)
@@ -865,6 +896,22 @@ func _run_all() -> void:
 	_release_all()
 	check("sprinting past a soldier in disguise raises no suspicion", Game.alert_level == Game.Alert.HIDDEN
 		and Game.suspicion < 0.1, "suspicion %.2f" % Game.suspicion)
+	# the stealth meter: a soldier who sees you glide notices you, gets a "?" and the eye fills
+	watcher2.global_position = player.global_position + Vector3(0, 0, -10)
+	player.state = Player.State.GLIDE
+	var watched := false
+	t = 0.0
+	while t < 2.0:
+		player.conspicuous_timer = 1.0
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		watched = watched or (watcher2.noticing and watcher2._marker != null and watcher2._marker.visible)
+	player.state = Player.State.GROUND
+	var meter: Control = Game.hud.stealth_meter
+	check("stealth meter: soldiers who notice you get a marker and the eye fills",
+		watched and Game.suspicion > 0.05 and meter.state() in ["NOTICED", "SPOTTED"],
+		"noticing %s, suspicion %.2f, meter %s" % [watched, Game.suspicion, meter.state()])
+	Game.set_alert(Game.Alert.HIDDEN)
 	watcher2.queue_free()
 	player.disguise = real_disguise
 	# stealth consume: nobody sees it, you get a bonus

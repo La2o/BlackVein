@@ -2,6 +2,27 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.12.0] — Unreleased — Creature forms and a stealth meter
+
+### New
+- **Creature forms** (new Creatures skills; N / hold LB + D-pad Down to cycle): whole-body
+  transformations that drain biomass while you wear them and drop you back to human when it runs out.
+  - **Brute** (level 12): a hulking mass of raw flesh and glowing veins, bone spikes and claws.
+    +60% damage, +50% health, takes 40% less damage, can't be knocked back, a little slower.
+  - **Stalker** (level 14): a lean black hunter with glowing eyes and long claws that prowls low.
+    +40% sprint, +30% jumps, clings to walls.
+  - **Wraith** (level 16): a pale winged horror that truly flies (unlimited wing beats) and glides
+    fast, but is frail.
+  Your arm, body and leg forms still work on top; disguise changes made while transformed apply when
+  you turn back.
+- **Stealth meter**: an eye at the top of the screen opens as soldiers grow suspicious (UNSEEN,
+  NOTICED, SPOTTED, SEARCHING), arrows around the middle of the screen point at everyone noticing you,
+  and those soldiers show a **?** (suspicious) or **!** (after you) over their heads.
+
+### Fixed
+- After a body change (consuming someone, changing disguise) while standing still, the new body could
+  stay frozen in a T-pose until you moved.
+
 ## [0.11.0] — 2026-10-19 — A bigger, varied map
 
 ### New
