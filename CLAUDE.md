@@ -100,7 +100,9 @@ The PCK is embedded, so each build is a single file. Smoke-test the Linux one wi
 
 ## Release checklist
 
-Releases are made **only when the owner asks**. Day to day: test locally with the fast loop above
+Releases are made **only when the owner asks**. Once Mixamo files are in use (`assets/mixamo/`, git-ignored,
+see docs/MIXAMO.md), the GitHub release workflow can't see them: export release builds locally and
+upload them to the release instead. Day to day: test locally with the fast loop above
 (no normal-speed runs), push to `main`, keep CHANGELOG.md and the version current.
 
 1. Tests pass (0 failed) locally **and on GitHub**. After pushing, check the Actions run:
