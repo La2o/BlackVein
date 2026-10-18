@@ -2,19 +2,9 @@
 
 Read this first in every new session. It's the fastest way to get back up to speed.
 
-## The owner
-
-- Doesn't want to write code. Claude builds everything; the owner plays and gives feedback.
-- Plays on PC in Godot 4.5, sometimes with a controller. Every new action needs a controller binding.
-- Wants Prototype-style mechanics plus original ideas, world events, progression and grind.
-- Likes being told what changed in plain words (keep CHANGELOG.md updated).
-
 ## Where the project lives
 
 - GitHub: https://github.com/La2o/BlackVein (branch `main`). This is the source of truth.
-- The owner's PC has a copy at `C:\Users\ygsna\BLACKVEIN` (written via the desktop-app bridge;
-  `.git` and `.github` can't be written there, so it's a plain copy, not a clone).
-- The owner plays the exported `BLACKVEIN.exe` (sent as a zip each release).
 - Pushing tags through the session proxy is refused; push `main` with `git -c push.negotiate=false push`.
 
 ## Engine & rules
@@ -30,7 +20,7 @@ Read this first in every new session. It's the fastest way to get back up to spe
   `Game.hit_info(damage, force, source, kind)`. kinds: melee, slash, blade, slam, impact, bullet, explosion.
 - Rewards go through `Game.add_xp(amount, reason)`. New powers go in `Game.SKILLS` and must be
   gated with `Game.has_skill(id)`.
-- Input actions are created in `scripts/controls.gd` (keyboard + controller). Add new ones there
+- Input actions are created in `scripts/controls.gd` (keyboard + controller; every action needs both). Add new ones there
   and to the HUD key table (`hud.gd` KEYS) and `docs/CONTROLS.md`.
 
 ## How to verify changes (do this every time)
