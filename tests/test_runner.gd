@@ -418,7 +418,8 @@ func _run_all() -> void:
 	wh.close_wheel(true)
 	Input.action_release("forms_wheel")
 	await get_tree().process_frame
-	check("forms wheel switches forms", pw.legs == PlayerPowers.Legs.LEAPER and not Game.hud.wheel_open and Engine.time_scale > 0.9)
+	check("forms wheel switches forms", pw.legs == PlayerPowers.Legs.LEAPER and not Game.hud.wheel_open and Engine.time_scale > 0.9,
+		"legs %d open %s time %.2f hitstop %.2f focus %s" % [pw.legs, Game.hud.wheel_open, Engine.time_scale, Game.hit_stop_timer, Game.focus_active])
 	pw.set_legs(PlayerPowers.Legs.NORMAL)
 
 	# ---------------- heavy landing shoves cars
