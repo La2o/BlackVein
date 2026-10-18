@@ -36,7 +36,7 @@ godot --headless --path . res://tests/test_runner.tscn    # full play-through, m
 
 Fast loop while working (~30 s instead of ~4.5 min): `--fixed-fps 60` drops real-time sync so the
 game simulates as fast as the CPU allows. Add `--quit-after` so a script parse error can't leave Godot
-idling forever. Do one normal-speed run before committing.
+idling forever. This is the day-to-day check; the normal-speed run is only for a GitHub release.
 ```
 godot --headless --fixed-fps 60 --quit-after 60000 --path . res://tests/test_runner.tscn
 ```
@@ -97,8 +97,8 @@ The PCK is embedded, so each build is a single file. Smoke-test the Linux one wi
 
 ## Release checklist
 
-Releases are made **only when the owner asks**. Day to day: test locally (fast loop above, one
-normal-speed run before committing), push to `main`, keep CHANGELOG.md and the version current.
+Releases are made **only when the owner asks**. Day to day: test locally with the fast loop above
+(no normal-speed runs), push to `main`, keep CHANGELOG.md and the version current.
 
 1. Tests pass (0 failed) locally **and on GitHub**. After pushing, check the Actions run:
    `gh run list -R La2o/BlackVein -L 1`, then read its annotations (failed checks are reported there,
