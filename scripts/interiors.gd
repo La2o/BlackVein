@@ -88,6 +88,8 @@ func setup(city: Node3D) -> void:
 			var cell := Vector2i(i, j)
 			if cell == city.base_cell or cell == Vector2i(mid, mid - 1):
 				continue
+			if not city.districts.get(cell, 0) in [City.District.DOWNTOWN, City.District.MIDTOWN]:
+				continue   # labs are city buildings, not houses or barns
 			candidates.append(cell)
 	candidates.shuffle()
 	var labs: Array[Vector2i] = []

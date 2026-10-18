@@ -84,6 +84,11 @@ func _maintain_population() -> void:
 	var want_civs := 42
 	if Game.daynight and Game.daynight.is_night():
 		want_civs = 24
+	# out in the fields or among the warehouses there are far fewer people about
+	match Game.city.district_at(ppos):
+		Game.city.District.FARM: want_civs = int(want_civs * 0.2)
+		Game.city.District.INDUSTRIAL: want_civs = int(want_civs * 0.45)
+		Game.city.District.SUBURB: want_civs = int(want_civs * 0.6)
 	want_civs = int(want_civs * Settings.crowd_density)
 	if Game.military.crowded():
 		want_civs = mini(want_civs, civs)

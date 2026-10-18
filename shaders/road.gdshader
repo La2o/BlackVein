@@ -10,6 +10,11 @@ uniform float wetness = 0.0;
 uniform sampler2D asphalt_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D asphalt_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D asphalt_rough : hint_roughness_r, filter_linear_mipmap_anisotropic, repeat_enable;
+// one pixel per block (city.gd _district_texture): farmland gets country lanes with grass verges,
+// the suburbs quiet streets without crosswalks
+uniform sampler2D district_map : filter_nearest;
+uniform float ring = 2.0;
+uniform sampler2D grass_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 
 varying vec3 wpos;
 
@@ -39,8 +44,23 @@ void vertex() {
 	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 
+float district_of(vec2 p) {
+	vec2 n = vec2(textureSize(district_map, 0));
+	vec2 cell = floor((p - street) / period) + ring;
+	return texture(district_map, (cell + 0.5) / n).r * 8.0;
+}
+
 void fragment() {
 	vec2 p = wpos.xz - origin;
+	// what kind of road: look at the blocks on all sides (5 = farmland, 3 = suburbs)
+	float farm = 1.0;
+	float quiet = 1.0;
+	for (int k = 0; k < 4; k++) {
+		vec2 off = vec2(k % 2 == 0 ? -10.0 : 10.0, k < 2 ? -10.0 : 10.0);
+		float d = district_of(p + off);
+		farm *= step(4.5, d) * step(d, 5.5);
+		quiet *= max(step(2.5, d) * step(d, 3.5), step(4.5, d) * step(d, 5.5));
+	}
 	vec2 m = mod(p, period);
 	vec2 c = abs(m - street * 0.5);
 	bool in_x_street = m.x < street; // street running along Z
@@ -89,6 +109,17 @@ void fragment() {
 		line = max(line, near_cross * step(0.5, fract(m.y / 1.2)) * 0.9);
 		if (near_cross > 0.5) { line_col = vec3(0.85, 0.82, 0.72); }
 	}
+	if (quiet > 0.5) {
+		// suburbs and country: just a dashed white line down the middle
+		line = 0.0;
+		line_col = vec3(0.85, 0.82, 0.72);
+		if (in_x_street && !in_z_street) {
+			line = (1.0 - step(0.08, abs(m.x - street * 0.5))) * step(0.5, fract(p.y / 6.0));
+		}
+		if (in_z_street && !in_x_street) {
+			line = (1.0 - step(0.08, abs(m.y - street * 0.5))) * step(0.5, fract(p.x / 6.0));
+		}
+	}
 	// worn paint
 	line *= 0.75 + 0.25 * noise(wpos.xz * 3.0);
 	col = mix(col, line_col, clamp(line, 0.0, 1.0));
@@ -96,6 +127,17 @@ void fragment() {
 	float puddle = smoothstep(0.55, 0.62, fbm(wpos.xz * 0.12 + 3.7)) * wetness;
 	float wet = clamp(wetness * 0.8 + puddle, 0.0, 1.0);
 	col *= mix(1.0, 0.55, wet);
+	if (farm > 0.5) {
+		// a narrow country lane: grass verges beyond 4.2 m from the centre line
+		float from_centre = 99.0;
+		if (in_x_street) { from_centre = min(from_centre, abs(m.x - street * 0.5)); }
+		if (in_z_street) { from_centre = min(from_centre, abs(m.y - street * 0.5)); }
+		float verge = smoothstep(4.0, 4.6, from_centre);
+		vec3 grass = texture(grass_col, wpos.xz / 4.0).rgb * 0.85;
+		col = mix(col, grass, verge);
+		wet *= 1.0 - verge;
+		line *= 1.0 - verge;
+	}
 	ALBEDO = col;
 	// paint lines and puddles are smooth; bare asphalt keeps its grain
 	NORMAL_MAP = mix(nmap, vec3(0.5, 0.5, 1.0), clamp(max(line, wet), 0.0, 1.0));

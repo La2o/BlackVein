@@ -4,6 +4,8 @@ shader_type spatial;
 // all drawn from world position so every building of any size looks right.
 // Walls are concrete, brick or plaster photo textures (CC0, assets/CREDITS.md),
 // picked per building; roofs are gravel.
+// `style` picks the kind of building: 0 city block, 1 house (painted clapboard, framed windows,
+// a door), 2 warehouse (corrugated metal, roll-up doors, a high window strip), 3 barn (red planks).
 
 uniform vec3 wall_color : source_color = vec3(0.6, 0.58, 0.54);
 uniform vec3 glass_color : source_color = vec3(0.14, 0.17, 0.21);
@@ -24,6 +26,14 @@ uniform sampler2D gravel_col : source_color, filter_linear_mipmap_anisotropic, r
 uniform sampler2D gravel_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 instance uniform float tint = 0.0;     // -1..1, per-building brightness/hue shift
 instance uniform float seed = 0.0;
+instance uniform float style = 0.0;
+instance uniform vec4 paint : source_color = vec4(0.85, 0.82, 0.74, 1.0);   // house / warehouse colour
+uniform sampler2D siding_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D siding_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D metal_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D metal_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D barn_col : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D barn_nrm : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 
 varying vec3 wpos;
 varying vec3 wnorm;
@@ -44,8 +54,105 @@ void vertex() {
 	wnorm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
 }
 
+// Small buildings outside the city: houses, warehouses and barns.
+void small_building(vec3 n, out vec3 col, out float rough, out float metal, out vec3 emit, out vec3 nmap) {
+	bool x_face = n.x > n.z;
+	float u = x_face ? wpos.z : wpos.x;
+	float y = wpos.y;
+	float face_id = (x_face ? sign(wnorm.x) * 3.0 : sign(wnorm.z) * 7.0) + seed * 17.0;
+	vec2 tuv = vec2(u, -y);
+	col = paint.rgb;
+	rough = 0.8;
+	metal = 0.0;
+	emit = vec3(0.0);
+	nmap = vec3(0.5, 0.5, 1.0);
+	if (style < 1.5) {
+		// house: clapboard siding painted, windows every 3.4 m on each floor, a door on the ground floor
+		col = texture(siding_col, tuv / 2.5).rgb * paint.rgb * 1.25;
+		nmap = texture(siding_nrm, tuv / 2.5).rgb;
+		vec2 cell = vec2(u / 3.4, (y - 0.15) / 3.0);
+		vec2 f = fract(cell);
+		float h = hash(floor(cell) + vec2(face_id, face_id * 0.37));
+		float win = step(0.3, f.x) * step(f.x, 0.7) * step(0.3, f.y) * step(f.y, 0.78);
+		float trim = step(0.25, f.x) * step(f.x, 0.75) * step(0.25, f.y) * step(f.y, 0.83) - win;
+		bool ground = y < 3.0;
+		float door = (ground && h < 0.22) ? step(0.32, f.x) * step(f.x, 0.68) * step(f.y, 0.75) : 0.0;
+		if (door > 0.5) {
+			col = mix(vec3(0.25, 0.12, 0.08), vec3(0.12, 0.18, 0.3), step(0.5, fract(seed * 13.0)));
+			nmap = vec3(0.5, 0.5, 1.0);
+		} else if (win > 0.5) {
+			col = glass_color * 0.9;
+			rough = 0.08;
+			metal = 0.4;
+			nmap = vec3(0.5, 0.5, 1.0);
+			if (h < 0.35) {
+				emit = lit_color * (0.04 + night * 0.7);
+			}
+		} else if (trim > 0.5) {
+			col = vec3(0.9, 0.89, 0.85);
+			nmap = vec3(0.5, 0.5, 1.0);
+		}
+		// a darker foundation strip
+		col = mix(col, vec3(0.35, 0.34, 0.32), step(y, 0.55));
+	} else if (style < 2.5) {
+		// warehouse: corrugated metal (ribs run up the wall), roll-up doors, a high window strip
+		vec2 muv = vec2(-y, u) / 3.0;
+		col = texture(metal_col, muv).rgb * paint.rgb * 1.3;
+		nmap = texture(metal_nrm, muv).rgb;
+		metal = 0.35;
+		rough = 0.55;
+		float bay = fract(u / 12.0);
+		float roll = step(0.33, bay) * step(bay, 0.67) * step(y, 4.8) * step(0.5, hash(vec2(floor(u / 12.0), face_id)));
+		if (roll > 0.5) {
+			col = vec3(0.55, 0.56, 0.55) * (0.8 + 0.2 * step(0.5, fract(y * 3.0)));
+			metal = 0.5;
+		}
+		float wstrip = step(0.5, fract(u / 2.0)) ;
+		// clerestory windows a little below the roof line (roof height comes from the box: use 8 m+)
+		if (y > 6.2 && y < 7.4 && wstrip > 0.5) {
+			col = glass_color;
+			rough = 0.1;
+			emit = lit_color * night * 0.35 * step(0.6, hash(vec2(floor(u / 2.0), face_id)));
+			nmap = vec3(0.5, 0.5, 1.0);
+		}
+		col = mix(col, vec3(0.3, 0.3, 0.3), step(y, 0.4));
+	} else {
+		// barn: red planks running up the wall, white trim, a big double door
+		vec2 buv = vec2(-y, u) / 3.0;
+		col = texture(barn_col, buv).rgb * vec3(1.55, 0.75, 0.62) * paint.rgb;
+		nmap = texture(barn_nrm, buv).rgb;
+		float door_w = 4.5;
+		float centre = abs(fract(u / 30.0) - 0.5) * 30.0;
+		if (centre < door_w * 0.5 && y < 5.0) {
+			col *= 0.8;
+			// the white X on the doors
+			float dx = (centre / (door_w * 0.5));
+			float dy = y / 5.0;
+			float xline = min(abs(dx - dy), abs(dx - (1.0 - dy)));
+			if (xline < 0.06 || dy > 0.96 || dx > 0.94) {
+				col = vec3(0.92, 0.9, 0.85);
+			}
+		}
+	}
+}
+
+
 void fragment() {
 	vec3 n = abs(wnorm);
+	if (style > 0.5 && n.y < 0.5) {
+		vec3 c;
+		float r;
+		float m;
+		vec3 e;
+		vec3 nm;
+		small_building(n, c, r, m, e, nm);
+		c *= mix(1.0, 0.75, wetness * (1.0 - m));
+		ALBEDO = c;
+		NORMAL_MAP = nm;
+		ROUGHNESS = mix(r, r * 0.4, wetness);
+		METALLIC = m;
+		EMISSION = e;
+	} else {
 	vec3 base = wall_color * (1.0 + tint * 0.18);
 	base = mix(base, base * vec3(1.06, 1.0, 0.92), max(tint, 0.0));
 	vec3 col = base;
@@ -143,12 +250,20 @@ void fragment() {
 			col *= grime;
 		}
 	} else {
-		// roof: gravel with tar patches
-		vec3 gravel = texture(gravel_col, wpos.xz / 3.0).rgb;
-		nmap = texture(gravel_nrm, wpos.xz / 3.0).rgb;
-		float tar = smoothstep(0.55, 0.6, noise(wpos.xz * 0.3 + seed * 5.0));
-		col = mix(gravel * 0.62, vec3(0.06), tar * 0.8) * (1.0 + tint * 0.1);
-		rough = mix(0.95, 0.6, tar);
+		if (style > 1.5 && style < 2.5) {
+			// warehouse: a corrugated metal roof
+			col = texture(metal_col, wpos.xz / 3.0).rgb * paint.rgb * 1.1;
+			nmap = texture(metal_nrm, wpos.xz / 3.0).rgb;
+			metal = 0.4;
+			rough = 0.5;
+		} else {
+			// roof: gravel with tar patches
+			vec3 gravel = texture(gravel_col, wpos.xz / 3.0).rgb;
+			nmap = texture(gravel_nrm, wpos.xz / 3.0).rgb;
+			float tar = smoothstep(0.55, 0.6, noise(wpos.xz * 0.3 + seed * 5.0));
+			col = mix(gravel * 0.62, vec3(0.06), tar * 0.8) * (1.0 + tint * 0.1);
+			rough = mix(0.95, 0.6, tar);
+		}
 	}
 	// rain makes surfaces darker and shinier
 	col *= mix(1.0, 0.75, wetness * (1.0 - metal));
@@ -159,4 +274,5 @@ void fragment() {
 	ROUGHNESS = rough;
 	METALLIC = metal;
 	EMISSION = emit;
+	}
 }

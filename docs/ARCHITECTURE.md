@@ -48,6 +48,12 @@ only hold the node skeleton.
   hunters. State machine: IDLE, WANDER, FLEE, COWER, PATROL, SEARCH, ENGAGE, CHASE, LEAP,
   LAUNCHED, GRABBED, CONSUMED, DEAD. Uses the nav mesh for paths and thinks a few times a second
   (rarely when far away).
+- `city.gd` — builds the map on a 16x16 block grid. Each block has a district (`City.District`:
+  downtown, midtown, park, suburb, industrial, farm) from `_district_rule`; each district has its own
+  builder (`_build_block`, `_build_suburb`, `_build_industrial`, `_build_farm`, `_build_park`). Houses,
+  warehouses and barns are `building.gdshader` styles; fields use `field.gdshader`; the road shader reads a
+  one-pixel-per-block district texture for country lanes and quiet suburban streets. `is_inside_building`
+  uses a grid index (`_bgrid`).
 - `humanoid.gd` — the code-built person model and its procedural animation (still used by the player).
 - `person.gd` — a rigged Quaternius person (CC0): body, skin, hair, painted-on clothes (`shaders/person.gdshader`,
   regions tagged per vertex from the bone that moves it) and the Universal Animation Library.

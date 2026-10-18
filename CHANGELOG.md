@@ -2,6 +2,29 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.11.0] — 2026-10-19 — A bigger, varied map
+
+### New
+- **The map is four times bigger** (16 x 16 blocks, about 1 km across) and no longer the same city
+  everywhere:
+  - **Downtown** (where you start): the skyscrapers.
+  - **Midtown**: brick and concrete mid-rise blocks, with a few **parks** (lawns, paths, trees,
+    fountains).
+  - **Suburbs** (south and west): houses with gable roofs you can run across, lawns, driveways,
+    back-yard fences, garden trees and cars in the driveways. Quiet streets without crosswalks.
+  - **Industry** (east): corrugated-metal warehouses with roll-up doors, brick chimneys, container
+    stacks to climb and storage tanks. The military base has moved here.
+  - **Farmland** (north): fields of wheat, green crops, plowed soil and pasture, red barns, silos, hay
+    bales, fences, tree lines and country lanes with grass verges. Few people about.
+  - The edge of the map matches its side, and open grassland stretches beyond it.
+- New CC0 textures from ambientCG: grass, field soil, clapboard siding, barn planks, corrugated metal,
+  slate and terracotta roof tiles.
+- The big map (M) shades each district.
+
+### Changed
+- Fewer pedestrians in farmland, industry and the suburbs; traffic lights only in town.
+- Research labs are always in downtown or midtown buildings.
+
 ## [0.10.0] — 2026-10-18 — Real people
 
 ### New

@@ -94,9 +94,25 @@ func _give_all_skills() -> void:
 func _run_all() -> void:
 	# ---------------- boot
 	check("city built", Game.city.buildings.size() > 100, "%d buildings" % Game.city.buildings.size())
+	var kinds := {}
+	for c in Game.city.districts:
+		kinds[Game.city.districts[c]] = true
+	check("the map has every kind of district", kinds.size() == City.District.size(), str(kinds.keys()))
+	check("farmland north, industry east, suburbs south", Game.city.district_at(Vector3(0, 0, -400)) == City.District.FARM
+		and Game.city.district_at(Vector3(400, 0, 0)) == City.District.INDUSTRIAL
+		and Game.city.district_at(Vector3(0, 0, 400)) == City.District.SUBURB
+		and Game.city.district_at(Game.city.spawn_point) == City.District.DOWNTOWN)
 	check("navigation ready", Game.city.nav_ready)
-	var path := Game.city.nav_path(Game.city.spawn_point, Game.city.spawn_point + Vector3(120, 0, 60))
-	check("nav path around blocks", path.size() > 2, "%d points" % path.size())
+	# the navigation map is built in the background; on the big map that takes a moment
+	var path := PackedVector3Array()
+	var waited := 0.0
+	while waited < 5.0:
+		path = Game.city.nav_path(Game.city.spawn_point, Game.city.spawn_point + Vector3(120, 0, 60))
+		if path.size() > 2:
+			break
+		await get_tree().physics_frame
+		waited += get_physics_process_delta_time()
+	check("nav path around blocks", path.size() > 2, "%d points after %.1f s" % [path.size(), waited])
 	await _wait(1.5)
 	check("player landed at spawn", player.state == Player.State.GROUND, "state %s" % Player.STATE_NAMES[player.state])
 	await _shot("01_spawn")

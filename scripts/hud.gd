@@ -654,8 +654,13 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.10[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.11[/color][/b]
 
+[b]A map four times bigger[/b] — downtown skyscrapers, brick midtown and parks, suburbs of houses and
+gardens to the south and west, warehouses and the military base to the east, and farmland with barns
+and silos to the north. Press M to see it.
+
+[b][color=#ff5544]0.10[/color][/b]
 [b]Real people[/b] — everyone in the city is now a rigged, animated character with a real face, hair and
 fitted gear.
 [b]Real textures[/b] — brick, concrete, asphalt and paving. Try Ultra graphics in Settings.
@@ -1514,6 +1519,18 @@ func _draw_big_map() -> void:
 	var scale := minf(vs.x, vs.y) * 0.9 / (half * 2.0)
 	var origin := vs * 0.5
 	var to2 := func(p: Vector3) -> Vector2: return origin + Vector2(p.x, p.z) * scale
+	# districts as soft colour under the buildings
+	var district_cols := [Color(0.2, 0.2, 0.24, 0.6), Color(0.22, 0.2, 0.2, 0.55), Color(0.14, 0.3, 0.14, 0.7),
+		Color(0.2, 0.26, 0.2, 0.55), Color(0.25, 0.24, 0.2, 0.55), Color(0.3, 0.28, 0.14, 0.6)]
+	var city: City = Game.city
+	for cell in city.districts:
+		var c: Vector2i = cell
+		if c.x < 0 or c.y < 0 or c.x >= city.blocks or c.y >= city.blocks:
+			continue
+		var o := Vector3(city.x0 + city.street_width + c.x * city.period, 0, city.z0 + city.street_width + c.y * city.period)
+		var q0: Vector2 = to2.call(o)
+		var q1: Vector2 = to2.call(o + Vector3(city.block_size, 0, city.block_size))
+		big_map.draw_rect(Rect2(q0, q1 - q0), district_cols[city.districts[cell]])
 	for b in Game.city.buildings:
 		var a: AABB = b["aabb"]
 		if absf(a.get_center().x) > half or absf(a.get_center().z) > half:

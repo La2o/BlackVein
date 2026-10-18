@@ -29,6 +29,10 @@ people are rigged, animated CC0 characters by Quaternius (credits in [assets/CRE
 | **Tanks** that fire shells | **Research labs** to infiltrate |
 | ![A gravel rooftop above the textured city](docs/screenshots/rooftop.jpg) | ![An infection outbreak with a glowing hive in the street](docs/screenshots/outbreak.jpg) |
 | **Rooftops** over brick and concrete | **Outbreaks** with hives to destroy |
+| ![Suburban streets with houses, lawns and gardens](docs/screenshots/suburbs.jpg) | ![Farmland with crop fields, barns and silos](docs/screenshots/farmland.jpg) |
+| **Suburbs** to the south and west | **Farmland** to the north |
+| ![Warehouses, chimneys and container yards](docs/screenshots/industrial.jpg) | ![A city park with a fountain and trees](docs/screenshots/park.jpg) |
+| **Industry** to the east, with the military base | **Parks** among midtown's brick blocks |
 
 ---
 
@@ -120,6 +124,9 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Devastators:** Groundspike and Tendril Barrage.
 - **Original powers:** Tether, Focus (bullet time), Biomass Decoy, Tendril Wings, and
   **Dominate** — brand enemies so they follow you and fight for you.
+- **A big, varied map** (about 1 km across): a skyscraper downtown, brick midtown with parks, suburbs
+  of houses and gardens, an industrial east with warehouses and the military base, and farmland to
+  the north with fields, barns, silos and country lanes.
 - **Living city:** civilians, soldiers, rocket teams, grenadiers, heavy gunners, elite strike teams,
   infected, hunters, tanks, trucks and gunships, plus a day/night cycle (the infected come out at
   night).
