@@ -48,6 +48,8 @@ var death_panel: Control
 var title_card: Control
 var settings_panel: PanelContainer
 var rebind_panel: PanelContainer
+var ach_panel: PanelContainer
+var _ach_text: RichTextLabel
 var _rebind_buttons := {}
 var _rebinding := ""
 var combo_label: Label
@@ -89,6 +91,7 @@ func _ready() -> void:
 	_build_title()
 	_build_settings()
 	_build_extras()
+	_build_achievements()
 	Game.notify.connect(_on_notify)
 	Game.event_feed.connect(_on_feed)
 	Game.alert_changed.connect(_on_alert_changed)
@@ -354,8 +357,8 @@ func _menu_button(text: String, cb: Callable) -> Button:
 func _build_pause() -> void:
 	pause_menu = PanelContainer.new()
 	pause_menu.add_theme_stylebox_override("panel", _panel_style())
-	pause_menu.set_anchors_preset(Control.PRESET_CENTER)
-	pause_menu.position = Vector2(-170, -200)
+	pause_menu.set_anchors_preset(Control.PRESET_CENTER_LEFT)
+	pause_menu.position = Vector2(70, -330)
 	pause_menu.visible = false
 	root.add_child(pause_menu)
 	var v := VBoxContainer.new()
@@ -379,6 +382,9 @@ func _build_pause() -> void:
 	v.add_child(_menu_button("Settings", func():
 		pause_menu.visible = false
 		open_settings()))
+	v.add_child(_menu_button("Achievements & memories", func():
+		ach_panel.visible = not ach_panel.visible
+		_refresh_achievements()))
 	var new_btn := _menu_button("New game (erase save)", func(): pass)
 	new_btn.pressed.connect(func():
 		if new_btn.text.begins_with("Sure"):
@@ -597,6 +603,46 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
+func _build_achievements() -> void:
+	ach_panel = PanelContainer.new()
+	ach_panel.add_theme_stylebox_override("panel", _panel_style(0.94))
+	ach_panel.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	ach_panel.position = Vector2(-560, -330)
+	ach_panel.custom_minimum_size = Vector2(520, 660)
+	ach_panel.visible = false
+	root.add_child(ach_panel)
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(500, 640)
+	ach_panel.add_child(scroll)
+	_ach_text = RichTextLabel.new()
+	_ach_text.bbcode_enabled = true
+	_ach_text.fit_content = true
+	_ach_text.custom_minimum_size = Vector2(480, 0)
+	_ach_text.add_theme_font_size_override("normal_font_size", 15)
+	scroll.add_child(_ach_text)
+
+
+func _refresh_achievements() -> void:
+	var lines: Array[String] = ["[b][color=#ff5544]ACHIEVEMENTS[/color][/b]\n"]
+	var got := 0
+	for a in Game.ACHIEVEMENTS:
+		var done := Game.has_achievement(a[0])
+		if done:
+			got += 1
+		var prog := mini(Game.achievement_progress(a[3]), int(a[4]))
+		var mark := "[color=#ffd84d]★[/color]" if done else "[color=#666666]☆[/color]"
+		var count := "" if done or int(a[4]) <= 1 else "  %d/%d" % [prog, int(a[4])]
+		lines.append("%s [b]%s[/b]  [color=#aaaaaa]%s%s[/color]" % [mark, a[1], a[2], count])
+	lines[0] = "[b][color=#ff5544]ACHIEVEMENTS  %d/%d[/color][/b]\n" % [got, Game.ACHIEVEMENTS.size()]
+	var mems: Array = Game.stats.get("memory_log", [])
+	lines.append("\n[b][color=#99ccff]MEMORIES  %d[/color][/b]" % mems.size())
+	if mems.is_empty():
+		lines.append("[color=#aaaaaa]Consume scientists and commanders to absorb their memories.[/color]")
+	for m in mems:
+		lines.append("[color=#cfe0ff]• %s[/color]" % str(m).replace("Memory absorbed: ", ""))
+	_ach_text.text = "\n".join(lines)
+
+
 func _build_rebind() -> void:
 	rebind_panel = PanelContainer.new()
 	rebind_panel.add_theme_stylebox_override("panel", _panel_style(0.95))
@@ -713,6 +759,7 @@ func toggle_pause(on: bool) -> void:
 	if not on:
 		help_panel.visible = false
 		big_map.visible = false
+		ach_panel.visible = false
 	get_tree().paused = on or evolve_menu.visible
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if get_tree().paused else Input.MOUSE_MODE_CAPTURED
 	if on:

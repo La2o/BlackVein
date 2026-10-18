@@ -40,7 +40,7 @@ func _ready() -> void:
 	_add("form_5", [_k(KEY_5)])
 	_add("form_6", [_k(KEY_6)])
 	# Menus
-	_add("evolve_menu", [_k(KEY_U), _k(KEY_TAB), _jb(JOY_BUTTON_BACK)])
+	_add("evolve_menu", [_k(KEY_TAB), _k(KEY_U), _jb(JOY_BUTTON_BACK)])
 	_add("map", [_k(KEY_M)])
 	_add("pause", [_k(KEY_ESCAPE), _jb(JOY_BUTTON_START)])
 	_add("toggle_help", [_k(KEY_F1), _k(KEY_H)])

@@ -11,15 +11,16 @@ CHANGELOG.md when done.
 - [x] Weather: rain and fog banks. (0.2.0)
 - [x] Settings menu: mouse sensitivity, invert Y, volume, graphics quality. (0.2.0)
 - [ ] More bases spread around a bigger map.
-- [ ] Infected zones that visibly spread and can be cleansed.
-- [ ] Key rebinding in the settings menu.
+- [x] Infected ground around hives. (0.3.0) Next: zones that grow over time.
+- [x] Key rebinding in the settings menu. (0.3.0)
 
 ## Later
 - [ ] Story missions built from the High-Value Target memories.
-- [ ] More forms: tendril wings for flight, a ranged spike shot.
+- [x] Tendril wings. (0.3.0)
+- [ ] A ranged form (bone spike shot).
 - [ ] Infected zones that visibly spread across the map over time.
-- [ ] Achievements and a stats screen.
-- [ ] Windows/Linux exports published on GitHub Releases.
+- [x] Achievements and a stats screen. (0.3.0)
+- [x] Windows/Linux exports via the release workflow. (0.3.0)
 
 ## Ideas parking lot
 - Co-op?

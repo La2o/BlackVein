@@ -1,0 +1,50 @@
+name: Release builds
+
+# Push a tag like v0.3.0 (or run it by hand from the Actions tab) to build
+# Windows and Linux versions and attach them to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot 4.5 and export templates
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5-stable/Godot_v4.5-stable_linux.x86_64.zip
+          unzip -q Godot_v4.5-stable_linux.x86_64.zip && mv Godot_v4.5-stable_linux.x86_64 godot && chmod +x godot
+          wget -q https://github.com/godotengine/godot/releases/download/4.5-stable/Godot_v4.5-stable_export_templates.tpz
+          mkdir -p ~/.local/share/godot/export_templates/4.5.stable
+          unzip -q -j Godot_v4.5-stable_export_templates.tpz templates/windows_release_x86_64.exe templates/linux_release.x86_64 templates/version.txt \
+            -d ~/.local/share/godot/export_templates/4.5.stable
+          rm Godot_v4.5-stable_export_templates.tpz
+
+      - name: Import project
+        run: ./godot --headless --path . --import || true
+
+      - name: Export
+        run: |
+          mkdir -p export/windows export/linux
+          ./godot --headless --path . --export-release "Windows Desktop" export/windows/BLACKVEIN.exe
+          ./godot --headless --path . --export-release "Linux" export/linux/BLACKVEIN.x86_64
+          cd export/windows && zip -q ../BLACKVEIN-windows.zip BLACKVEIN.exe && cd ../..
+          cd export/linux && zip -q ../BLACKVEIN-linux.zip BLACKVEIN.x86_64 && cd ../..
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BLACKVEIN-builds
+          path: export/*.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: export/*.zip

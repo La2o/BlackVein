@@ -100,6 +100,8 @@ func take_hit(info: Dictionary) -> void:
 
 func _destroy(src: Node) -> void:
 	destroyed = true
+	if src == Game.player:
+		Game.stat_add("hives")
 	Game.explode(global_position + Vector3.UP * 1.5, 10.0, 60.0, self, 20.0)
 	for k in 4:
 		Game.fx.splat(global_position + Vector3.UP * 2.0, Vector3(randf() - 0.5, 1, randf() - 0.5), Color(0.4, 0.03, 0.03), 30)

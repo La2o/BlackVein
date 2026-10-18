@@ -12,7 +12,13 @@ There are no downloaded art or audio assets.
 
 ---
 
-## Play it (Windows, Mac or Linux)
+## Play it
+
+**Easiest (Windows):** download `BLACKVEIN-windows.zip` from the Releases page (or the build you
+were sent), unzip it, and double-click `BLACKVEIN.exe`. If Windows SmartScreen warns you, click
+**More info → Run anyway** (the game isn't code-signed).
+
+**From the source (Windows, Mac or Linux):**
 
 1. Download **Godot 4.5** (standard version, not .NET) from <https://godotengine.org/download>.
    It's a single file — no installer, no account.
@@ -76,7 +82,8 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md)
 - **Bosses:** the Leviathan and the Juggernaut super-tank.
 - **Military base** to raid in disguise, with a commander whose memories unlock artillery strikes.
 - **Traffic and weather:** cars that drive (and crash), rain storms and fog.
-- **Combo meter**, starter goals, a stats screen and a settings menu.
+- **Combo meter**, starter goals, 19 achievements, a memories log, a stats screen,
+  a settings menu with key rebinding, and adaptive music.
 - **Progression:** XP from kills, consumes and events → levels → skill points → a skill tree
   of 23 powers and upgrades. Start weak, grind, get monstrous.
 - **Save files:** automatic saves every 45 seconds, on level up, and when you quit.
@@ -89,6 +96,7 @@ scenes/             main.tscn (the game) and player.tscn
 scripts/            all game code (one file per system, see docs/ARCHITECTURE.md)
 shaders/            buildings, roads, screen effects
 sfx/                generated sound effects (rebuild with tools/make_sounds.py)
+music/              generated music loops (rebuild with tools/make_music.py)
 tests/              automated play-through test (85+ checks)
 tools/              helper scripts
 docs/               architecture, controls, roadmap
@@ -103,6 +111,12 @@ godot --headless --path . res://tests/test_runner.tscn
 It plays through movement, combat, every power, vehicles, all world events, leveling and saving,
 then prints PASS/FAIL for each check. GitHub runs it automatically on every push
 (see `.github/workflows/tests.yml`).
+
+## Making a build yourself
+
+In Godot: **Project → Export**, pick *Windows Desktop* or *Linux*, then **Export Project**
+(the first time, Godot offers to download its export templates). Or push a tag like `v0.3.0`
+to GitHub and the release workflow builds both for you.
 
 ## License
 

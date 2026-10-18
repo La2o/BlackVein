@@ -50,6 +50,18 @@ func _ready() -> void:
 	jug.queue_free()
 	Game.director.active_events.clear()
 
+	# outbreak hive with infected ground
+	Game.director.start_random_event("outbreak")
+	await _wait(0.3)
+	var hive: Node3D = get_tree().get_nodes_in_group("hives")[0]
+	hive.global_position = sp + Vector3(0, 0, -24)
+	player.pitch = -0.35
+	await _wait(1.0)
+	await _shot("outbreak")
+	hive.queue_free()
+	Game.director.active_events.clear()
+	player.pitch = 0.05
+
 	# traffic and crowd
 	for k in 8:
 		Game.director._maintain_population()
@@ -90,6 +102,14 @@ func _ready() -> void:
 	Game.hud.help_panel.visible = true
 	await _wait(0.2)
 	await _shot("menu_controls")
+	Game.hud.help_panel.visible = false
+	Game.stat_add("consumes")
+	await _wait(1.0)
+	Game.hud.toggle_pause(true)
+	Game.hud.ach_panel.visible = true
+	Game.hud._refresh_achievements()
+	await _wait(0.2)
+	await _shot("menu_pause_achievements")
 	Game.delete_save()
 	get_tree().quit()
 

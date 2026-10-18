@@ -69,6 +69,7 @@ var charging := false
 var charge := 0.0
 var double_jump_ready := true
 var flaps_left := 0
+var _glide_accum := 0.0
 var dash_ready := true
 var air_press := false
 var wall_normal := Vector3.ZERO
@@ -249,6 +250,13 @@ func _physics_process(delta: float) -> void:
 func _update_stats(delta: float) -> void:
 	if state == State.DEAD:
 		return
+	if global_position.y > 100.0 and is_on_floor():
+		Game.stat_max("max_height", int(global_position.y))
+	if state == State.GLIDE:
+		_glide_accum += delta
+		if _glide_accum >= 1.0:
+			_glide_accum -= 1.0
+			Game.stat_add("glide_seconds")
 	time_since_damage += delta
 	if time_since_damage > 4.0 and health < max_health * regen_cap:
 		health = minf(max_health * regen_cap, health + regen_rate * delta)

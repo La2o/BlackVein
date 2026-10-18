@@ -134,6 +134,8 @@ func can_hijack(by: Node) -> bool:
 
 func hijack(by: Node) -> void:
 	pilot = by
+	if by == Game.player:
+		Game.stat_add("hijack_heli")
 	remove_from_group("military")
 	add_to_group("player_vehicle")
 	_yaw = rotation.y

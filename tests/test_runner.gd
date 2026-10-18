@@ -537,6 +537,11 @@ func _run_all() -> void:
 	check("goals complete and advance", Game.goal_index >= 1, "goal %d" % Game.goal_index)
 	Game.goal_index = maxi(gi, Game.goal_index)
 
+	# ---------------- achievements
+	Game.stat_add("consumes")
+	await _wait(1.2)
+	check("achievements unlock", Game.has_achievement("first_taste"))
+
 	# ---------------- save and load
 	var lvl := Game.level
 	Game.save_game()

@@ -2,6 +2,32 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.3.0] — 2026-10-18 — Music, achievements and a Windows build
+
+### New
+- **Ready-to-play Windows build** (`BLACKVEIN.exe`) — no Godot needed. A Linux build too.
+- **Music** that reacts to the action: a dark ambient score while you roam, a driving combat
+  track when things kick off, and a heavier boss theme. All synthesized by `tools/make_music.py`.
+  Music volume slider in Settings.
+- **Achievements** (19 of them, each worth 100 XP) and a **memories log** of everything you've
+  absorbed from scientists and commanders. Both in the pause menu.
+- **Tendril Wings** (new skill, level 15, 3 ranks): while gliding, press jump to flap upward.
+- **Infected ground** spreads in a pulsing web around every hive.
+- **Key rebinding**: Settings → Change keys. Prompts on screen follow your new keys.
+- **Release workflow**: push a version tag on GitHub and it builds Windows and Linux versions
+  and attaches them to a release.
+
+### Fixed
+- A Biomass Decoy caught in its own explosion could chain-explode forever and freeze the game.
+- Timers no longer reference people or cars that were already gone (fewer hidden errors).
+- The city stops spawning extra people when it's very crowded, and bodies clear faster then,
+  so long play sessions stay smooth.
+- Looping sounds and music loop properly.
+- The skills key shows as Tab on screen; the pause menu no longer covers the achievements list.
+
+### Tests
+- 89 automated checks plus a 5-minute "bot mashes every button" soak test (`tests/soak.tscn`).
+
 ## [0.2.0] — 2026-10-18 — Bosses, base raids and a living city
 
 ### New

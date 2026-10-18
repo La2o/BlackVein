@@ -51,6 +51,29 @@ var stats := {}             # counters: consumes, wall_runs, events, tanks, boss
 var goal_index := 0
 var _goal_timer := 0.0
 
+## Achievements: [id, name, description, stat or special key, target]
+const ACHIEVEMENTS := [
+	["first_taste", "First Taste", "Consume someone", "consumes", 1],
+	["skyscraper", "Skyscraper Sprint", "Climb higher than 120 m", "max_height", 120],
+	["hang_time", "Hang Time", "Glide for 60 seconds in total", "glide_seconds", 60],
+	["wrecking_ball", "Wrecking Ball", "Blow up 15 cars", "cars", 15],
+	["tank_thief", "Tank Thief", "Hijack a tank", "hijack_tank", 1],
+	["air_pirate", "Air Pirate", "Hijack a gunship", "hijack_heli", 1],
+	["ghost", "Ghost", "Lose the military by changing disguise 5 times", "disguise_escapes", 5],
+	["massacre", "Massacre", "Reach a x40 combo", "best_combo", 40],
+	["savage", "SAVAGE", "Reach a x60 combo", "best_combo", 60],
+	["exterminator", "Exterminator", "Kill 150 infected", "kills_infected", 150],
+	["army", "One-Person Army", "Take down 150 soldiers", "kills_military", 150],
+	["hive_mind", "Hive Breaker", "Destroy 5 hives", "hives", 5],
+	["leviathan", "Leviathan Slayer", "Kill the Leviathan", "leviathan", 1],
+	["juggernaut", "Scrap Metal", "Destroy the Juggernaut", "juggernaut", 1],
+	["mind_reader", "Mind Reader", "Absorb 5 memories", "memories", 5],
+	["base_raider", "Base Raider", "Consume a base commander", "flag:artillery_codes", 1],
+	["max_heat", "Most Wanted", "Reach the highest military alert", "max_heat", 5],
+	["events", "Busy Night", "Complete 25 world events", "events", 25],
+	["evolved", "Apex", "Reach level 50", "level", 50],
+]
+
 ## Starter goals that teach the game and pay XP. [stat or check, target, text, xp]
 const GOALS := [
 	["wall_runs", 1, "Sprint into a building to run up it", 40],
@@ -155,6 +178,7 @@ func _process(delta: float) -> void:
 	if _goal_timer <= 0.0:
 		_goal_timer = 0.5
 		_check_goal()
+		_check_achievements()
 		npc_count = get_tree().get_nodes_in_group("npcs").size()
 	if combo > 0:
 		combo_timer -= real_delta
@@ -218,6 +242,40 @@ func _goal_progress(g: Array) -> int:
 	if key.begins_with("flag:"):
 		return 1 if flags.get(key.substr(5), false) else 0
 	return stat(key)
+
+
+func achievement_progress(id_key: String) -> int:
+	match id_key:
+		"best_combo": return best_combo
+		"kills_infected": return int(kills.get("infected", 0))
+		"kills_military": return int(kills.get("military", 0))
+		"level": return level
+	if id_key.begins_with("flag:"):
+		return 1 if flags.get(id_key.substr(5), false) else 0
+	return stat(id_key)
+
+
+func has_achievement(id: String) -> bool:
+	return flags.get("ach_" + id, false)
+
+
+func _check_achievements() -> void:
+	for a in ACHIEVEMENTS:
+		if has_achievement(a[0]):
+			continue
+		if achievement_progress(a[3]) >= int(a[4]):
+			flags["ach_" + a[0]] = true
+			say("ACHIEVEMENT: " + str(a[1]), Color(1, 0.85, 0.3))
+			feed("Achievement unlocked: %s — %s" % [a[1], a[2]], Color(1, 0.85, 0.3))
+			add_xp(100, "")
+			if fx:
+				fx.sound_ui("evolve", 0.0)
+			return
+
+
+func stat_max(key: String, value: int) -> void:
+	if value > stat(key):
+		stats[key] = value
 
 
 func current_goal_text() -> String:
@@ -499,6 +557,7 @@ func add_heat(amount: float) -> void:
 	if alert_level == Alert.ALERT:
 		var before := int(heat)
 		heat = minf(max_heat(), heat + amount)
+		stat_max("max_heat", int(heat))
 		if int(heat) > before:
 			feed("Military response increased", Color(1, 0.45, 0.35))
 
@@ -517,6 +576,7 @@ func set_alert(level: int) -> void:
 ## Changing disguise while nobody is looking makes the military lose you.
 func disguise_changed_unseen() -> void:
 	if alert_level != Alert.HIDDEN and time_since_seen > 0.6:
+		stat_add("disguise_escapes")
 		set_alert(Alert.HIDDEN)
 		heat = maxf(0.0, heat - 1.5)
 		say("Disguise changed. They lost you.", Color(0.6, 0.9, 1))

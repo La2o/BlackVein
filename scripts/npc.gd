@@ -389,6 +389,7 @@ func _die(info: Dictionary) -> void:
 				Game.add_xp(150 if kind == "hunter" else (900 if kind == "leviathan" else 5))
 				if kind == "leviathan":
 					Game.say("THE LEVIATHAN IS DEAD", Color(1, 0.85, 0.3))
+					Game.stat_add("leviathan")
 				if kind == "hunter":
 					Game.feed("Hunter killed", Color(0.7, 1, 0.6))
 			"civilian":

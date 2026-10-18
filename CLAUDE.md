@@ -65,9 +65,28 @@ See `docs/ARCHITECTURE.md` for the full map. Short version:
 | Settings | `scripts/settings.gd` (autoload) |
 | Goals, combos, stats | `scripts/game.gd` |
 
+## Audio notes
+
+- Sounds: `tools/make_sounds.py` → `sfx/`. Music: `tools/make_music.py` → `music/`.
+- Looping (music, rain, helicopter, hive) is set in each file's `.import` (`edit/loop_mode=2`).
+  WAVs import as QOA-compressed, so never compute loop points from `data.size()`.
+
+## Exporting
+
+Templates live in `~/.local/share/godot/export_templates/4.5.stable/` (only
+`windows_release_x86_64.exe`, `linux_release.x86_64`, `version.txt` are needed; extract them from
+`Godot_v4.5-stable_export_templates.tpz` on the godotengine/godot GitHub release).
+```
+godot --headless --path . --export-release "Windows Desktop" export/windows/BLACKVEIN.exe
+godot --headless --path . --export-release "Linux" export/linux/BLACKVEIN.x86_64
+```
+The PCK is embedded, so each build is a single file. Smoke-test the Linux one with
+`export/linux/BLACKVEIN.x86_64 --headless --quit-after 400`.
+
 ## Release checklist
 
 1. Tests pass (0 failed).
 2. CHANGELOG.md has a new entry.
 3. Bump `config/version` in project.godot if it's a release.
-4. Zip the folder without `.godot/` (the `.gitignore` already excludes it).
+4. Run the soak test: `godot --headless --path . res://tests/soak.tscn -- seconds=300` — no SCRIPT ERRORs.
+5. Export Windows + Linux, zip the source without `.godot/` and `export/`.

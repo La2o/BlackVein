@@ -172,6 +172,8 @@ func take_hit(info: Dictionary) -> void:
 
 func explode() -> void:
 	wrecked = true
+	if thrown_by == Game.player:
+		Game.stat_add("cars")
 	hp = 0.0
 	_body_mesh.material_override = _get_shared()["burnt"]
 	_cabin_mesh.material_override = _get_shared()["burnt"]

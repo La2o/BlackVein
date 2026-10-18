@@ -828,6 +828,11 @@ func _finish_consume() -> void:
 		Game.disguise_changed_unseen()
 	if info.get("memory", "") != "":
 		Game.say(info["memory"], Color(0.8, 0.9, 1.0))
+		Game.stat_add("memories")
+		var mem_list: Array = Game.stats.get("memory_log", [])
+		if not mem_list.has(info["memory"]):
+			mem_list.append(info["memory"])
+		Game.stats["memory_log"] = mem_list
 
 
 func _witnessed(pos: Vector3) -> bool:
