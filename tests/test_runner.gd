@@ -561,13 +561,22 @@ func _run_all() -> void:
 	await _tap("decoy")
 	check("decoy while holding someone plants a bio-bomb", is_instance_valid(bomb) and bomb.bio_bomb_timer > 0.0)
 	player.powers.drop_held()   # drop them among the soldiers
-	bomb.global_position = player.global_position + Vector3(0, 0.5, -11)
-	await _wait(2.2)
+	await get_tree().physics_frame
+	bomb.velocity = Vector3.ZERO
+	bomb.global_position = bystanders[1].global_position + Vector3(0, 0.5, 1.0)
+	var bomb_at: Vector3 = bomb.global_position
+	while is_instance_valid(bomb):
+		bomb_at = bomb.global_position
+		await get_tree().physics_frame
+	await _wait(0.3)
 	var hurt := 0
 	for b in bystanders:
 		if not is_instance_valid(b) or b.hp < b.max_hp:
 			hurt += 1
-	check("the bio-bomb bursts and hurts everyone near it", not is_instance_valid(bomb) and hurt >= 2, "%d hurt" % hurt)
+	var where := ""
+	for b in bystanders:
+		where += (" %.1f/%.0f" % [b.global_position.distance_to(bomb_at), b.hp]) if is_instance_valid(b) else " gone"
+	check("the bio-bomb bursts and hurts everyone near it", not is_instance_valid(bomb) and hurt >= 2, "%d hurt:%s" % [hurt, where])
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)
 	player.health = player.max_health
@@ -1264,6 +1273,22 @@ func _run_all() -> void:
 	check("people go limp (ragdoll) when they die", is_instance_valid(victim) and victim.model.ragdolling
 		and victim.model.skeleton.get_child_count() > 0,
 		"valid %s" % is_instance_valid(victim) if not is_instance_valid(victim) else "ragdoll %s, state %d, hp %.0f, model %d" % [victim.model.ragdolling, victim.state, victim.hp, victim.model.get_instance_id()])
+
+	# ---------------- time trials (fixed rooftop courses)
+	var races: Node = Game.get_meta("races")
+	check("4 time trials with courses over the roofs", races.starts.size() == 4 and races.courses[0].size() >= 6,
+		"%d races, %d rings" % [races.starts.size(), races.courses[0].size() if races.courses.size() > 0 else 0])
+	player.velocity = Vector3.ZERO
+	player.global_position = races.starts[0] + Vector3.UP * 1.0
+	await _wait(0.3)
+	check("walking into a beacon starts a time trial", races.active == 0)
+	await _wait(3.2)
+	for ring in races.courses[0]:
+		player.global_position = ring
+		player.velocity = Vector3.ZERO
+		await _wait(0.15)
+	check("flying through every ring finishes it and saves a best time", races.active == -1 and races.best_time(0) > 0.0,
+		"best %.2f" % races.best_time(0))
 
 	# ---------------- viral caches (collectibles)
 	var cache_node: Node = Game.get_meta("collectibles")

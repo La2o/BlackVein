@@ -130,13 +130,13 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
   grenade launchers and rocket launchers that lock onto tanks and gunships.
 - **Hijack** tanks and gunships.
 - **Devastators:** Groundspike and Tendril Barrage.
-- **Original powers:** Tether, Focus (bullet time), Biomass Decoy, Tendril Wings, and
-  **Dominate** — brand enemies so they follow you and fight for you.
+- **Original powers:** Tether, Focus (bullet time), Biomass Decoy, **Bio-Bomb** (plant one in
+  someone and throw them), Tendril Wings, and **Dominate** — brand enemies so they follow you and fight for you.
 - **A big, varied map** (about 1 km across): a skyscraper downtown, brick midtown with parks, suburbs
   of houses and gardens, an industrial east with warehouses and the military base, and farmland to
   the north with fields, barns, silos and country lanes.
-- **Living city:** civilians, soldiers, rocket teams, grenadiers, heavy gunners, elite strike teams,
-  infected, hunters, tanks, trucks and gunships, plus a day/night cycle (the infected come out at
+- **Living city:** civilians, soldiers, rocket teams, grenadiers, heavy gunners, riot troopers with
+  shields, rooftop snipers, elite strike teams, infected, brutes, hunters, tanks, trucks and gunships, plus a day/night cycle (the infected come out at
   night).
 - **Military alert system:** hidden → suspicious → alert → searching, with escalating heat
   (more soldiers, tanks, gunships, airstrikes).
@@ -152,10 +152,12 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Traffic and weather:** cars that drive (and crash), rain storms and fog.
 - **60 viral caches** hidden on rooftops, barns, silos and in parks: XP, biomass and a skill point
   for every ten.
-- **Combo meter**, starter goals, 20 achievements, a memories log, a stats screen,
+- **Time trials:** four rooftop courses with par times and saved best times.
+- **Ragdolls:** the dead go limp and tumble.
+- **Combo meter**, starter goals, 21 achievements, a memories log, a stats screen,
   a settings menu with key rebinding, and adaptive music.
 - **Progression:** XP from kills, consumes and events → levels → skill points → a skill tree
-  of 25 powers and upgrades. Start weak, grind, get monstrous.
+  of 26 powers and upgrades. Start weak, grind, get monstrous.
 - **Save files:** automatic saves every 45 seconds, on level up, and when you quit.
 
 ## Project layout

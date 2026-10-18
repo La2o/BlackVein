@@ -660,7 +660,15 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.12[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.13[/color][/b]
+
+[b]Ragdolls[/b] — the dead go limp and tumble.
+[b]New enemies[/b] — riot troopers with shields (flank them or smash the shield), rooftop snipers with
+red lasers (break line of sight!) and hulking brute infected.
+[b]Bio-Bomb[/b] — grab someone, press Decoy, throw them.
+[b]Time trials[/b] — four blue beacons (on the map, M) start rooftop courses. Beat par and your best time.
+
+[b][color=#ff5544]0.12[/color][/b]
 
 [b]Creature forms[/b] — become the Brute, the Stalker or the flying Wraith (learn them in Skills,
 then press N / hold LB + D-pad Down). They burn biomass.
@@ -1571,6 +1579,14 @@ func _draw_big_map() -> void:
 			var ep: Vector2 = to2.call(e["pos"])
 			big_map.draw_rect(Rect2(ep - Vector2(6, 6), Vector2(12, 12)), e["color"])
 			big_map.draw_string(font, ep + Vector2(10, 18), str(e["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, e["color"])
+	if Game.has_meta("races"):
+		var tr: Node = Game.get_meta("races")
+		for r in tr.starts.size():
+			var sp: Vector2 = to2.call(tr.starts[r])
+			var best: float = tr.best_time(r)
+			big_map.draw_circle(sp, 6.0, Color(0.3, 0.85, 1.0))
+			big_map.draw_string(font, sp + Vector2(9, 5), "TRIAL %d%s" % [r + 1, ("  " + tr._fmt(best)) if best > 0.0 else ""],
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.3, 0.85, 1.0))
 	if Game.director:
 		for e in Game.director.active_events:
 			var p: Vector2 = to2.call(e["pos"])

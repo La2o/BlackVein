@@ -15,6 +15,9 @@ All notable changes to BLACKVEIN. Newest first.
   have one guarding the hive.
 - **Bio-Bomb** (Abilities, level 13, needs Decoy): grab someone and press Decoy to fill them with
   unstable biomass, then throw them. They burst on impact, or 1.6 s later, in a big explosion.
+- **Time trials**: four fixed rooftop courses, started by blue light beacons in the street (marked on
+  the map). Rings show the way, with a par time and your best time saved. XP for finishing and for
+  beating par. New achievement: Roof Runner (finish all four).
 - Riot trooper and sniper disguises get the same access as soldiers.
 
 ### Fixed

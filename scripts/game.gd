@@ -75,6 +75,7 @@ var _goal_timer := 0.0
 const ACHIEVEMENTS := [
 	["first_taste", "First Taste", "Consume someone", "consumes", 1],
 	["hoarder", "Hoarder", "Find 30 viral caches", "caches", 30],
+	["trials", "Roof Runner", "Finish all 4 time trials", "trials", 4],
 	["skyscraper", "Skyscraper Sprint", "Climb higher than 120 m", "max_height", 120],
 	["hang_time", "Hang Time", "Glide for 60 seconds in total", "glide_seconds", 60],
 	["wrecking_ball", "Wrecking Ball", "Blow up 15 cars", "cars", 15],

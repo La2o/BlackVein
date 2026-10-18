@@ -36,6 +36,12 @@ func _ready() -> void:
 	caches.set_script(load("res://scripts/collectibles.gd"))
 	add_child(caches)
 	Game.set_meta("collectibles", caches)
+	var races := Node3D.new()
+	races.name = "Races"
+	races.set_script(load("res://scripts/races.gd"))
+	add_child(races)
+	races.setup(city)
+	Game.set_meta("races", races)
 	player.set_spawn(city.spawn_point, city.spawn_yaw)
 	daynight.setup(sun, world_env.environment)
 	weather.setup(world_env.environment)
