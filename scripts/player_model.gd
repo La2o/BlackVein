@@ -397,13 +397,59 @@ func _apply_legs() -> void:
 ## Trick poses from player.gd mapped to the closest animation (the whole-body flips, leans and tilts
 ## are still done by player.gd on top).
 func _pose_anim(pose: Dictionary) -> String:
-	if pose == Player.POSE_TUCK or pose == Player.POSE_COIL:
-		return "Crouch_Idle"
-	if pose == Player.POSE_HERO:
-		return "Fixing_Kneeling"
+	if pose == Player.POSE_TUCK or pose == Player.POSE_COIL or pose == Player.POSE_HERO:
+		return "Crouch_Idle"   # tucked for flips and rolls, coiled for a charge, crouched on a hero landing
 	if pose == Player.POSE_NINJA:
 		return "Sprint"
-	return "Jump"   # rocket, skydive, long jump, vault
+	if pose == Player.POSE_SKYDIVE:
+		return "Swim_Idle"     # arms and legs spread
+	return "Jump"   # rocket, long jump, vault
+
+
+var vertical_speed := 0.0   # set by player.gd every frame, for take-off and landing
+var _was_air := false
+var _air_time := 0.0
+
+
+## The player's own locomotion (people in the street use person_model.gd's): walk, jog and sprint
+## matched to your real speed, a take-off when you leave the ground, a landing when you touch down,
+## arms spread when gliding.
+func _player_locomotion(delta: float, speed: float, mode: String) -> void:
+	swing_timer = maxf(0.0, swing_timer - delta)
+	var airborne := mode in ["air", "glide"]
+	if airborne:
+		_air_time += delta
+	if _was_air and not airborne and _air_time > 0.35 and speed < 6.0 and mode != "dead":
+		# touched down without running on: a short landing
+		_current = ""
+		play("Jump_Land", 0.08, 1.3)
+		_oneshot_t = 0.3
+	if not airborne:
+		_air_time = 0.0
+	if _was_air != airborne and airborne and vertical_speed > 3.0 and _oneshot_t <= 0.0:
+		_current = ""
+		play("Jump_Start", 0.06, 1.8)
+		_oneshot_t = 0.16
+	_was_air = airborne
+	if _oneshot_t > 0.0:
+		_oneshot_t -= delta
+		return
+	match mode:
+		"idle":
+			play("Idle", 0.25)
+		"walk", "run":
+			if speed < 3.0:
+				play("Walk", 0.25, clampf(speed / 1.4, 0.7, 1.6))
+			elif speed < 9.5:
+				play("Jog_Fwd", 0.2, clampf(speed / 3.6, 0.8, 2.3))
+			else:
+				play("Sprint", 0.15, clampf(speed / 6.5, 1.0, 3.2))
+		"air":
+			play("Jump", 0.18)
+		"glide":
+			play("Swim_Idle", 0.3, 0.6)
+		_:
+			super.animate(delta, speed, mode)
 
 
 func animate(delta: float, speed: float, mode: String) -> void:
@@ -418,7 +464,7 @@ func animate(delta: float, speed: float, mode: String) -> void:
 	elif armed and mode in ["idle", "walk"] and _oneshot_t <= 0.0:
 		play("Pistol_Idle", 0.2)
 	else:
-		super(delta, speed, mode)
+		_player_locomotion(delta, speed, mode)
 	pose_override = {}
 	_t += delta
 	var wing_form := defense == Defense.WINGS or creature == 3

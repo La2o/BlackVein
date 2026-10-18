@@ -1281,6 +1281,7 @@ func _update_visual(delta: float) -> void:
 	model.wings_visible = Game.has_skill("wings")
 	if not pose.is_empty():
 		model.pose_override = pose
+	model.vertical_speed = velocity.y
 	model.animate(delta, anim_speed, mode)
 
 

@@ -19,6 +19,11 @@ All notable changes to BLACKVEIN. Newest first.
   NOTICED, SPOTTED, SEARCHING), arrows around the middle of the screen point at everyone noticing you,
   and those soldiers show a **?** (suspicious) or **!** (after you) over their heads.
 
+### Changed
+- **Smoother player animation:** walking, jogging and sprinting now match your real speed (the sprint
+  plays up to 3x so your feet keep up instead of sliding), jumps have a take-off and touch-downs a
+  landing, gliding and skydiving spread your arms, and superhero landings crouch instead of kneeling.
+
 ### Fixed
 - After a body change (consuming someone, changing disguise) while standing still, the new body could
   stay frozen in a T-pose until you moved.
