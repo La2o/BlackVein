@@ -24,7 +24,7 @@ All notable changes to BLACKVEIN. Newest first.
 - A killing blow that also launched someone skipped their death entirely (no ragdoll, no death events).
 - Soldiers left on rooftops could be removed as "stranded" even when they belonged there (snipers).
 
- — 2026-10-19 — Creature forms, a stealth meter and collectibles
+## [0.12.0] — 2026-10-19 — Creature forms, a stealth meter and collectibles
 
 ### New
 - **Creature forms** (new Creatures skills; N / hold LB + D-pad Down to cycle): whole-body
