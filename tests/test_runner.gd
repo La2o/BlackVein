@@ -404,15 +404,19 @@ func _run_all() -> void:
 	pw.set_vision(PlayerPowers.Vision.NORMAL)
 	await _clear_units()
 
-	# ---------------- forms wheel
+	# ---------------- forms wheel (held open like a player would; letting go picks the form)
+	Input.action_press("forms_wheel")
 	Game.hud.open_wheel()
 	await get_tree().process_frame
-	check("forms wheel opens in slow motion", Game.hud.wheel_open and Engine.time_scale < 0.2, "time %.2f" % Engine.time_scale)
+	check("forms wheel opens in slow motion", Game.hud.wheel_open and Engine.time_scale < 0.2,
+		"time %.2f open %s paused %s menu %s hitstop %.2f dead %s" % [Engine.time_scale, Game.hud.wheel_open,
+		get_tree().paused, Game.hud._any_menu_open(), Game.hit_stop_timer, player.is_dead()])
 	var wh: Control = Game.hud.wheel
 	for i in wh.entries.size():
 		if wh.entries[i]["part"] == "legs" and wh.entries[i]["index"] == PlayerPowers.Legs.LEAPER:
 			wh.hovered = i
 	wh.close_wheel(true)
+	Input.action_release("forms_wheel")
 	await get_tree().process_frame
 	check("forms wheel switches forms", pw.legs == PlayerPowers.Legs.LEAPER and not Game.hud.wheel_open and Engine.time_scale > 0.9)
 	pw.set_legs(PlayerPowers.Legs.NORMAL)
@@ -763,6 +767,7 @@ func _run_all() -> void:
 		await _wait(1.3)
 		check("consuming the commander gives artillery codes", Game.flags.get("artillery_codes", false))
 		check("commander gives a soldier disguise", player.disguise == "commander", player.disguise)
+		check("a soldier disguise has no prop gun in your hand", player.model.held_item == null)
 		Game.level = 20
 		Game.skill_points = 5
 		Game.skills.erase("artillery")
@@ -770,6 +775,13 @@ func _run_all() -> void:
 		await _tap("artillery")
 		await _wait(0.2)
 		check("artillery can be called", player.powers.artillery_cooldown > 0.0)
+		player.powers.give_weapon("rifle", 30)
+		player.powers._wardrobe_cd = 0.0
+		var rebuilt := player.powers.wear_disguise(0)
+		await get_tree().process_frame
+		var gun_shown: bool = player.model.hand_r.get_children().any(func(c): return c.has_meta("weapon") and not c.is_queued_for_deletion())
+		check("a picked-up gun stays visible after changing body", rebuilt and gun_shown, "rebuilt %s" % rebuilt)
+		player.powers._drop_weapon()
 	await _wait(5.0)
 	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)

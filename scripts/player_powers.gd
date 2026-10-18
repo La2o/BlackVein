@@ -889,6 +889,7 @@ func wear_disguise(index: int) -> bool:
 	player.model.build(outfit)
 	player.model.set_form(form)
 	player.model.set_defense(defense)
+	_attach_weapon_mesh()   # rebuilding the body dropped the gun mesh
 	if thermal_on:
 		player.model.set_thermal(false)
 	Game.fx.burst_ring(player.global_position, Color(0.8, 0.1, 0.06, 0.7), 2.2)
@@ -1041,6 +1042,7 @@ func _finish_consume() -> void:
 		Game.add_disguise(kind, str(info.get("label", kind)), info["outfit"])
 		player.model.set_form(form)
 		player.model.set_defense(defense)
+		_attach_weapon_mesh()   # rebuilding the body dropped the gun mesh
 		if thermal_on:
 			player.model.set_thermal(false)
 	if witnessed:

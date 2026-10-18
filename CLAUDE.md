@@ -34,6 +34,15 @@ godot --headless --path . --quit-after 600                # quick boot check, lo
 godot --headless --path . res://tests/test_runner.tscn    # full play-through, must end "0 failed"
 ```
 
+Fast loop while working (~30 s instead of ~4.5 min): `--fixed-fps 60` drops real-time sync so the
+game simulates as fast as the CPU allows. Add `--quit-after` so a script parse error can't leave Godot
+idling forever. Do one normal-speed run before committing.
+```
+godot --headless --fixed-fps 60 --quit-after 60000 --path . res://tests/test_runner.tscn
+```
+Tests must drive input like a player (e.g. hold `forms_wheel` while the wheel is open), not lean on
+real-time gaps between frames.
+
 Screenshots (slow, software rendering):
 ```
 xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_compatibility \

@@ -2,6 +2,14 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.8.2] — 2026-10-18
+
+### Fixed
+- Consuming a soldier no longer leaves their prop rifle in your hand: disguises copy the outfit,
+  not the gun. Only weapons you actually pick up are shown.
+- Consuming or changing disguise while holding a picked-up gun no longer makes the gun invisible.
+- Tests run about 9x faster during development (`--fixed-fps 60`, see CLAUDE.md).
+
 ## [0.8.1] — 2026-10-18
 
 ### New

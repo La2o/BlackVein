@@ -37,7 +37,10 @@ func build(new_outfit: Dictionary = {}) -> void:
 	_form_parts.clear()
 	_defense_parts.clear()
 	_whip_links.clear()
-	setup(outfit)
+	# a disguise copies the outfit, not the victim's prop gun: only weapons you pick up are shown
+	var worn := outfit.duplicate()
+	worn["item"] = "none"
+	setup(worn)
 	_wing_pivots.clear()
 	_crawler.clear()
 	_leg_parts.clear()
