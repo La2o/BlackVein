@@ -1208,6 +1208,20 @@ func _run_all() -> void:
 	check("goals complete and advance", Game.goal_index >= 1, "goal %d" % Game.goal_index)
 	Game.goal_index = maxi(gi, Game.goal_index)
 
+	# ---------------- viral caches (collectibles)
+	var cache_node: Node = Game.get_meta("collectibles")
+	check("60 viral caches are hidden around the map", cache_node.caches.size() + cache_node.found_count() == 60,
+		"%d left, %d found" % [cache_node.caches.size(), cache_node.found_count()])
+	Game.flags["caches"] = [900, 901, 902, 903, 904, 905, 906, 907, 908]   # nine already found
+	var sp_before := Game.skill_points
+	var first: Node3D = cache_node.caches[0]
+	await _teleport(first.global_position + Vector3(0, -0.5, 0))
+	await _wait(0.2)
+	check("touching a cache collects it, the tenth gives a skill point",
+		not is_instance_valid(first) and cache_node.found_count() == 10 and Game.skill_points == sp_before + 1,
+		"found %d, skill points %d->%d" % [cache_node.found_count(), sp_before, Game.skill_points])
+	await _teleport(Game.city.spawn_point)
+
 	# ---------------- achievements
 	Game.stat_add("consumes")
 	await _wait(1.2)

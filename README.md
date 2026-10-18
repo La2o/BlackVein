@@ -147,7 +147,9 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Buildings you can enter:** research labs (with Evolution Samples), the military bunker,
   an infested subway nest with a Hive Heart, and your own safehouse.
 - **Traffic and weather:** cars that drive (and crash), rain storms and fog.
-- **Combo meter**, starter goals, 19 achievements, a memories log, a stats screen,
+- **60 viral caches** hidden on rooftops, barns, silos and in parks: XP, biomass and a skill point
+  for every ten.
+- **Combo meter**, starter goals, 20 achievements, a memories log, a stats screen,
   a settings menu with key rebinding, and adaptive music.
 - **Progression:** XP from kills, consumes and events → levels → skill points → a skill tree
   of 25 powers and upgrades. Start weak, grind, get monstrous.

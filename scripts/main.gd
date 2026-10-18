@@ -31,6 +31,11 @@ func _ready() -> void:
 	interiors.set_script(load("res://scripts/interiors.gd"))
 	add_child(interiors)
 	interiors.setup(city)
+	var caches := Node3D.new()
+	caches.name = "Collectibles"
+	caches.set_script(load("res://scripts/collectibles.gd"))
+	add_child(caches)
+	Game.set_meta("collectibles", caches)
 	player.set_spawn(city.spawn_point, city.spawn_yaw)
 	daynight.setup(sun, world_env.environment)
 	weather.setup(world_env.environment)
@@ -42,6 +47,7 @@ func _ready() -> void:
 		Game.say("Sprint into a wall to run up it", Color(1, 0.85, 0.7))
 		get_tree().create_timer(6.0, false).timeout.connect(func():
 			Game.feed("Tip: kill, consume and finish events to earn XP and unlock powers", Color(1, 0.85, 0.6)))
+	caches.setup(city)   # after loading, so caches you already found stay gone
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	var pads := Input.get_connected_joypads()
 	if not pads.is_empty():

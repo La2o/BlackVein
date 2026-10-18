@@ -15,6 +15,9 @@ All notable changes to BLACKVEIN. Newest first.
     fast, but is frail.
   Your arm, body and leg forms still work on top; disguise changes made while transformed apply when
   you turn back.
+- **60 Viral Caches**: glowing clusters of biomass hidden all over the map (skyscraper and house
+  roofs, warehouses, barns, silos, parks). Each refills your biomass and gives XP; every 10 found is a
+  skill point. A new achievement, Hoarder, for 30.
 - **Stealth meter**: an eye at the top of the screen opens as soldiers grow suspicious (UNSEEN,
   NOTICED, SPOTTED, SEARCHING), arrows around the middle of the screen point at everyone noticing you,
   and those soldiers show a **?** (suspicious) or **!** (after you) over their heads.
