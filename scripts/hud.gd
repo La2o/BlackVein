@@ -654,8 +654,11 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.9[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.10[/color][/b]
 
+[b]Real people[/b] — everyone in the city is now a rigged, animated character with a real face, hair and
+fitted gear.
+[b]Real textures[/b] — brick, concrete, asphalt and paving. Try Ultra graphics in Settings.
 [b]Stealth[/b] — parkour all you like in a disguise that fits. Flying, powers and fights give you
 away; inside bases even running does. Watch "Blending in / Standing out" near soldiers.
 Consume someone unseen for bonus XP.

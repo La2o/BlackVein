@@ -61,8 +61,8 @@ func _ready() -> void:
 	cam.look_at(base + Vector3(-4.0, 0.45, 0))
 	await _wait(0.3)
 	await _shot("people_close_civilians")
-	cam.global_position = base + Vector3(1.0, 0.75, -2.6)
-	cam.look_at(base + Vector3(1.0, 0.45, 0))
+	cam.global_position = base + Vector3(1.0, 0.95, -2.2)
+	cam.look_at(base + Vector3(1.0, 0.75, 0))
 	await _wait(0.3)
 	await _shot("people_close_military")
 	# faces

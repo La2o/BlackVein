@@ -15,5 +15,6 @@ desktop.ini
 .idea/
 *.swp
 
-# Mixamo files may ship in builds but must not be redistributed (see docs/MIXAMO.md)
-assets/mixamo/
+
+# Original Quaternius downloads (unpacked into assets/characters)
+assets/quaternius/

@@ -116,13 +116,15 @@ func setup(k: String, extra := {}) -> void:
 	outfit = _make_outfit(k)
 	if extra.has("outfit"):
 		outfit = extra["outfit"]
-	model = Node3D.new()
-	model.set_script(HUMANOID)
+	# a rigged, animated Quaternius person (person_model.gd), feet at the bottom of the capsule
+	model = PersonModel.new()
+	model.foot_offset = -0.9
 	add_child(model)
 	model.setup(outfit)
 	model.scale = Vector3.ONE * scale_factor
 	if k == "hunter" or k == "leviathan":
 		var spike_mat: Material = HUMANOID.mat(Color(0.12, 0.02, 0.02), 0.0, 0.2, 0.3)
+		# bone spikes down the back
 		for i in 5:
 			var cone := CylinderMesh.new()
 			cone.top_radius = 0.0
@@ -131,31 +133,25 @@ func setup(k: String, extra := {}) -> void:
 			var sp := MeshInstance3D.new()
 			sp.mesh = cone
 			sp.material_override = spike_mat
-			sp.position = Vector3((i % 2) * 0.12 - 0.06, 0.66 - i * 0.16, 0.19)
-			sp.rotation.x = 0.9
-			model.torso.add_child(sp)
-			model.all_meshes.append(sp)
-		for side in [-1.0, 1.0]:
+			model.attach_to_body("spine_03" if i < 3 else "spine_01", sp,
+				Vector3((i % 2) * 0.12 - 0.06, 0.12 - (i % 3) * 0.1, -0.16), Vector3(-0.9, 0, 0))
+		for side in ["l", "r"]:
 			var claw := MeshInstance3D.new()
 			claw.mesh = HUMANOID.box(Vector3(0.03, 0.45, 0.06))
 			claw.material_override = spike_mat
-			claw.position = Vector3(0, -0.2, -0.05)
-			(model.hand_l if side < 0 else model.hand_r).add_child(claw)
-			model.all_meshes.append(claw)
+			model.attach_to_body("hand_" + side, claw, Vector3(0, -0.22, 0.03))
 	if k == "commander":
 		label = "Colonel %s" % LAST_NAMES[randi() % LAST_NAMES.size()]
 		memory = "Memory absorbed: artillery codes. Disguised as a soldier, you can now call in strikes (unlock in Skills)."
 	if k == "patient_zero":
 		var blue: Material = HUMANOID.mat(Color(0.3, 0.75, 1.0), 2.5)
-		for hand in [model.hand_l, model.hand_r]:
+		for side in ["l", "r"]:
 			for i in 3:
 				var claw := MeshInstance3D.new()
 				claw.mesh = HUMANOID.box(Vector3(0.02, 0.55, 0.05))
 				claw.material_override = blue
-				claw.position = Vector3((i - 1) * 0.05, -0.27, -0.03)
-				claw.rotation = Vector3(0.18, 0, (i - 1) * 0.12)
-				hand.add_child(claw)
-				model.all_meshes.append(claw)
+				model.attach_to_body("hand_" + side, claw, Vector3((i - 1) * 0.05, -0.28, 0.04),
+					Vector3(-0.18, 0, (i - 1) * 0.12))
 	if k == "scientist":
 		label = "Dr. %s %s" % [FIRST_NAMES[randi() % FIRST_NAMES.size()], LAST_NAMES[randi() % LAST_NAMES.size()]]
 		memory = extra.get("memory", "Memory absorbed: the outbreak started in a lab under the city.")
@@ -628,9 +624,10 @@ func _dead_physics(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0, 25.0 * delta)
 	move_and_slide()
 	var k := 1.0 - exp(-8.0 * delta)
-	var target_basis := Basis.looking_at(_face_dir, Vector3.UP).rotated(Basis.looking_at(_face_dir, Vector3.UP).x, 1.45)
+	# the death animation falls over by itself: just settle upright and let it play
+	var target_basis := Basis.looking_at(_face_dir, Vector3.UP)
 	model.basis = Basis(model.basis.get_rotation_quaternion().slerp(target_basis.get_rotation_quaternion(), k)).scaled(Vector3.ONE * scale_factor)
-	model.position = model.position.lerp(Vector3(0, -0.65 * scale_factor, 0), k)
+	model.position = model.position.lerp(Vector3.ZERO, k)
 	model.animate(delta, 0.0, "dead")
 	if _dead_time > 1.5 and collision_layer != 0:
 		collision_layer = 0

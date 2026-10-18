@@ -891,12 +891,14 @@ func _run_all() -> void:
 	pw.give_weapon("launcher", 6)
 	var lock_tank = Game.military.spawn_ground_vehicle("tank", player.global_position + Vector3(0, 0.3, -45), 0.0)
 	lock_tank.abandoned = true
-	player.yaw = 0.0
-	player.pitch = -0.02
 	await _wait(0.2)
+	var to_tank: Vector3 = lock_tank.global_position - player.global_position
+	player.yaw = atan2(-to_tank.x, -to_tank.z)   # look straight at it
+	player.pitch = -0.02
+	await _wait(0.1)
 	Input.action_press("special")
 	await _wait(0.9)
-	check("holding aim on a tank locks on", pw.lock_target == lock_tank, str(pw.lock_target))
+	check("holding aim on a tank locks on", pw.lock_target == lock_tank, "weapon %s, locking on %s, tank alive %s, state %s" % [pw.weapon, pw._lock_on, is_instance_valid(lock_tank), Player.STATE_NAMES[player.state]])
 	Input.action_press("attack")
 	await get_tree().physics_frame
 	await get_tree().physics_frame

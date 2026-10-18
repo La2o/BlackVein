@@ -48,7 +48,11 @@ only hold the node skeleton.
   hunters. State machine: IDLE, WANDER, FLEE, COWER, PATROL, SEARCH, ENGAGE, CHASE, LEAP,
   LAUNCHED, GRABBED, CONSUMED, DEAD. Uses the nav mesh for paths and thinks a few times a second
   (rarely when far away).
-- `humanoid.gd` — the shared capsule-person model and its procedural animation.
+- `humanoid.gd` — the code-built person model and its procedural animation (still used by the player).
+- `person.gd` — a rigged Quaternius person (CC0): body, skin, hair, painted-on clothes (`shaders/person.gdshader`,
+  regions tagged per vertex from the bone that moves it) and the Universal Animation Library.
+- `person_model.gd` — `Person` with the same interface as `humanoid.gd` (outfits, `animate`, `swing`, tints,
+  hands), plus gear fitted to bones: helmets, caps, hoods, vests, belts, coats, guns. Every NPC uses it.
 - `car.gd` — RigidBody car: knockable, grabbable, throwable, explodes.
 - `ground_vehicle.gd` — tanks and trucks driving the street grid; tanks shoot, trucks deploy soldiers.
 - `helicopter.gd` — gunships: orbit, minigun, homing missiles, building avoidance, crash.

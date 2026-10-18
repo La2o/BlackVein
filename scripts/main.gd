@@ -25,6 +25,7 @@ func _ready() -> void:
 	military.units_parent = units
 	director.units_parent = units
 	city.build()
+	Person.warm_up()
 	var interiors := Node3D.new()
 	interiors.name = "Interiors"
 	interiors.set_script(load("res://scripts/interiors.gd"))

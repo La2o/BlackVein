@@ -1,0 +1,223 @@
+class_name PersonModel
+extends Person
+## Drop-in replacement for humanoid.gd on NPCs: takes the same outfit dictionaries (humanoid.complete)
+## and answers the same calls (animate, swing, set_tint, set_thermal, torso, hand_l/hand_r, held_item),
+## but it's a rigged Quaternius person playing real animations.
+## Gear (helmets, caps, hoods, vests, belts, coat tails, guns) is placed in skeleton space relative to
+## each bone's rest pose, so it sits right on any body.
+
+const HUMANOID := preload("res://scripts/humanoid.gd")
+const HAIR_MAP := {"short": "parted", "buzz": "buzzed", "curly": "buzzed", "long": "long", "bun": "buns",
+	"ponytail": "long", "bald": ""}
+const SKIN_REF := Color(0.93, 0.76, 0.64)   # roughly the colour of the light skin texture
+
+var torso: MeshInstance3D
+var all_meshes: Array[MeshInstance3D] = []
+var held_item: Node3D
+var head_gear: Node3D
+var hand_l: Node3D
+var hand_r: Node3D
+var chest: Node3D
+var swing_timer := 0.0
+var _thermal_on := false
+var _thermal_mat: StandardMaterial3D
+var _oneshot_t := 0.0
+var _dead := false
+var _unit := 1.0      # skeleton units per metre
+
+
+## Same signature as humanoid.setup(outfit).
+func setup(outfit: Dictionary) -> void:
+	var o: Dictionary = HUMANOID.complete(outfit)
+	var body := "f" if o["body"] == "f" else "m"
+	var gear: String = o["gear"]
+	var hair: String = HAIR_MAP.get(str(o["hair"]), "parted")
+	if body == "f" and hair == "buzzed":
+		hair = "buzzed_f"
+	if gear in ["helmet", "hood"]:
+		hair = ""
+	elif gear in ["cap", "officer", "beret"]:
+		hair = "buzzed" if body == "m" else "buzzed_f"   # short hair under a cap
+	var skin: Color = o["skin"]
+	var new_look := {
+		"body": body, "hair": hair, "hair_color": o["hair_color"], "beard": o["beard"] and body == "m",
+		"skin": Color(skin.r / SKIN_REF.r, skin.g / SKIN_REF.g, skin.b / SKIN_REF.b),
+		"shirt": o["coat_color"] if o["coat"] else o["shirt"], "pants": o["pants"], "shoes": o["shoes"],
+		"long_sleeves": o["top"] != "tshirt" or o["coat"], "camo": o["camo"],
+		"denim": not o["camo"] and (o["pants"] as Color).b > (o["pants"] as Color).r,
+		"height": (1.04 if body == "m" else 0.97) * (1.0 + (float(o["bulk"]) - 1.0) * 0.3),
+	}
+	if o["infected"] or (o["has_glow"] and o["glow_style"] == "veins"):
+		new_look["glow"] = o["glow"]
+	super.setup(new_look)
+	torso = body_mesh
+	_unit = 1.0 / maxf(skeleton.global_transform.basis.get_scale().y, 0.0001)
+	hand_l = bone_attach("hand_l")
+	hand_r = bone_attach("hand_r")
+	chest = bone_attach("spine_03")
+	_build_gear(o)
+	for c in skeleton.get_children():
+		if c is MeshInstance3D:
+			all_meshes.append(c)
+
+
+## Puts `node` on a bone, at a spot given in metres relative to that bone's rest position
+## (character space: +Y up, +Z forward), so it follows the bone from then on.
+func attach_to_body(bone: String, node: Node3D, offset: Vector3, rot := Vector3.ZERO, scl := Vector3.ONE) -> Node3D:
+	var idx := skeleton.find_bone(bone)
+	var ba := bone_attach(bone)
+	ba.add_child(node)
+	var rest := skeleton.get_bone_global_rest(idx)
+	var want := Transform3D(Basis.from_euler(rot).scaled(scl * _unit), rest.origin + offset * _unit)
+	node.transform = rest.affine_inverse() * want
+	if node is MeshInstance3D:
+		all_meshes.append(node)
+	return node
+
+
+func _piece(mesh: Mesh, color: Color, rough := 0.8, metal := 0.0) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = HUMANOID.mat(color, 0.0, metal, rough)
+	return mi
+
+
+func _build_gear(o: Dictionary) -> void:
+	var gc: Color = o["gear_color"]
+	var dark := Color(0.08, 0.075, 0.07)
+	# a belt hides the waist seam between the painted shirt and trousers
+	var belt := CylinderMesh.new()
+	belt.top_radius = 0.165 if look["body"] == "m" else 0.15
+	belt.bottom_radius = belt.top_radius
+	belt.height = 0.055
+	attach_to_body("pelvis", _piece(belt, dark if not o["camo"] else gc.darkened(0.3), 0.6), Vector3(0, 0.1, 0))
+	match str(o["gear"]):
+		"helmet":
+			var h := SphereMesh.new()
+			h.radius = 0.13
+			h.height = 0.13
+			h.is_hemisphere = true
+			head_gear = attach_to_body("Head", _piece(h, gc, 0.7), Vector3(0, 0.1, 0.025), Vector3.ZERO, Vector3(1.0, 1.05, 1.12))
+		"cap", "officer", "beret":
+			var c := CylinderMesh.new()
+			c.top_radius = 0.108 if o["gear"] != "beret" else 0.12
+			c.bottom_radius = 0.112
+			c.height = 0.1 if o["gear"] != "beret" else 0.05
+			head_gear = attach_to_body("Head", _piece(c, gc, 0.8), Vector3(0, 0.175, 0.02), Vector3(-0.08, 0, 0))
+			if o["gear"] != "beret":
+				var brim := BoxMesh.new()
+				brim.size = Vector3(0.17, 0.012, 0.09)
+				attach_to_body("Head", _piece(brim, gc.darkened(0.2)), Vector3(0, 0.13, 0.13))
+		"hood":
+			# a shell over the top and back of the head, open at the face
+			var hood := SphereMesh.new()
+			hood.radius = 0.135
+			hood.height = 0.135
+			hood.is_hemisphere = true
+			head_gear = attach_to_body("Head", _piece(hood, o["coat_color"] if o["coat"] else o["shirt"], 0.9),
+				Vector3(0, 0.07, -0.02), Vector3(-PI * 0.5 + 0.35, 0, 0), Vector3(1.05, 1.25, 1.1))
+	if o["vest"]:
+		var v := BoxMesh.new()
+		v.size = Vector3(0.33, 0.3, 0.23)
+		attach_to_body("spine_03", _piece(v, o["vest_color"], 0.85), Vector3(0, -0.02, 0.0))
+	if o["coat"]:
+		# the back of a long coat, hanging from the hips to the knees
+		var back := BoxMesh.new()
+		back.size = Vector3(0.36, 0.6, 0.03)
+		attach_to_body("pelvis", _piece(back, o["coat_color"], 0.85), Vector3(0, -0.22, -0.13), Vector3(0.1, 0, 0))
+	match str(o["item"]):
+		"rifle":
+			var r := BoxMesh.new()
+			r.size = Vector3(0.06, 0.11, 0.8)
+			held_item = _hold(_piece(r, Color(0.08, 0.08, 0.08), 0.4, 0.6), 0.22)
+		"launcher":
+			var l := CylinderMesh.new()
+			l.top_radius = 0.07
+			l.bottom_radius = 0.07
+			l.height = 1.0
+			held_item = _hold(_piece(l, Color(0.2, 0.25, 0.15)), 0.1, Vector3(PI * 0.5, 0, 0))
+
+
+## Puts a gun in the right hand so it points straight ahead in the aiming animation: the hand's pose
+## is read from that animation once, and the gun is fixed to the hand relative to it.
+func _hold(gun: Node3D, forward: float, rot := Vector3.ZERO) -> Node3D:
+	play("Pistol_Idle", 0.0)
+	anim.advance(0.0)
+	var idx := skeleton.find_bone("hand_r")
+	var hand_pose := skeleton.get_bone_global_pose(idx)
+	var want := Transform3D(Basis.from_euler(rot).scaled(Vector3.ONE * _unit),
+		hand_pose.origin + Vector3(0, 0.02, forward) * _unit)
+	var ba := bone_attach("hand_r")
+	ba.add_child(gun)
+	gun.transform = hand_pose.affine_inverse() * want
+	if gun is MeshInstance3D:
+		all_meshes.append(gun)
+	play("Idle", 0.0)
+	return gun
+
+
+func swing(right := true, style := 0, duration := 0.22) -> void:
+	swing_timer = duration
+	var anim_name := "Pistol_Shoot" if style == 4 else ("Punch_Cross" if right else "Punch_Jab")
+	_current = ""
+	play(anim_name, 0.05)
+	anim.seek(0.0, true)
+	_oneshot_t = minf(anim.current_animation_length, maxf(duration, 0.35))
+
+
+## mode: idle, walk, run, aim, flail, dead, grabbed, air, glide, crouch, cower (as in humanoid.gd)
+func animate(delta: float, speed: float, mode: String) -> void:
+	if anim == null:
+		return
+	swing_timer = maxf(0.0, swing_timer - delta)
+	if mode != "dead":
+		_dead = false
+	if _oneshot_t > 0.0:
+		_oneshot_t -= delta
+		if mode in ["idle", "walk", "run", "aim"]:
+			return
+	match mode:
+		"walk":
+			play("Walk", 0.25, clampf(speed / 1.4, 0.6, 2.2))
+		"run":
+			if speed > 5.0:
+				play("Sprint", 0.2, clampf(speed / 6.5, 0.7, 2.0))
+			else:
+				play("Jog_Fwd", 0.2, clampf(speed / 3.5, 0.7, 2.0))
+		"aim":
+			play("Pistol_Idle", 0.25)
+		"cower", "crouch":
+			play("Crouch_Idle", 0.3)
+		"grabbed":
+			play("Hit_Chest", 0.15)
+		"flail", "air", "glide":
+			play("Jump", 0.2)
+		"dead":
+			if not _dead:
+				_dead = true
+				play("Death01", 0.15)
+		_:
+			play("Idle", 0.3)
+
+
+func plays_death() -> bool:
+	return true
+
+
+func set_thermal(on: bool) -> void:
+	if on == _thermal_on:
+		return
+	_thermal_on = on
+	if _thermal_mat == null:
+		_thermal_mat = StandardMaterial3D.new()
+		_thermal_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_thermal_mat.albedo_color = Color(1.0, 0.25, 0.1)
+	for m in all_meshes:
+		if is_instance_valid(m):
+			m.material_overlay = _thermal_mat if on else null
+
+
+func set_tint(material: Material) -> void:
+	for m in all_meshes:
+		if is_instance_valid(m):
+			m.material_overlay = material

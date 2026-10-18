@@ -2,6 +2,19 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.10.0] — 2026-10-18 — Real people
+
+### New
+- **Every person in the city is now a rigged, animated character** (free CC0 models and animations by
+  Quaternius) instead of the code-built figures: real faces, eyes, hair and beards, male and female
+  bodies, many skin tones, and motion-captured-style walking, jogging, sprinting, aiming, punching,
+  shooting, cowering, falling and dying.
+- Clothes are painted onto the bodies (shirts with long or short sleeves, jeans, camo, shoes) and
+  fitted gear follows the skeleton: helmets, officer caps, berets, hoods, armour vests, belts, lab
+  coats, rifles and rocket launchers. Infected glow with red veins; hunters carry bone spikes and
+  claws; Patient Zero has glowing blue claws.
+- People far from the camera animate less often, so crowds stay fast.
+
 ## [0.9.1] — 2026-10-18 — Real textures
 
 ### New
