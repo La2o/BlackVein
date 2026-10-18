@@ -43,6 +43,7 @@ func build(new_outfit: Dictionary = {}) -> void:
 	var worn := outfit.duplicate()
 	worn["item"] = "none"
 	foot_offset = -0.9
+	needs_pivots = true
 	setup(worn)
 	_wing_pivots.clear()
 	_crawler.clear()

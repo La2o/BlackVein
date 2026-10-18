@@ -33,6 +33,7 @@ const BONE_REGION := {
 }
 
 static var _meshes := {}      # body -> ArrayMesh with region colours
+static var _scenes := {}      # path -> PackedScene, held so Godot doesn't reload it for every person
 static var _hair := {}        # hair file -> [{mesh, skin, material}] so each style is loaded once
 static var _library: AnimationLibrary = null
 
@@ -50,7 +51,8 @@ func setup(new_look: Dictionary) -> void:
 	for c in get_children():
 		c.queue_free()
 	var body: String = look.get("body", "m")
-	var root: Node3D = (load(BODIES[body]) as PackedScene).instantiate()
+	var packed := _scene(BODIES[body])
+	var root: Node3D = packed.instantiate()
 	add_child(root)
 	skeleton = root.get_node("Armature/Skeleton3D")
 	for c in skeleton.get_children():
@@ -61,7 +63,7 @@ func setup(new_look: Dictionary) -> void:
 	body_mesh.mesh = _region_mesh(body, body_mesh)
 	body_mat = ShaderMaterial.new()
 	body_mat.shader = SHADER
-	body_mat.set_shader_parameter("skin_tex", load(SKIN_TEX[body]))
+	body_mat.set_shader_parameter("skin_tex", _res(SKIN_TEX[body]))
 	if src_mat:
 		body_mat.set_shader_parameter("normal_tex", src_mat.normal_texture)
 		body_mat.set_shader_parameter("rough_tex", src_mat.roughness_texture)
@@ -145,7 +147,7 @@ func bone_attach(bone: String) -> BoneAttachment3D:
 func _add_hair(file: String, col: Color) -> void:
 	if not _hair.has(file):
 		var parts: Array = []
-		var scene: Node = (load("res://assets/characters/hair/%s.gltf" % file) as PackedScene).instantiate()
+		var scene: Node = _scene("res://assets/characters/hair/%s.gltf" % file).instantiate()
 		for c in scene.get_node("Armature/Skeleton3D").get_children():
 			var src := c as MeshInstance3D
 			if src:
@@ -169,19 +171,33 @@ func _add_hair(file: String, col: Color) -> void:
 ## first person to spawn doesn't cause a hitch. main.gd calls it while the city is built.
 static func warm_up() -> void:
 	library()
+	for b in BODIES:
+		_scene(BODIES[b])
 	for body in BODIES:
 		if _meshes.has(body):
 			continue
-		var scene: Node = (load(BODIES[body]) as PackedScene).instantiate()
+		var scene: Node = _scene(BODIES[body]).instantiate()
 		for c in scene.get_node("Armature/Skeleton3D").get_children():
 			if c is MeshInstance3D and str(c.name).to_lower().begins_with("superhero"):
 				_region_mesh(body, c)
 		scene.free()
 
 
+## Resources are only cached while something references them: keep these alive, or every spawn
+## reads the whole character file from disk again (~60 ms each).
+static func _scene(path: String) -> PackedScene:
+	return _res(path) as PackedScene
+
+
+static func _res(path: String) -> Resource:
+	if not _scenes.has(path):
+		_scenes[path] = load(path)
+	return _scenes[path]
+
+
 static func library() -> AnimationLibrary:
 	if _library == null:
-		var scene: Node = (load(ANIMS) as PackedScene).instantiate()
+		var scene: Node = _scene(ANIMS).instantiate()
 		var ap := scene.get_node("AnimationPlayer") as AnimationPlayer
 		_library = ap.get_animation_library("")   # Godot already loops the "_Loop" ones and drops the suffix
 		scene.free()

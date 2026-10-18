@@ -32,6 +32,8 @@ var shin_r: Node3D
 var body: Node3D          # the model's own frame (as `self` was), carried by the spine
 var body_material: ShaderMaterial
 var pose_override := {}   # accepted for compatibility; see player_model.gd
+## The limb pivots cost a bone attachment each, updated every frame: only the player needs them.
+var needs_pivots := false
 static var _sculpt_cache := {}
 var swing_timer := 0.0
 var _thermal_on := false
@@ -70,17 +72,18 @@ func setup(outfit: Dictionary) -> void:
 	body_material = HUMANOID.body_mat(o)
 	_unit = 1.0 / maxf(skeleton.global_transform.basis.get_scale().y, 0.0001)
 	chest = bone_attach("spine_03")
-	arm_l = _limb_pivot("upperarm_l")
-	arm_r = _limb_pivot("upperarm_r")
-	forearm_l = _limb_pivot("lowerarm_l")
-	forearm_r = _limb_pivot("lowerarm_r")
-	hand_l = _limb_pivot("hand_l")
-	hand_r = _limb_pivot("hand_r")
-	leg_l = _limb_pivot("thigh_l")
-	leg_r = _limb_pivot("thigh_r")
-	shin_l = _limb_pivot("calf_l")
-	shin_r = _limb_pivot("calf_r")
-	body = _frame_pivot("spine_02", Transform3D.IDENTITY)
+	if needs_pivots:
+		arm_l = _limb_pivot("upperarm_l")
+		arm_r = _limb_pivot("upperarm_r")
+		forearm_l = _limb_pivot("lowerarm_l")
+		forearm_r = _limb_pivot("lowerarm_r")
+		hand_l = _limb_pivot("hand_l")
+		hand_r = _limb_pivot("hand_r")
+		leg_l = _limb_pivot("thigh_l")
+		leg_r = _limb_pivot("thigh_r")
+		shin_l = _limb_pivot("calf_l")
+		shin_r = _limb_pivot("calf_r")
+		body = _frame_pivot("spine_02", Transform3D.IDENTITY)
 	_build_gear(o)
 	for c in skeleton.get_children():
 		if c is MeshInstance3D:

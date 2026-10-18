@@ -44,6 +44,13 @@ idling forever. This is the day-to-day check; the normal-speed run is only for a
 ```
 godot --headless --fixed-fps 60 --quit-after 60000 --path . res://tests/test_runner.tscn
 ```
+Frame drops? `tests/profile.tscn` runs the real game in a window (the world active, the player sprinting
+with the military after them) and prints fps, the worst 1% and every frame over 33 ms with the NPC
+count. `-- old=1` swaps in the old code-built NPCs for comparison. Keep loaded resources referenced:
+Godot drops unreferenced ones from its cache, so a `load()` per spawn re-reads the file (person.gd `_res`).
+```
+godot --path . --resolution 1920x1080 res://tests/profile.tscn -- seconds=40
+```
 Tests must drive input like a player (e.g. hold `forms_wheel` while the wheel is open), not lean on
 real-time gaps between frames.
 

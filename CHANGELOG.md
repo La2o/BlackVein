@@ -13,7 +13,8 @@ All notable changes to BLACKVEIN. Newest first.
   fitted gear follows the skeleton: helmets, officer caps, berets, hoods, armour vests, belts, lab
   coats, rifles and rocket launchers. Infected glow with red veins; hunters carry bone spikes and
   claws; Patient Zero has glowing blue claws.
-- People far from the camera animate less often, so crowds stay fast.
+- People far from the camera animate less often, and spawning someone takes under a millisecond, so
+  crowds stay smooth (an early build stuttered every time people appeared).
 - **New music** (free CC0 from OpenGameArt): "Bleak Terminal" by ruskerdax while you explore,
   "AI Fight" from the T&T Free Cyberpunk Pack 2 in combat, and Juhani Junkala's "Epic Boss Battle"
   for bosses. The game still crossfades between them as the action changes.

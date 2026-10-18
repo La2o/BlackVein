@@ -26,6 +26,9 @@ const KINDS := {
 const FIRST_NAMES := ["Dana", "Marcus", "Elena", "Victor", "Ruth", "Isaac", "Mara", "Owen", "Lena", "Samuel"]
 const LAST_NAMES := ["Kessler", "Okafor", "Vance", "Moreau", "Hale", "Ibarra", "Lindqvist", "Brandt", "Castell"]
 
+## profiling switch: the old code-built people instead of the rigged ones (tests/profile.gd old=1)
+static var use_old_models := false
+
 var kind := "civilian"
 var faction := "civilian"
 var hp := 30.0
@@ -117,12 +120,16 @@ func setup(k: String, extra := {}) -> void:
 	if extra.has("outfit"):
 		outfit = extra["outfit"]
 	# a rigged, animated Quaternius person (person_model.gd), feet at the bottom of the capsule
-	model = PersonModel.new()
-	model.foot_offset = -0.9
+	if use_old_models:
+		model = Node3D.new()
+		model.set_script(HUMANOID)
+	else:
+		model = PersonModel.new()
+		model.foot_offset = -0.9
 	add_child(model)
 	model.setup(outfit)
 	model.scale = Vector3.ONE * scale_factor
-	if k == "hunter" or k == "leviathan":
+	if (k == "hunter" or k == "leviathan") and model is PersonModel:
 		var spike_mat: Material = HUMANOID.mat(Color(0.12, 0.02, 0.02), 0.0, 0.2, 0.3)
 		# bone spikes down the back
 		for i in 5:
@@ -143,7 +150,7 @@ func setup(k: String, extra := {}) -> void:
 	if k == "commander":
 		label = "Colonel %s" % LAST_NAMES[randi() % LAST_NAMES.size()]
 		memory = "Memory absorbed: artillery codes. Disguised as a soldier, you can now call in strikes (unlock in Skills)."
-	if k == "patient_zero":
+	if k == "patient_zero" and model is PersonModel:
 		var blue: Material = HUMANOID.mat(Color(0.3, 0.75, 1.0), 2.5)
 		for side in ["l", "r"]:
 			for i in 3:
