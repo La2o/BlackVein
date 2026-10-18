@@ -659,8 +659,15 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.11[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.12[/color][/b]
 
+[b]Creature forms[/b] — become the Brute, the Stalker or the flying Wraith (learn them in Skills,
+then press N / hold LB + D-pad Down). They burn biomass.
+[b]Stealth meter[/b] — the eye at the top fills as soldiers notice you; a ? or ! marks who has.
+[b]60 Viral Caches[/b] are hidden around the map: a skill point for every ten.
+[b]Smoother animation[/b] for BLACKVEIN: real sprinting, take-offs and landings.
+
+[b][color=#ff5544]0.11[/color][/b]
 [b]A map four times bigger[/b] — downtown skyscrapers, brick midtown and parks, suburbs of houses and
 gardens to the south and west, warehouses and the military base to the east, and farmland with barns
 and silos to the north. Press M to see it.

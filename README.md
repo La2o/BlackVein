@@ -22,17 +22,19 @@ people are rigged, animated CC0 characters by Quaternius (credits in [assets/CRE
 | | |
 |---|---|
 | ![The Leviathan boss charging down a street](docs/screenshots/boss-leviathan.jpg) | ![Groundspike devastator at sunset](docs/screenshots/devastator.jpg) |
-| **The Leviathan** — one of three bosses | **Groundspike** devastator |
-| ![Flying a hijacked gunship between lit skyscrapers](docs/screenshots/gunship.jpg) | ![Walking the streets at night in a scientist disguise](docs/screenshots/night.jpg) |
-| **Hijack gunships** and tanks | **Day and night**, with disguises |
-| ![Driving a hijacked tank at dusk](docs/screenshots/tank.jpg) | ![Inside a research lab, disguised as a scientist](docs/screenshots/lab.jpg) |
-| **Tanks** that fire shells | **Research labs** to infiltrate |
-| ![A gravel rooftop above the textured city](docs/screenshots/rooftop.jpg) | ![An infection outbreak with a glowing hive in the street](docs/screenshots/outbreak.jpg) |
-| **Rooftops** over brick and concrete | **Outbreaks** with hives to destroy |
+| **The Leviathan**, one of three bosses | **Groundspike** devastator |
+| ![Flying a hijacked gunship between lit skyscrapers](docs/screenshots/gunship.jpg) | ![Driving a hijacked tank at dusk](docs/screenshots/tank.jpg) |
+| **Hijack gunships** and tanks | **Tanks** that fire shells |
+| ![The Brute creature form: a hulking mass of flesh with glowing veins](docs/screenshots/brute.jpg) | ![The stealth meter eye with soldiers marked by exclamation points](docs/screenshots/stealth.jpg) |
+| **Creature forms**: the Brute | The **stealth meter** and soldiers who've spotted you |
+| ![A line of rigged, animated city people](docs/screenshots/people.jpg) | ![BLACKVEIN in a hood and long coat with faint red veins](docs/screenshots/player.jpg) |
+| **Real, animated people** | **BLACKVEIN** himself |
 | ![Suburban streets with houses, lawns and gardens](docs/screenshots/suburbs.jpg) | ![Farmland with crop fields, barns and silos](docs/screenshots/farmland.jpg) |
 | **Suburbs** to the south and west | **Farmland** to the north |
 | ![Warehouses, chimneys and container yards](docs/screenshots/industrial.jpg) | ![A city park with a fountain and trees](docs/screenshots/park.jpg) |
 | **Industry** to the east, with the military base | **Parks** among midtown's brick blocks |
+| ![An infection outbreak with a glowing hive in the street](docs/screenshots/outbreak.jpg) | ![A rainy night street](docs/screenshots/night.jpg) |
+| **Outbreaks** with hives to destroy | **Day and night**, rain and fog |
 
 ---
 

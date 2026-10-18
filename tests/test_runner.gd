@@ -829,7 +829,7 @@ func _run_all() -> void:
 	var heli_parked := base_helis.any(func(h): return h.get("parked") == true)
 	check("gunship parked on the helipad", base_helis.size() > 0 and (heli_parked or base_alarmed),
 		"%d base gunships, parked %s, base alarmed %s" % [base_helis.size(), heli_parked, base_alarmed])
-	if commander:
+	if commander and is_instance_valid(commander):
 		await _teleport(Game.city.spawn_point)
 		commander.global_position = player.global_position + Vector3(0, 0.3, -1.4)
 		# nobody else (a passer-by, a fresh body) may be closer than the commander
