@@ -7,6 +7,7 @@ extends Person
 ## each bone's rest pose, so it sits right on any body.
 
 const HUMANOID := preload("res://scripts/humanoid.gd")
+const K := preload("res://scripts/body_kit.gd")
 const HAIR_MAP := {"short": "parted", "buzz": "buzzed", "curly": "buzzed", "long": "long", "bun": "buns",
 	"ponytail": "long", "bald": ""}
 const SKIN_REF := Color(0.93, 0.76, 0.64)   # roughly the colour of the light skin texture
@@ -15,9 +16,23 @@ var torso: MeshInstance3D
 var all_meshes: Array[MeshInstance3D] = []
 var held_item: Node3D
 var head_gear: Node3D
+var chest: Node3D
+## Body-part pivots in the old humanoid.gd convention (down the limb is -Y, forward is -Z, metres),
+## riding on the bones, so code written for humanoid.gd can hang pieces on them.
+var arm_l: Node3D
+var arm_r: Node3D
+var forearm_l: Node3D
+var forearm_r: Node3D
 var hand_l: Node3D
 var hand_r: Node3D
-var chest: Node3D
+var leg_l: Node3D
+var leg_r: Node3D
+var shin_l: Node3D
+var shin_r: Node3D
+var body: Node3D          # the model's own frame (as `self` was), carried by the spine
+var body_material: ShaderMaterial
+var pose_override := {}   # accepted for compatibility; see player_model.gd
+static var _sculpt_cache := {}
 var swing_timer := 0.0
 var _thermal_on := false
 var _thermal_mat: StandardMaterial3D
@@ -29,32 +44,43 @@ var _unit := 1.0      # skeleton units per metre
 ## Same signature as humanoid.setup(outfit).
 func setup(outfit: Dictionary) -> void:
 	var o: Dictionary = HUMANOID.complete(outfit)
-	var body := "f" if o["body"] == "f" else "m"
+	var sex := "f" if o["body"] == "f" else "m"
 	var gear: String = o["gear"]
 	var hair: String = HAIR_MAP.get(str(o["hair"]), "parted")
-	if body == "f" and hair == "buzzed":
+	if sex == "f" and hair == "buzzed":
 		hair = "buzzed_f"
 	if gear in ["helmet", "hood"]:
 		hair = ""
 	elif gear in ["cap", "officer", "beret"]:
-		hair = "buzzed" if body == "m" else "buzzed_f"   # short hair under a cap
+		hair = "buzzed" if sex == "m" else "buzzed_f"   # short hair under a cap
 	var skin: Color = o["skin"]
 	var new_look := {
-		"body": body, "hair": hair, "hair_color": o["hair_color"], "beard": o["beard"] and body == "m",
+		"body": sex, "hair": hair, "hair_color": o["hair_color"], "beard": o["beard"] and sex == "m",
 		"skin": Color(skin.r / SKIN_REF.r, skin.g / SKIN_REF.g, skin.b / SKIN_REF.b),
 		"shirt": o["coat_color"] if o["coat"] else o["shirt"], "pants": o["pants"], "shoes": o["shoes"],
 		"long_sleeves": o["top"] != "tshirt" or o["coat"], "camo": o["camo"],
 		"denim": not o["camo"] and (o["pants"] as Color).b > (o["pants"] as Color).r,
-		"height": (1.04 if body == "m" else 0.97) * (1.0 + (float(o["bulk"]) - 1.0) * 0.3),
+		"height": (1.04 if sex == "m" else 0.97) * (1.0 + (float(o["bulk"]) - 1.0) * 0.3),
 	}
-	if o["infected"] or (o["has_glow"] and o["glow_style"] == "veins"):
+	if o["infected"] or o["veins"] or (o["has_glow"] and o["glow_style"] == "veins"):
 		new_look["glow"] = o["glow"]
+		new_look["vein_amount"] = 1.0 if o["infected"] else 0.4   # BLACKVEIN shows only a few
 	super.setup(new_look)
 	torso = body_mesh
+	body_material = HUMANOID.body_mat(o)
 	_unit = 1.0 / maxf(skeleton.global_transform.basis.get_scale().y, 0.0001)
-	hand_l = bone_attach("hand_l")
-	hand_r = bone_attach("hand_r")
 	chest = bone_attach("spine_03")
+	arm_l = _limb_pivot("upperarm_l")
+	arm_r = _limb_pivot("upperarm_r")
+	forearm_l = _limb_pivot("lowerarm_l")
+	forearm_r = _limb_pivot("lowerarm_r")
+	hand_l = _limb_pivot("hand_l")
+	hand_r = _limb_pivot("hand_r")
+	leg_l = _limb_pivot("thigh_l")
+	leg_r = _limb_pivot("thigh_r")
+	shin_l = _limb_pivot("calf_l")
+	shin_r = _limb_pivot("calf_r")
+	body = _frame_pivot("spine_02", Transform3D.IDENTITY)
 	_build_gear(o)
 	for c in skeleton.get_children():
 		if c is MeshInstance3D:
@@ -73,6 +99,85 @@ func attach_to_body(bone: String, node: Node3D, offset: Vector3, rot := Vector3.
 	if node is MeshInstance3D:
 		all_meshes.append(node)
 	return node
+
+
+## A node on `bone` whose frame, at rest, is `want` given in this model's own coordinates.
+func _frame_pivot(bone: String, want: Transform3D) -> Node3D:
+	var idx := skeleton.find_bone(bone)
+	var ba := bone_attach(bone)
+	var piv := Node3D.new()
+	ba.add_child(piv)
+	var bone_rest_global := skeleton.global_transform * skeleton.get_bone_global_rest(idx)
+	piv.transform = bone_rest_global.affine_inverse() * global_transform * want
+	return piv
+
+
+## A limb pivot like humanoid.gd's: at the joint, -Y running down the limb, -Z facing forward.
+func _limb_pivot(bone: String) -> Node3D:
+	var idx := skeleton.find_bone(bone)
+	var to_self := global_transform.affine_inverse() * skeleton.global_transform
+	var rest := skeleton.get_bone_global_rest(idx)
+	var origin := to_self * rest.origin
+	var along := (to_self.basis * rest.basis.y).normalized()   # bones point down +Y
+	var y := -along
+	var z := Vector3(0, 0, 1) - y * y.z
+	if z.length() < 0.2:
+		z = Vector3(0, 1, 0) - y * y.y
+	z = z.normalized()
+	return _frame_pivot(bone, Transform3D(Basis(y.cross(z), y, z), origin))
+
+
+## Scales a bone's pose (animations here never key scale, so it sticks): bulkier arms or legs.
+func set_bone_scale(bone: String, scl: Vector3) -> void:
+	var idx := skeleton.find_bone(bone)
+	if idx >= 0:
+		skeleton.set_bone_pose_scale(idx, scl)
+
+
+# humanoid.gd helpers, so code written for it keeps working
+static func mat(color: Color, emission := 0.0, metallic := 0.0, roughness := 0.8) -> StandardMaterial3D:
+	return HUMANOID.mat(color, emission, metallic, roughness)
+
+
+static func box(size: Vector3) -> BoxMesh:
+	return HUMANOID.box(size)
+
+
+static func sphere(radius: float) -> SphereMesh:
+	return HUMANOID.sphere(radius)
+
+
+static func capsule(radius: float, height: float) -> CapsuleMesh:
+	return HUMANOID.capsule(radius, height)
+
+
+func _part(parent: Node3D, mesh: Mesh, material: Material, pos: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = material
+	mi.position = pos
+	parent.add_child(mi)
+	all_meshes.append(mi)
+	return mi
+
+
+func _pivot(parent: Node3D, pos: Vector3) -> Node3D:
+	var n := Node3D.new()
+	n.position = pos
+	parent.add_child(n)
+	return n
+
+
+func _sculpt(parent: Node3D, key: String, build_fn: Callable, pos := Vector3.ZERO) -> MeshInstance3D:
+	var mesh: ArrayMesh
+	if _sculpt_cache.has(key):
+		mesh = _sculpt_cache[key]
+	else:
+		var kit := K.new()
+		build_fn.call(kit)
+		mesh = kit.commit()
+		_sculpt_cache[key] = mesh
+	return _part(parent, mesh, body_material, pos)
 
 
 func _piece(mesh: Mesh, color: Color, rough := 0.8, metal := 0.0) -> MeshInstance3D:
@@ -114,8 +219,9 @@ func _build_gear(o: Dictionary) -> void:
 			hood.radius = 0.135
 			hood.height = 0.135
 			hood.is_hemisphere = true
+			# dome tipped up and back: covers the crown, back and sides, face left open
 			head_gear = attach_to_body("Head", _piece(hood, o["coat_color"] if o["coat"] else o["shirt"], 0.9),
-				Vector3(0, 0.07, -0.02), Vector3(-PI * 0.5 + 0.35, 0, 0), Vector3(1.05, 1.25, 1.1))
+				Vector3(0, 0.075, -0.02), Vector3(-0.62, 0, 0), Vector3(1.1, 1.38, 1.22))
 	if o["vest"]:
 		var v := BoxMesh.new()
 		v.size = Vector3(0.33, 0.3, 0.23)
@@ -158,7 +264,11 @@ func _hold(gun: Node3D, forward: float, rot := Vector3.ZERO) -> Node3D:
 
 func swing(right := true, style := 0, duration := 0.22) -> void:
 	swing_timer = duration
-	var anim_name := "Pistol_Shoot" if style == 4 else ("Punch_Cross" if right else "Punch_Jab")
+	# 0 punch, 1 slash, 2 heavy blow, 3 big swing, 4 gunshot
+	var anim_name := "Punch_Cross" if right else "Punch_Jab"
+	match style:
+		1, 3: anim_name = "Sword_Attack"
+		4: anim_name = "Pistol_Shoot"
 	_current = ""
 	play(anim_name, 0.05)
 	anim.seek(0.0, true)

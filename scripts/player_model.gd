@@ -1,6 +1,8 @@
-extends "res://scripts/humanoid.gd"
-## The player's body: hooded default look, disguises, arm transformations,
-## body forms (shield, armor, wings) and leg forms.
+extends "res://scripts/person_model.gd"
+## The player's body: a rigged Quaternius person (person_model.gd) in the hooded long-coat true form,
+## disguises, arm transformations, body forms (shield, armor, wings, light) and leg forms.
+## Pieces hang on the humanoid-style pivots (arm_l, forearm_r, hand_r, leg_l, shin_r, body) so they
+## follow the animated bones; bulkier forms scale the bones themselves.
 
 enum Form { FISTS, CLAWS, HAMMER, BLADE, WHIP, MUSCLE, SPIKES }
 enum Defense { NONE, SHIELD, ARMOR, WINGS, LIGHT }   # same order as PlayerPowers.Defense
@@ -40,6 +42,7 @@ func build(new_outfit: Dictionary = {}) -> void:
 	# a disguise copies the outfit, not the victim's prop gun: only weapons you pick up are shown
 	var worn := outfit.duplicate()
 	worn["item"] = "none"
+	foot_offset = -0.9
 	setup(worn)
 	_wing_pivots.clear()
 	_crawler.clear()
@@ -89,8 +92,8 @@ func _apply_form() -> void:
 		return
 	_clear(_form_parts)
 	_whip_links.clear()
-	arm_l.scale = Vector3.ONE
-	arm_r.scale = Vector3.ONE
+	for b in ["upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r"]:
+		set_bone_scale(b, Vector3.ONE)
 	var flesh := mat(FLESH, 0.5, 0.0, 0.35)
 	var dark := mat(Color(0.07, 0.02, 0.02), 0.0, 0.3, 0.25)
 	var glow := mat(Color(1, 0.12, 0.06), 2.5)
@@ -107,8 +110,8 @@ func _apply_form() -> void:
 				for k in 4:
 					var a := k * TAU / 4.0
 					_add(_form_parts, hand, box(Vector3(0.1, 0.2, 0.1)), dark, Vector3(cos(a) * 0.22, -0.18, sin(a) * 0.22), Vector3(0.5, a, 0.3))
-			arm_l.scale = Vector3(1.35, 1.0, 1.35)
-			arm_r.scale = Vector3(1.35, 1.0, 1.35)
+			for b in ["upperarm_l", "upperarm_r"]:
+				set_bone_scale(b, Vector3(1.35, 1.0, 1.35))
 		Form.BLADE:
 			_add(_form_parts, forearm_r, capsule(0.075, 0.42), flesh, Vector3(0, -0.12, 0))
 			_add(_form_parts, hand_r, box(Vector3(0.05, 1.8, 0.26)), dark, Vector3(0, -0.92, 0))
@@ -128,8 +131,10 @@ func _apply_form() -> void:
 				_add(_form_parts, forearm_r, box(Vector3(0.035, 0.3, 0.035)), bone, Vector3(cos(a) * 0.08, -0.18, sin(a) * 0.08), Vector3(0.2 * cos(a), 0, 0.2 * sin(a)))
 			_add(_form_parts, hand_r, capsule(0.06, 0.35), bone, Vector3(0, -0.15, 0))
 		Form.MUSCLE:
-			arm_l.scale = Vector3(1.75, 1.12, 1.75)
-			arm_r.scale = Vector3(1.75, 1.12, 1.75)
+			for b in ["upperarm_l", "upperarm_r"]:
+				set_bone_scale(b, Vector3(1.6, 1.08, 1.6))
+			for b in ["lowerarm_l", "lowerarm_r"]:
+				set_bone_scale(b, Vector3(1.3, 1.0, 1.3))
 			for arm in [arm_l, arm_r]:
 				_add(_form_parts, arm, box(Vector3(0.025, 0.26, 0.025)), glow, Vector3(0.04, -0.15, -0.065), Vector3(0, 0, 0.2))
 				_add(_form_parts, arm, sphere(0.13), flesh, Vector3(0, -0.05, 0))
@@ -156,7 +161,7 @@ func _apply_defense() -> void:
 			rim.radial_segments = 6
 			_add(_defense_parts, forearm_l, rim, glow, Vector3(0, -0.29, 0))
 		Defense.ARMOR:
-			_add(_defense_parts, self, capsule(0.27, 0.95), rock, Vector3(0, 0.17, 0), Vector3.ZERO, Vector3(1.0, 1.0, 0.8))
+			_add(_defense_parts, body, capsule(0.27, 0.95), rock, Vector3(0, 0.17, 0), Vector3.ZERO, Vector3(1.0, 1.0, 0.8))
 			for arm in [arm_l, arm_r]:
 				_add(_defense_parts, arm, capsule(0.08, 0.36), rock, Vector3(0, -0.14, 0))
 				_add(_defense_parts, arm, box(Vector3(0.12, 0.2, 0.12)), rock, Vector3(0, 0.03, 0), Vector3(0, 0, 0.6 * signf(arm.position.x)))
@@ -166,13 +171,13 @@ func _apply_defense() -> void:
 				_add(_defense_parts, leg, capsule(0.11, 0.42), rock, Vector3(0, -0.17, 0))
 			for sh in [shin_l, shin_r]:
 				_add(_defense_parts, sh, capsule(0.085, 0.34), rock, Vector3(0, -0.14, 0))
-			_add(_defense_parts, self, box(Vector3(0.04, 0.4, 0.02)), glow, Vector3(0, 0.25, -0.22))
+			_add(_defense_parts, body, box(Vector3(0.04, 0.4, 0.02)), glow, Vector3(0, 0.25, -0.22))
 		Defense.LIGHT:
 			# a lean runner's body: glowing sinew lines down every limb and two swept-back fins
 			for limb in [arm_l, arm_r, forearm_l, forearm_r, leg_l, leg_r, shin_l, shin_r]:
 				_add(_defense_parts, limb, box(Vector3(0.022, 0.3, 0.022)), glow, Vector3(0, -0.14, -0.075))
 			for side in [-1.0, 1.0]:
-				_add(_defense_parts, self, box(Vector3(0.025, 0.36, 0.14)), rock, Vector3(side * 0.12, 0.3, 0.17),
+				_add(_defense_parts, body, box(Vector3(0.025, 0.36, 0.14)), rock, Vector3(side * 0.12, 0.3, 0.17),
 					Vector3(0.55, 0, side * 0.3))
 
 
@@ -182,7 +187,7 @@ func _ensure_wings() -> void:
 		return
 	_wing_pivots.clear()
 	for side in [-1.0, 1.0]:
-		var piv := _pivot(self, Vector3(side * 0.07, 0.42, 0.13))
+		var piv := _pivot(body, Vector3(side * 0.07, 0.42, 0.13))
 		_sculpt(piv, "wing|%.0f" % side, func(kit): _build_wing(kit, side))
 		_wing_pivots.append(piv)
 
@@ -231,10 +236,8 @@ func _apply_legs() -> void:
 		if is_instance_valid(c):
 			c.queue_free()
 	_crawler.clear()
-	for sh in [shin_l, shin_r]:
-		sh.scale = Vector3.ONE
-	for lg in [leg_l, leg_r]:
-		lg.scale = Vector3.ONE
+	for b in ["calf_l", "calf_r", "thigh_l", "thigh_r"]:
+		set_bone_scale(b, Vector3.ONE)
 	var flesh := mat(FLESH, 0.5, 0.0, 0.35)
 	var dark := mat(Color(0.07, 0.02, 0.02), 0.0, 0.3, 0.25)
 	var glow := mat(Color(1, 0.12, 0.06), 2.5)
@@ -262,7 +265,7 @@ func _apply_legs() -> void:
 		Legs.CRAWLER:
 			for side in [-1.0, 1.0]:
 				for j in 2:
-					var anchor := _pivot(self, Vector3(side * 0.12, -0.02 - j * 0.08, 0.1))
+					var anchor := _pivot(body, Vector3(side * 0.12, -0.02 - j * 0.08, 0.1))
 					anchor.rotation = Vector3(-0.3 - j * 0.55, 0, side * 1.75)
 					anchor.set_meta("base_x", anchor.rotation.x)
 					_add(_leg_parts, anchor, capsule(0.035, 0.5), flesh, Vector3(0, -0.22, 0))
@@ -273,8 +276,9 @@ func _apply_legs() -> void:
 					_crawler.append(anchor)
 		Legs.CRUSHER:
 			var rock := mat(Color(0.1, 0.07, 0.07), 0.0, 0.3, 0.55)
+			for b in ["calf_l", "calf_r"]:
+				set_bone_scale(b, Vector3(1.35, 1.0, 1.35))
 			for sh in [shin_l, shin_r]:
-				sh.scale = Vector3(1.35, 1.0, 1.35)
 				var hoof := CylinderMesh.new()
 				hoof.top_radius = 0.07
 				hoof.bottom_radius = 0.1
@@ -288,12 +292,32 @@ func _apply_legs() -> void:
 				spike.height = 0.16
 				_add(_leg_parts, sh, spike, rock, Vector3(0, 0.02, -0.08), Vector3(-1.2, 0, 0))
 				_add(_leg_parts, sh, box(Vector3(0.012, 0.16, 0.012)), glow, Vector3(0.03, -0.12, -0.092))
-			for lg in [leg_l, leg_r]:
-				lg.scale = Vector3(1.2, 1.0, 1.2)
+			for b in ["thigh_l", "thigh_r"]:
+				set_bone_scale(b, Vector3(1.2, 1.0, 1.2))
+
+
+## Trick poses from player.gd mapped to the closest animation (the whole-body flips, leans and tilts
+## are still done by player.gd on top).
+func _pose_anim(pose: Dictionary) -> String:
+	if pose == Player.POSE_TUCK or pose == Player.POSE_COIL:
+		return "Crouch_Idle"
+	if pose == Player.POSE_HERO:
+		return "Fixing_Kneeling"
+	if pose == Player.POSE_NINJA:
+		return "Sprint"
+	return "Jump"   # rocket, skydive, long jump, vault
 
 
 func animate(delta: float, speed: float, mode: String) -> void:
-	super(delta, speed, mode)
+	var armed := hand_r != null and hand_r.get_children().any(func(c): return c.has_meta("weapon"))
+	if not pose_override.is_empty() and _oneshot_t <= 0.0:
+		play(_pose_anim(pose_override), 0.12, 1.4 if pose_override == Player.POSE_NINJA else 1.0)
+		swing_timer = maxf(0.0, swing_timer - delta)
+	elif armed and mode in ["idle", "walk"] and _oneshot_t <= 0.0:
+		play("Pistol_Idle", 0.2)
+	else:
+		super(delta, speed, mode)
+	pose_override = {}
 	_t += delta
 	var wing_form := defense == Defense.WINGS
 	var show := wing_form or (wings_visible and (mode == "glide" or _flap > 0.0))
@@ -319,9 +343,6 @@ func animate(delta: float, speed: float, mode: String) -> void:
 		var c := _crawler[i]
 		if is_instance_valid(c):
 			c.rotation.x = float(c.get_meta("base_x", 0.0)) + sin(_t * 6.0 + i * 1.7) * 0.18 * clampf(speed / 8.0, 0.2, 1.0)
-	if defense == Defense.SHIELD and mode in ["idle", "walk", "run", "air"] and swing_timer <= 0.0:
-		var k := 1.0 - exp(-16.0 * delta)
-		arm_l.rotation = arm_l.rotation.lerp(Vector3(1.5, 0.35, 0.15), k)
 	if form == Form.WHIP and not _whip_links.is_empty():
 		for i in _whip_links.size():
 			var link := _whip_links[i]

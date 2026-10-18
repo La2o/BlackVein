@@ -103,6 +103,7 @@ func apply_colors() -> void:
 	var glow: Color = look.get("glow", Color(0, 0, 0))
 	body_mat.set_shader_parameter("glow_color", glow)
 	body_mat.set_shader_parameter("glow", 1.0 if glow.v > 0.01 else 0.0)
+	body_mat.set_shader_parameter("vein_amount", look.get("vein_amount", 1.0))
 
 
 var _anim_acc := 0.0

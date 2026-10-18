@@ -16,6 +16,7 @@ uniform float camo = 0.0;
 uniform float denim = 0.0;
 uniform vec3 glow_color : source_color = vec3(0.0);   // veins / tech lights
 uniform float glow = 0.0;
+uniform float vein_amount = 1.0;   // 1 = infected, lower = a few faint veins
 
 varying vec4 region;
 
@@ -69,8 +70,8 @@ void fragment() {
 	// clothes hide most of the muscle detail of the body underneath
 	NORMAL_MAP = mix(texture(normal_tex, UV).rgb, vec3(0.5, 0.5, 1.0), cloth * 0.85);
 	// glowing veins: thin bright lines wandering over bare skin
-	float vein = 1.0 - smoothstep(0.0, 0.035, abs(noise(UV * 55.0) - 0.5));
-	vein *= 0.5 + 0.5 * noise(UV * 9.0 + 3.0);
+	float vein = 1.0 - smoothstep(0.0, 0.035 * vein_amount, abs(noise(UV * 55.0) - 0.5));
+	vein *= smoothstep(1.0 - vein_amount, 1.0, noise(UV * 9.0 + 3.0));
 	EMISSION = glow_color * glow * vein * 2.5 * (1.0 - cloth);
 	ALBEDO = mix(ALBEDO, ALBEDO * 0.7 + glow_color * 0.3, glow * vein * (1.0 - cloth));
 }
