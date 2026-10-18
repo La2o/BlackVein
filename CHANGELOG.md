@@ -2,7 +2,23 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
-## [0.12.0] — 2026-10-19 — Creature forms, a stealth meter and collectibles
+## [Unreleased]
+
+### New
+- **Ragdolls**: people and soldiers go limp when they die. Their bodies tumble, fold over cars and
+  sprawl on the road. Up to 10 are simulated at once; bosses keep their death animation.
+- **Riot troopers** join hunts at higher alert. Their shield cuts hits from the front to a tenth.
+  Flank them, or smash the shield away with a big hit or an explosion.
+- **Snipers** take positions on rooftops at alert 3 and above. They see twice as far, paint you with a red
+  laser for 1.6 s, then fire one heavy shot. Break line of sight before the shot lands.
+- **Brute infected**: hulking, spiked infected that leap like hunters and hit hard. Most outbreaks
+  have one guarding the hive.
+- Riot trooper and sniper disguises get the same access as soldiers.
+
+### Fixed
+- A killing blow that also launched someone skipped their death entirely (no ragdoll, no death events).
+
+ — 2026-10-19 — Creature forms, a stealth meter and collectibles
 
 ### New
 - **Creature forms** (new Creatures skills; N / hold LB + D-pad Down to cycle): whole-body

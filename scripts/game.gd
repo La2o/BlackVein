@@ -52,14 +52,16 @@ var disguises: Array = []   # wardrobe: [{kind, label, outfit}] of identities yo
 var interiors: Node = null  # the enterable-buildings manager
 
 ## Every kind of foot soldier (the commander is separate: he never leaves the base).
-const SOLDIER_KINDS := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite"]
-const MILITARY_DISGUISES := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]
+const SOLDIER_KINDS := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "riot", "sniper"]
+const MILITARY_DISGUISES := ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "riot", "sniper", "commander"]
 const DISGUISE_INFO := {
 	"civilian": ["Civilian", "Blend into crowds on the street. The military ignores you while you stay calm."],
 	"soldier": ["Soldier", "Walk into the military base and bunker. Soldiers get suspicious more slowly."],
 	"rocket_soldier": ["Rocket soldier", "Same access as a soldier: the base and the bunker."],
 	"grenadier": ["Grenadier", "Same access as a soldier: the base and the bunker."],
 	"heavy_gunner": ["Heavy gunner", "Same access as a soldier: the base and the bunker."],
+	"riot": ["Riot trooper", "Same access as a soldier: the base and the bunker."],
+	"sniper": ["Sniper", "Same access as a soldier: the base and the bunker."],
 	"elite": ["Strike team", "Military access, and other soldiers trust you most."],
 	"commander": ["Base commander", "Full military access. Lets you call Artillery strikes."],
 	"scientist": ["Scientist", "Walk freely through the research labs without raising alarms."],

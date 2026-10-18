@@ -339,7 +339,9 @@ func _start_outbreak() -> void:
 	var e := _new_event("outbreak", pos, 240.0, "Destroy the hive near " + Game.city.location_name(pos))
 	e["units"].append(_spawn_hive(pos, e["tag"]))
 	for k in 6:
-		e["units"].append(Game.military.spawn_npc("infected", pos + Vector3(randf_range(-8, 8), 0, randf_range(-8, 8)), {"tag": e["tag"]}))
+		# a brute guards most hives
+		var kind := "brute" if k == 0 and randf() < 0.7 else "infected"
+		e["units"].append(Game.military.spawn_npc(kind, pos + Vector3(randf_range(-8, 8), 0, randf_range(-8, 8)), {"tag": e["tag"]}))
 	Game.panic_at(pos, 60.0)
 
 

@@ -1005,6 +1005,28 @@ func _run_all() -> void:
 	check("grenadiers lob grenades", saw_grenade)
 	check("heavy gunners are tough", heavy.max_hp > 100.0)
 	await _clear_units()
+	# riot troopers block hits from the front; a big hit smashes the shield
+	var riot = Game.military.spawn_npc("riot", player.global_position + Vector3(0, 0, -4))
+	await _wait(0.2)
+	riot._face_dir = (player.global_position - riot.global_position).normalized()
+	var riot_hp: float = riot.hp
+	riot.take_hit(Game.hit_info(20.0, Vector3.ZERO, player, "melee"))
+	check("a riot shield blocks frontal hits", riot._shield != null and riot_hp - riot.hp < 4.0, "lost %.1f" % (riot_hp - riot.hp))
+	riot.take_hit(Game.hit_info(60.0, Vector3.ZERO, player, "melee"))
+	check("a big hit smashes the riot shield", riot._shield == null)
+	# snipers paint you with a laser before they fire
+	Game.raise_alert(player.global_position, "")
+	var sniper = Game.military.spawn_npc("sniper", player.global_position + Vector3(0, 0, -30))
+	var lasered := false
+	t = 0.0
+	while t < 3.0 and is_instance_valid(sniper):
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		lasered = lasered or (sniper._laser != null and sniper._laser.visible)
+	check("snipers aim a red laser at you", lasered)
+	var brute = Game.military.spawn_npc("brute", player.global_position + Vector3(0, 0, -40))
+	check("brute infected are big and tough", brute.scale_factor > 1.3 and brute.max_hp > 250.0 and brute.is_in_group("hunters"))
+	await _clear_units()
 	Game.set_alert(Game.Alert.HIDDEN)
 	player.invuln_timer = 0.0
 
@@ -1207,6 +1229,15 @@ func _run_all() -> void:
 	await _wait(0.8)
 	check("goals complete and advance", Game.goal_index >= 1, "goal %d" % Game.goal_index)
 	Game.goal_index = maxi(gi, Game.goal_index)
+
+	# ---------------- ragdolls: people go limp when they die
+	var victim: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(0, 0, -5))
+	await _wait(0.2)
+	victim.take_hit(Game.hit_info(999.0, Vector3(0, 4, -8), null, "melee"))
+	await _wait(0.6)
+	check("people go limp (ragdoll) when they die", is_instance_valid(victim) and victim.model.ragdolling
+		and victim.model.skeleton.get_child_count() > 0,
+		"valid %s" % is_instance_valid(victim) if not is_instance_valid(victim) else "ragdoll %s, state %d, hp %.0f, model %d" % [victim.model.ragdolling, victim.state, victim.hp, victim.model.get_instance_id()])
 
 	# ---------------- viral caches (collectibles)
 	var cache_node: Node = Game.get_meta("collectibles")

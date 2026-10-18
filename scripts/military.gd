@@ -169,10 +169,17 @@ func _maintain() -> void:
 				kind = "grenadier"
 			elif hunted and heat >= 2.5 and roll < 0.6 + heat * 0.03:
 				kind = "heavy_gunner"
+			elif hunted and heat >= 2.0 and roll < 0.72 + heat * 0.03:
+				kind = "riot"
 			if heat >= 4.0 and randf() < 0.35:
 				kind = "elite"
 			var s := spawn_npc(kind, base + Vector3(randf_range(-3, 3), 0, randf_range(-3, 3)))
 			s.patrol_center = base
+	# snipers on the rooftops once the heat is up
+	if hunted and heat >= 2.5 and _count("military", ppos, 200.0, "sniper") < 2 and randf() < 0.2:
+		var roof: Vector3 = Game.city.random_roof_point(ppos, 50.0, 140.0)
+		if roof.y > 8.0:
+			spawn_npc("sniper", roof)
 	# tanks
 	var tanks := _count("military_vehicles", ppos, 220.0, "tank")
 	var want_tanks := 0

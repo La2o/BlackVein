@@ -19,8 +19,8 @@ const H := 4.6
 const DEPTH := -140.0
 
 const TYPES := {
-	"lab": {"name": "Origin Biotech Lab", "color": Color(0.3, 0.85, 1.0), "allowed": ["scientist", "soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]},
-	"bunker": {"name": "Military Bunker", "color": Color(1.0, 0.8, 0.2), "allowed": ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "commander"]},
+	"lab": {"name": "Origin Biotech Lab", "color": Color(0.3, 0.85, 1.0), "allowed": ["scientist", "soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "riot", "sniper", "commander"]},
+	"bunker": {"name": "Military Bunker", "color": Color(1.0, 0.8, 0.2), "allowed": ["soldier", "rocket_soldier", "grenadier", "heavy_gunner", "elite", "riot", "sniper", "commander"]},
 	"nest": {"name": "Subway Nest", "color": Color(1.0, 0.25, 0.15), "allowed": []},
 	"safehouse": {"name": "Safehouse", "color": Color(0.4, 1.0, 0.5), "allowed": []},
 }

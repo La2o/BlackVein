@@ -283,7 +283,7 @@ func swing(right := true, style := 0, duration := 0.22) -> void:
 
 ## mode: idle, walk, run, aim, flail, dead, grabbed, air, glide, crouch, cower (as in humanoid.gd)
 func animate(delta: float, speed: float, mode: String) -> void:
-	if anim == null:
+	if anim == null or ragdolling:
 		return
 	swing_timer = maxf(0.0, swing_timer - delta)
 	if mode != "dead":
@@ -337,3 +337,72 @@ func set_tint(material: Material) -> void:
 	for m in all_meshes:
 		if is_instance_valid(m):
 			m.material_overlay = material
+
+
+# ------------------------------------------------------------------ ragdoll
+
+## Bones that get a physics body when someone goes limp: [bone, child bone it reaches to, radius]
+const RAGDOLL_BONES := [
+	["pelvis", "spine_02", 0.13], ["spine_02", "neck_01", 0.14], ["Head", "", 0.11],
+	["upperarm_l", "lowerarm_l", 0.06], ["lowerarm_l", "hand_l", 0.05],
+	["upperarm_r", "lowerarm_r", 0.06], ["lowerarm_r", "hand_r", 0.05],
+	["thigh_l", "calf_l", 0.08], ["calf_l", "foot_l", 0.065],
+	["thigh_r", "calf_r", 0.08], ["calf_r", "foot_r", 0.065],
+]
+static var _active_ragdolls: Array = []   # oldest first; only a few simulate at once
+const MAX_RAGDOLLS := 10
+
+var ragdolling := false
+
+
+## Goes limp: the skeleton is handed to jointed physics bodies, pushed by `impulse`.
+func ragdoll(impulse: Vector3) -> void:
+	if ragdolling or skeleton == null:
+		return
+	ragdolling = true
+	_oneshot_t = 0.0
+	anim.stop()
+	anim.active = false
+	var sim := PhysicalBoneSimulator3D.new()
+	skeleton.add_child(sim)
+	var unit := 1.0 / maxf(skeleton.global_transform.basis.get_scale().y, 0.0001)
+	for spec in RAGDOLL_BONES:
+		var idx := skeleton.find_bone(spec[0])
+		if idx < 0:
+			continue
+		var pose := skeleton.get_bone_global_pose(idx)
+		var length := 0.22 * unit
+		if spec[1] != "":
+			var child := skeleton.find_bone(spec[1])
+			if child >= 0:
+				length = pose.origin.distance_to(skeleton.get_bone_global_pose(child).origin)
+		var pb := PhysicalBone3D.new()
+		pb.bone_name = spec[0]
+		pb.joint_type = PhysicalBone3D.JOINT_TYPE_CONE if spec[0] in ["Head", "upperarm_l", "upperarm_r", "thigh_l", "thigh_r"] \
+			else PhysicalBone3D.JOINT_TYPE_PIN
+		pb.collision_layer = 0
+		pb.collision_mask = Game.LAYER_WORLD | Game.LAYER_PROPS | Game.LAYER_VEHICLE
+		pb.mass = 4.0
+		pb.linear_damp = 0.4
+		pb.angular_damp = 2.0
+		# the body sits halfway down the bone; the joint is at the bone's start
+		pb.body_offset = Transform3D(Basis(), Vector3(0, -length * 0.5, 0))
+		pb.joint_offset = Transform3D(Basis(), Vector3(0, length * 0.5, 0))
+		var shape := CollisionShape3D.new()
+		var cap := CapsuleShape3D.new()
+		cap.radius = float(spec[2]) * unit
+		cap.height = maxf(length, cap.radius * 2.0 + 0.01)
+		shape.shape = cap
+		pb.add_child(shape)
+		sim.add_child(pb)
+		pb.transform = pose * pb.body_offset.affine_inverse()
+	sim.physical_bones_start_simulation()
+	for pb in sim.get_children():
+		if pb is PhysicalBone3D:
+			var share := 1.0 if (pb as PhysicalBone3D).bone_name in ["pelvis", "spine_02"] else 0.35
+			(pb as PhysicalBone3D).apply_central_impulse(impulse * share)
+	_active_ragdolls.append(sim)
+	while _active_ragdolls.size() > MAX_RAGDOLLS:
+		var old = _active_ragdolls.pop_front()
+		if is_instance_valid(old):
+			(old as PhysicalBoneSimulator3D).physical_bones_stop_simulation()

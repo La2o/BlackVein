@@ -20,6 +20,9 @@ const KINDS := {
 	"commander": {"hp": 220.0, "walk": 2.2, "run": 6.0, "faction": "military", "label": "the base commander", "weapon": "rifle"},
 	"infected": {"hp": 35.0, "walk": 2.0, "run": 7.2, "faction": "infected", "label": "an infected"},
 	"hunter": {"hp": 480.0, "walk": 4.0, "run": 15.0, "faction": "infected", "label": "a hunter"},
+	"brute": {"hp": 300.0, "walk": 3.2, "run": 11.0, "faction": "infected", "label": "a brute", "xp": 80},
+	"riot": {"hp": 90.0, "walk": 2.4, "run": 5.2, "faction": "military", "label": "a riot trooper", "weapon": "rifle", "xp": 22},
+	"sniper": {"hp": 45.0, "walk": 2.2, "run": 5.5, "faction": "military", "label": "a sniper", "weapon": "rifle", "xp": 20},
 	"leviathan": {"hp": 4200.0, "walk": 5.0, "run": 12.5, "faction": "infected", "label": "the Leviathan"},
 	"patient_zero": {"hp": 6500.0, "walk": 6.0, "run": 19.0, "faction": "infected", "label": "Patient Zero"},
 }
@@ -84,6 +87,9 @@ var _leap_cooldown := 0.0
 var _scream_cooldown := 0.0
 var _search_point := Vector3.INF
 var _last_seen_player := 99.0
+var _shield: MeshInstance3D       # riot troopers
+var _laser: MeshInstance3D        # snipers: the red aiming line
+var _aim_time := 0.0
 var noticing := false              # a soldier who can see you and finds you suspicious (stealth meter)
 var _marker: Label3D               # "?" while they're suspicious, "!" once they're after you
 var _grabbed_by: Node = null
@@ -103,7 +109,7 @@ func setup(k: String, extra := {}) -> void:
 	run_speed = data["run"]
 	label = data["label"]
 	event_tag = extra.get("tag", "")
-	scale_factor = 1.7 if k == "hunter" else (3.2 if k == "leviathan" else 1.0)
+	scale_factor = 1.7 if k == "hunter" else (3.2 if k == "leviathan" else (1.45 if k == "brute" else 1.0))
 	if k == "leviathan":
 		boss_name = "THE LEVIATHAN"
 	if k == "patient_zero":
@@ -131,7 +137,15 @@ func setup(k: String, extra := {}) -> void:
 	add_child(model)
 	model.setup(outfit)
 	model.scale = Vector3.ONE * scale_factor
-	if (k == "hunter" or k == "leviathan") and model is PersonModel:
+	if k == "riot" and model is PersonModel:
+		# a riot shield carried across the chest: blocks hits from the front until something big smashes it
+		_shield = MeshInstance3D.new()
+		var sm := BoxMesh.new()
+		sm.size = Vector3(0.62, 1.05, 0.06)
+		_shield.mesh = sm
+		_shield.material_override = HUMANOID.mat(Color(0.55, 0.65, 0.75), 0.0, 0.4, 0.15)
+		model.attach_to_body("spine_02", _shield, Vector3(0.08, -0.12, 0.32), Vector3(0, 0.15, 0))
+	if (k == "hunter" or k == "leviathan" or k == "brute") and model is PersonModel:
 		var spike_mat: Material = HUMANOID.mat(Color(0.12, 0.02, 0.02), 0.0, 0.2, 0.3)
 		# bone spikes down the back
 		for i in 5:
@@ -173,7 +187,7 @@ func setup(k: String, extra := {}) -> void:
 		add_to_group("infected")
 	if faction == "military":
 		add_to_group("military")
-	if k == "hunter" or k == "leviathan":
+	if k == "hunter" or k == "leviathan" or k == "brute":
 		add_to_group("hunters")
 	patrol_center = global_position
 	_think_timer = randf() * 0.4
@@ -279,6 +293,19 @@ func _make_outfit(k: String) -> Dictionary:
 				"glow": Color(0.9, 0.12, 0.05), "glow_style": "veins", "infected": true, "top": _pick(["tshirt", "long", "tank"]),
 				"glasses": false, "gear": "none"}, true)
 			return person
+		"brute":
+			return {"skin": Color(0.5, 0.15, 0.11), "pants": Color(0.14, 0.08, 0.07), "glow": Color(1, 0.22, 0.06),
+				"infected": true, "shirtless": true, "hair": "bald", "body": "m", "gear": "none"}
+		"riot":
+			person.merge({"shirt": Color(0.08, 0.1, 0.16), "pants": Color(0.07, 0.08, 0.12), "gear": "helmet",
+				"gear_color": Color(0.1, 0.12, 0.18), "top": "long", "vest": true, "vest_color": Color(0.05, 0.06, 0.09),
+				"gloves": true, "boots": true, "belt": true, "body": "m", "beard": false, "glasses": false}, true)
+			return person
+		"sniper":
+			person.merge({"shirt": Color(0.3, 0.32, 0.22), "pants": Color(0.28, 0.3, 0.2), "gear": "beret",
+				"gear_color": Color(0.2, 0.24, 0.16), "item": "rifle", "top": "long", "camo": true, "gloves": true,
+				"boots": true, "belt": true, "beard": false, "glasses": false}, true)
+			return person
 		"hunter":
 			return {"shirt": Color(0.3, 0.08, 0.07), "pants": Color(0.22, 0.06, 0.05), "skin": Color(0.35, 0.1, 0.09),
 				"glow": Color(1, 0.15, 0.05), "bulk": 1.5, "infected": true, "top": "tank", "veins": true, "hair": "bald", "body": "m"}
@@ -375,6 +402,22 @@ func take_hit(info: Dictionary) -> void:
 		return
 	if kind == "elite" and info["kind"] == "bullet":
 		dmg *= 0.6
+	if _shield and is_instance_valid(_shield) and src != null and is_instance_valid(src) and src is Node3D:
+		var to_src := (src as Node3D).global_position - global_position
+		to_src.y = 0.0
+		if to_src.length() > 0.1 and _face_dir.dot(to_src.normalized()) > 0.3:
+			if dmg > 45.0 or info["kind"] in ["explosion", "slam"]:
+				# smashed out of their hands
+				Game.fx.debris(_shield.global_position, 10, Color(0.6, 0.7, 0.8))
+				Game.fx.sound("block", global_position, 2.0)
+				_shield.queue_free()
+				_shield = null
+				dmg *= 0.5
+			else:
+				Game.fx.sound("block", global_position, -2.0)
+				Game.fx.burst_ring(global_position + _face_dir * 0.6 + Vector3.UP * 0.3, Color(0.7, 0.85, 1.0, 0.6), 1.0)
+				dmg *= 0.1
+				force *= 0.2
 	hp -= dmg
 	_hit_flash = 0.12
 	if src == Game.player and dmg > 1.0:
@@ -416,11 +459,10 @@ func _on_attacked_by_player() -> void:
 
 func _launch(force: Vector3, src: Node) -> void:
 	velocity = force
-	state = S.LAUNCHED if hp > 0.0 else S.DEAD
+	if state != S.DEAD:
+		state = S.LAUNCHED   # a killing blow still goes through _die (and the ragdoll)
 	_airborne_time = 0.0
 	_thrower = src
-	if hp > 0.0:
-		state = S.LAUNCHED
 
 
 func yank_to(by: Node3D) -> void:
@@ -499,6 +541,10 @@ func _die(info: Dictionary) -> void:
 		return
 	var was_launched := state == S.LAUNCHED
 	state = S.DEAD
+	# go limp: physics takes the body from here (bosses keep their death animation)
+	if model is PersonModel and scale_factor < 1.5:
+		var force: Vector3 = info.get("force", Vector3.ZERO)
+		model.ragdoll(force * 4.0 + velocity * 3.0 + Vector3.UP * 2.0)
 	hp = 0.0
 	_dead_time = 0.0
 	remove_from_group(faction)
@@ -627,6 +673,15 @@ func _physics_process(delta: float) -> void:
 
 func _dead_physics(delta: float) -> void:
 	_dead_time += delta
+	# a ragdoll: the body is physics now, the (invisible) capsule stays put
+	if model is PersonModel and model.ragdolling:
+		model.animate(delta, 0.0, "dead")
+		if _dead_time > 1.5 and collision_layer != 0:
+			collision_layer = 0
+		var lim := 30.0 if Game.npc_count < 90 else 10.0
+		if _dead_time > lim or Game.fell_out(global_position):
+			queue_free()
+		return
 	velocity.y -= 30.0 * delta
 	if is_on_floor():
 		velocity.x = move_toward(velocity.x, 0, 25.0 * delta)
@@ -848,7 +903,7 @@ func _think_military() -> void:
 	if p and not p.is_dead():
 		var pp := _player_target_pos()
 		var d := me.distance_to(pp)
-		var sight := 85.0
+		var sight := 170.0 if kind == "sniper" else 85.0
 		var wx: Node = Game.get_meta("weather", null)
 		if wx and wx.is_bad_weather() and kind != "elite":
 			sight = 45.0
@@ -929,7 +984,7 @@ func _think_military() -> void:
 func _think_infected() -> void:
 	var me := global_position
 	var best: Node3D = null
-	var hunterish := kind in ["hunter", "leviathan", "patient_zero"]
+	var hunterish := kind in ["hunter", "leviathan", "patient_zero", "brute"]
 	var best_d := 34.0 if not hunterish else 70.0
 	var p := Game.player
 	if p and not p.is_dead() and p.vehicle == null:
@@ -1045,6 +1100,9 @@ func _act_engage(delta: float) -> void:
 	var to := tpos - global_position
 	var flat := Vector3(to.x, 0, to.z)
 	var dist := flat.length()
+	if kind == "sniper":
+		_snipe(delta, tpos, flat)
+		return
 	# rockets and grenades keep their distance; heavy gunners wade in
 	var ideal_min := 10.0
 	var ideal_max := 28.0
@@ -1094,6 +1152,45 @@ func _act_engage(delta: float) -> void:
 		_burst_timer = 0.07 if _burst_left > 0 else randf_range(1.6, 2.4)
 	else:
 		_burst_timer = 0.11 if _burst_left > 0 else randf_range(0.9, 1.7)
+
+
+## Snipers stay put on their rooftop, paint you with a red laser for 1.6 s, then take one heavy shot.
+func _snipe(delta: float, tpos: Vector3, flat: Vector3) -> void:
+	velocity.x = move_toward(velocity.x, 0.0, 20.0 * delta)
+	velocity.z = move_toward(velocity.z, 0.0, 20.0 * delta)
+	_face_dir = flat.normalized() if flat.length() > 0.1 else _face_dir
+	var muzzle := global_position + Vector3.UP * 0.55 + _face_dir * 0.7
+	var sees := can_see_point(tpos + Vector3.UP * 0.3)
+	if _laser == null:
+		_laser = MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.025, 0.025, 1.0)
+		_laser.mesh = bm
+		_laser.material_override = HUMANOID.mat(Color(1, 0.08, 0.05), 6.0)
+		_laser.top_level = true
+		add_child(_laser)
+	_laser.visible = sees
+	if not sees:
+		_aim_time = 0.0
+		return
+	Game.fx.orient_line(_laser, muzzle, tpos + Vector3.UP * 0.4, 0.025)
+	_aim_time += delta
+	if _aim_time < 1.6:
+		return
+	_aim_time = -1.9   # reload before the next aim
+	var dir := (tpos + Vector3.UP * randf_range(0.0, 0.5) - muzzle).normalized()
+	dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.006).normalized()
+	var mask := Game.LAYER_WORLD | Game.LAYER_PLAYER | Game.LAYER_NPC | Game.LAYER_VEHICLE | Game.LAYER_PROPS
+	var hit := Game.raycast(muzzle, muzzle + dir * 250.0, mask, [get_rid()])
+	var end := muzzle + dir * 250.0
+	if not hit.is_empty():
+		end = hit["position"]
+		var c := hit["collider"] as Node
+		if c and c.has_method("take_hit") and not c.is_in_group("military"):
+			c.take_hit(Game.hit_info(24.0, dir * 4.0, self, "bullet"))
+	Game.fx.tracer(muzzle, end, Color(1, 0.9, 0.6), 0.08)
+	Game.fx.sound("gunshot", muzzle, 4.0, 0.05)
+	Game.panic_at(global_position, 40.0)
 
 
 func _fire_bullet(tpos: Vector3, dist: float) -> void:
@@ -1169,7 +1266,7 @@ func _act_chase(delta: float) -> void:
 	elif kind == "patient_zero":
 		if _pz_moves(delta, dist, tpos):
 			return
-	if kind in ["hunter", "leviathan", "patient_zero"] and _leap_cooldown <= 0.0 and is_on_floor():
+	if kind in ["hunter", "leviathan", "patient_zero", "brute"] and _leap_cooldown <= 0.0 and is_on_floor():
 		var height := to.y
 		if (dist > 6.0 and dist < 24.0) or (height > 5.0 and dist < 40.0):
 			_leap_at(tpos)
@@ -1192,6 +1289,9 @@ func _melee(t: Node3D) -> void:
 	if kind == "hunter":
 		dmg = 22.0
 		force = _face_dir * 18.0 + Vector3.UP * 6.0
+	elif kind == "brute":
+		dmg = 16.0
+		force = _face_dir * 14.0 + Vector3.UP * 5.0
 	elif kind == "leviathan":
 		dmg = 40.0
 		force = _face_dir * 30.0 + Vector3.UP * 12.0
