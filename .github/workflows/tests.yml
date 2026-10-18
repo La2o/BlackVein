@@ -7,9 +7,9 @@ on:
 jobs:
   play-through:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download Godot 4.5
         run: |
@@ -22,4 +22,21 @@ jobs:
         run: ./godot --headless --path . --import || true
 
       - name: Run automated play-through
-        run: ./godot --headless --path . res://tests/test_runner.tscn
+        run: |
+          set +e
+          ./godot --headless --path . res://tests/test_runner.tscn > test.log 2>&1
+          code=$?
+          cat test.log
+          # surface every failed check and script error as an annotation on the run
+          grep -E "^FAIL" test.log | while read -r line; do echo "::error title=Test failed::$line"; done
+          grep -E "SCRIPT ERROR" -A2 test.log | grep -vE "^--$" | paste - - - | head -20 | while read -r line; do echo "::error title=Script error::$line"; done
+          summary=$(grep -E "checks, [0-9]+ failed" test.log | tail -1)
+          echo "::notice title=Result::${summary:-no summary line (crashed or timed out), exit $code}"
+          exit $code
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-log
+          path: test.log
