@@ -9,6 +9,14 @@ Read this first in every new session. It's the fastest way to get back up to spe
 - Wants Prototype-style mechanics plus original ideas, world events, progression and grind.
 - Likes being told what changed in plain words (keep CHANGELOG.md updated).
 
+## Where the project lives
+
+- GitHub: https://github.com/La2o/BlackVein (branch `main`). This is the source of truth.
+- The owner's PC has a copy at `C:\Users\ygsna\BLACKVEIN` (written via the desktop-app bridge;
+  `.git` and `.github` can't be written there, so it's a plain copy, not a clone).
+- The owner plays the exported `BLACKVEIN.exe` (sent as a zip each release).
+- Pushing tags through the session proxy is refused; push `main` with `git -c push.negotiate=false push`.
+
 ## Engine & rules
 
 - Godot **4.5**, GDScript only, Forward+ renderer (must also work in Compatibility).
