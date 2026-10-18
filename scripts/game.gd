@@ -117,6 +117,7 @@ var play_time := 0.0
 var autosave_timer := 45.0
 const MAX_LEVEL := 50
 const SAVE_PATH := "user://blackvein_save.json"
+var save_path := SAVE_PATH   # tests point this elsewhere, see use_test_storage()
 
 ## id: [name, description, category, cost per rank, min level, max rank, requires]
 const SKILLS := {
@@ -451,7 +452,7 @@ func locked_message(id: String) -> void:
 # ---------------------------------------------------------------- saving
 
 func has_save() -> bool:
-	return FileAccess.file_exists(SAVE_PATH)
+	return FileAccess.file_exists(save_path)
 
 
 func save_game(announce := false) -> void:
@@ -472,7 +473,7 @@ func save_game(announce := false) -> void:
 			"form": pw.form, "defense": pw.defense, "vision": pw.vision, "legs": pw.legs,
 		},
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_string(JSON.stringify(data, "\t"))
@@ -485,7 +486,7 @@ func save_game(announce := false) -> void:
 func load_game() -> bool:
 	if not has_save():
 		return false
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path, FileAccess.READ)
 	if f == null:
 		return false
 	var parsed = JSON.parse_string(f.get_as_text())
@@ -603,9 +604,16 @@ func is_trespassing(pos: Vector3) -> bool:
 	return false
 
 
+## Tests call this first so they never wipe the player's real save or settings.
+func use_test_storage() -> void:
+	save_path = "user://test_save.json"
+	Settings.path = "user://test_settings.cfg"
+	Settings.last_seen_version = str(ProjectSettings.get_setting("application/config/version", ""))   # no "what's new" popup
+
+
 func delete_save() -> void:
 	if has_save():
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
 
 
 func new_game() -> void:

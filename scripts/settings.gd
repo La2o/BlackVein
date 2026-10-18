@@ -6,6 +6,7 @@ extends Node
 signal changed
 
 const PATH := "user://settings.cfg"
+var path := PATH
 
 var mouse_sensitivity := 1.0     # multiplier
 var stick_sensitivity := 1.0     # multiplier
@@ -115,7 +116,7 @@ func key_name(action: String) -> String:
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(PATH) != OK:
+	if cfg.load(path) != OK:
 		return
 	mouse_sensitivity = cfg.get_value("controls", "mouse_sensitivity", mouse_sensitivity)
 	stick_sensitivity = cfg.get_value("controls", "stick_sensitivity", stick_sensitivity)
@@ -149,7 +150,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "volume", volume)
 	cfg.set_value("audio", "music_volume", music_volume)
 	cfg.set_value("controls", "bindings", bindings)
-	cfg.save(PATH)
+	cfg.save(path)
 
 
 func apply() -> void:

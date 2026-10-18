@@ -41,6 +41,11 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_comp
 ```
 
 When adding a feature, add a check to `tests/test_runner.gd`.
+Every test scene calls `Game.use_test_storage()` first so it never deletes the player's real save or
+settings (they share `user://` with the game). New test scenes must do the same.
+Screenshots run in a window: if another window takes focus, Godot releases simulated key presses and
+movement checks fail — only the headless run counts.
+README screenshots live in `docs/screenshots/` (1280x720 JPG, `.gdignore` keeps them out of builds).
 For a quick visual check of specific scenes use `tests/screenshots.tscn` (edit it to set up what you want to see).
 
 ## Where things live

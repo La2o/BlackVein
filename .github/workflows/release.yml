@@ -1,11 +1,17 @@
 name: Release builds
 
-# Push a tag like v0.3.0 (or run it by hand from the Actions tab) to build
-# Windows and Linux versions and attach them to a GitHub Release.
+# Push a tag like v0.3.0 to build Windows and Linux versions and attach them to a GitHub Release.
+# To (re)build an older version, run this by hand from the Actions tab and enter its tag:
+# versions from before export settings existed borrow them from main.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and release (e.g. v0.1.0). Leave empty for a test build."
+        required: false
+        default: ""
 
 jobs:
   export:
@@ -13,8 +19,19 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Borrow export settings from main for old versions
+        run: |
+          for f in export_presets.cfg icon.ico; do
+            [ -f "$f" ] || git show origin/main:"$f" > "$f"
+          done
 
       - name: Download Godot 4.5 and export templates
         run: |
@@ -37,6 +54,14 @@ jobs:
           cd export/windows && zip -q ../BLACKVEIN-windows.zip BLACKVEIN.exe && cd ../..
           cd export/linux && zip -q ../BLACKVEIN-linux.zip BLACKVEIN.x86_64 && cd ../..
 
+      - name: Release notes from the changelog
+        run: |
+          # the matching "## [x.y.z]" section of main's CHANGELOG.md
+          git show origin/main:CHANGELOG.md | awk -v v="${TAG#v}" '
+            /^## \[/ { if (on) exit; on = index($0, "[" v "]") > 0; next }
+            on' > notes.md
+          [ -s notes.md ] || echo "BLACKVEIN $TAG" > notes.md
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -44,7 +69,10 @@ jobs:
           path: export/*.zip
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          name: BLACKVEIN ${{ env.TAG }}
+          body_path: notes.md
           files: export/*.zip

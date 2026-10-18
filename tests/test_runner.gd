@@ -18,6 +18,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("shots="):
 			shots_dir = a.substr(6)
+	Game.use_test_storage()
 	Game.delete_save()
 	Game.reset_state()
 	main = MAIN.instantiate()
@@ -183,6 +184,42 @@ func _run_all() -> void:
 	check("jump while running leaves the ground instantly", left_ground)
 	check("jump while running keeps your speed", air_speed >= run_speed * 0.95, "%.1f -> %.1f m/s" % [run_speed, air_speed])
 	await _wait(3.0)
+
+	# ---------------- sprinting over a low wall is one seamless vault
+	await _teleport(Game.city.spawn_point, PI * 0.5)
+	await _wait(0.5)
+	Input.action_press("sprint")
+	Input.action_press("move_forward")
+	await _wait(1.0)
+	var run_dir := Vector3(player.velocity.x, 0, player.velocity.z).normalized()
+	var feet_y := player.global_position.y - 0.9
+	var block := StaticBody3D.new()
+	block.collision_layer = Game.LAYER_WORLD
+	var block_shape := CollisionShape3D.new()
+	var block_box := BoxShape3D.new()
+	block_box.size = Vector3(4.0, 1.3, 2.5)
+	block_shape.shape = block_box
+	block.add_child(block_shape)
+	main.add_child(block)
+	var block_at := player.global_position + run_dir * 16.0
+	block.global_position = Vector3(block_at.x, feet_y + 0.65, block_at.z)
+	block.look_at(block.global_position + run_dir, Vector3.UP)
+	var vaults0 := int(Game.stats.get("vaults", 0))
+	var min_speed := INF
+	var went_wall := false
+	t = 0.0
+	while t < 1.6:
+		await get_tree().physics_frame
+		t += get_physics_process_delta_time()
+		min_speed = minf(min_speed, Vector3(player.velocity.x, 0, player.velocity.z).length())
+		went_wall = went_wall or player.state == Player.State.WALL
+	var past := (player.global_position - block.global_position).dot(run_dir)
+	_release_all()
+	block.queue_free()
+	check("sprinting at a low wall vaults it", int(Game.stats.get("vaults", 0)) > vaults0 and past > 2.0 and not went_wall,
+		"%.1f m past, wall %s" % [past, went_wall])
+	check("vaulting never slows the run", min_speed > player.sprint_speed * 0.85, "slowest %.1f m/s" % min_speed)
+	await _wait(1.0)
 
 	# ---------------- controller works on any device id
 	var joy := InputEventJoypadMotion.new()
@@ -643,7 +680,13 @@ func _run_all() -> void:
 	if commander:
 		await _teleport(Game.city.spawn_point)
 		commander.global_position = player.global_position + Vector3(0, 0.3, -1.4)
+		# nobody else (a passer-by, a fresh body) may be closer than the commander
+		for n in get_tree().get_nodes_in_group("npcs"):
+			if n != commander and (n as Node3D).global_position.distance_to(player.global_position) < 6.0:
+				n.queue_free()
 		await get_tree().physics_frame
+		var near: Node3D = Game.nearest_in_group("npcs", player.global_position, 3.4, func(n): return n.can_be_consumed())
+		check("commander is the one in reach", near == commander, str(near.get("kind")) if near else "nobody")
 		await _tap("consume")
 		await _wait(1.3)
 		check("consuming the commander gives artillery codes", Game.flags.get("artillery_codes", false))

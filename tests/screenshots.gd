@@ -13,6 +13,7 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("shots="):
 			dir = a.substr(6)
+	Game.use_test_storage()
 	Game.delete_save()
 	Game.reset_state()
 	main = MAIN.instantiate()

@@ -131,6 +131,9 @@ var _base_q := Quaternion.IDENTITY
 var _bank := 0.0
 var _last_facing := Vector3.FORWARD
 var _vault_cd := 0.0
+var _vault_t := 0.0       # time left in the current vault arc (plus a little landing grace)
+var _vault_speed := 0.0   # running speed the vault keeps
+const VAULT_MAX_HEIGHT := 1.8
 
 @onready var visual: Node3D = $Visual
 @onready var model: Node3D = $Visual/Model
@@ -288,6 +291,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	velocity /= comp
 	_push_props()
+	if _vault_t > 0.0:
+		_vault_assist(delta)
 	_check_landing()
 	_update_visual(delta)
 
@@ -338,40 +343,86 @@ func _state_ground(delta: float) -> void:
 	if (Input.is_action_just_pressed("dash") and not Input.is_action_pressed("devastator_mod")) and dash_cooldown_timer <= 0.0 and powers.can_move():
 		_start_dash()
 		return
+	# low obstacles are vaulted before they can count as a wall to run up
+	if sprinting and _try_vault(delta):
+		return
 	if (sprinting or powers.clings_to_walls()) and wall_cooldown <= 0.0:
 		var n := _wall_ahead(wish)
 		if n != Vector3.ZERO:
 			_enter_wall(n)
 			return
-	if sprinting:
-		_try_vault(delta)
 
 
-## Sprinting into something low (a car, bench, low wall) hops over it without slowing down.
-func _try_vault(delta: float) -> void:
+## Sprinting at something low (a car, bench, low wall) hops over it in one smooth arc without
+## slowing down: the obstacle is spotted well ahead, its height measured and the hop sized to clear it.
+func _try_vault(delta: float) -> bool:
 	_vault_cd -= delta
 	var hv := Vector3(velocity.x, 0, velocity.z)
-	if _vault_cd > 0.0 or hv.length() < 9.0 or not is_on_floor():
-		return
-	var d := hv.normalized()
-	var reach := CAPSULE_RADIUS + 0.4 + hv.length() * 0.06
+	var speed := hv.length()
+	if _vault_cd > 0.0 or speed < 9.0 or not is_on_floor():
+		return false
+	var d := hv / speed
+	var feet := global_position + Vector3.DOWN * 0.9
+	var reach := CAPSULE_RADIUS + 0.3 + speed * 0.22
 	var mask := Game.LAYER_WORLD | Game.LAYER_PROPS | Game.LAYER_VEHICLE
 	var ex: Array[RID] = [get_rid()]
-	var low := Game.raycast(global_position + Vector3.DOWN * 0.5, global_position + Vector3.DOWN * 0.5 + d * reach, mask, ex)
+	var low_from := feet + Vector3.UP * 0.35
+	var low := Game.raycast(low_from, low_from + d * reach, mask, ex)
 	if low.is_empty():
-		return
-	var high := Game.raycast(global_position + Vector3.UP * 0.75, global_position + Vector3.UP * 0.75 + d * (reach + 0.8), mask, ex)
-	if not high.is_empty():
-		return
-	_vault_cd = 0.6
-	velocity.y = 10.0
+		return false
+	var ln: Vector3 = low["normal"]
+	if ln.y > 0.6:
+		return false   # a ramp: just run up it
+	var face: Vector3 = low["position"]
+	var probe := face + d * 0.35
+	var top_ray := Game.raycast(Vector3(probe.x, feet.y + VAULT_MAX_HEIGHT + 0.6, probe.z),
+		Vector3(probe.x, feet.y + 0.3, probe.z), mask, ex)
+	if top_ray.is_empty():
+		return false   # taller than a vault (or the ray started inside it)
+	var top_pos: Vector3 = top_ray["position"]
+	var top := top_pos.y - feet.y
+	if top > VAULT_MAX_HEIGHT:
+		return false
+	var dist := Vector2(face.x - feet.x, face.z - feet.z).length()
+	var high_from := feet + Vector3.UP * (top + 1.1)
+	if not Game.raycast(high_from, high_from + d * (dist + 1.5), mask, ex).is_empty():
+		return false   # no room for the body above it
+	# lowest arc that is above the obstacle's top when we reach its face
+	var clear := top + 0.3
+	var tf := maxf(dist / speed, 0.08)
+	var vy := maxf(clear / tf + gravity * tf * 0.5, sqrt(2.0 * gravity * clear))
+	vy = minf(vy, 16.0)
+	_vault_cd = 0.4
+	_vault_speed = speed
+	_vault_t = 2.0 * vy / gravity + 0.15
+	velocity.y = vy
 	state = State.AIR
 	coyote = 0.0
 	double_jump_ready = true
-	start_trick("vault", 0.5, 1.0 if randf() < 0.5 else -1.0)
+	start_trick("vault", 2.0 * vy / gravity, 1.0 if randf() < 0.5 else -1.0)
 	Game.fx.sound("whoosh", global_position, -8.0)
 	Game.stat_add("vaults")
 	conspicuous_timer = maxf(conspicuous_timer, 1.0)
+	return true
+
+
+## Keeps a vault flowing: if the arc clips the obstacle's edge, slide up over it at full
+## speed instead of stopping against it.
+func _vault_assist(delta: float) -> void:
+	_vault_t -= delta
+	if state != State.AIR:
+		_vault_t = 0.0
+		return
+	if not is_on_wall():
+		return
+	var dir := Vector3(pre_move_velocity.x, 0, pre_move_velocity.z)
+	if dir.length() < 1.0 or Vector3(velocity.x, 0, velocity.z).length() > _vault_speed * 0.9:
+		return
+	dir = dir.normalized()
+	global_position.y += 0.2
+	velocity.x = dir.x * _vault_speed
+	velocity.z = dir.z * _vault_speed
+	velocity.y = maxf(velocity.y, 3.0)
 
 
 func _ground_jump() -> void:
@@ -923,6 +974,8 @@ func _check_landing() -> void:
 	if state in [State.AIR, State.GLIDE, State.DIVE, State.TETHER]:
 		var impact := fall_speed_before_move
 		var was_dive := state == State.DIVE
+		var from_vault := _vault_t > 0.0 and state == State.AIR
+		_vault_t = 0.0
 		if state == State.TETHER and tether_line:
 			tether_line.visible = false
 		state = State.GROUND
@@ -934,6 +987,8 @@ func _check_landing() -> void:
 		if powers.legs in [PlayerPowers.Legs.LEAPER, PlayerPowers.Legs.CRUSHER]:
 			stomp_at = 16.0
 		var moving_on := sprinting and wish.length() > 0.3
+		if from_vault:
+			return   # a vault lands straight back into the run: no roll, no squash
 		if impact > 16.0 and moving_on and not was_dive:
 			start_trick("roll", 0.5)
 			Game.fx.debris(global_position + Vector3.DOWN * 0.8, 6, Color(0.5, 0.48, 0.45))

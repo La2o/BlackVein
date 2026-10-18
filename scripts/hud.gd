@@ -637,8 +637,12 @@ func _build_settings() -> void:
 	_build_rebind()
 
 
-const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.7[/color][/b]
+const WHATS_NEW := """[b][color=#ff5544]WHAT'S NEW in 0.7.1[/color][/b]
 
+[b]Seamless vaults[/b] — sprint at a car or low wall and you flow over it at full speed.
+[b]Brighter nights[/b] — more moonlight, easier to see the streets.
+
+[b][color=#ff5544]0.7[/color][/b]
 [b]Forms wheel[/b] (hold Alt or X / hold D-pad Up) — time slows and you pick a form for every
 body part: [b]head[/b] (Thermal, Night Vision, Predator Sense), [b]arms[/b], [b]body[/b] (Shield, Armor,
 [b]Wings[/b]) and [b]legs[/b] (Runner, Leaper, Crawler, Crusher). Unlock them in Skills.

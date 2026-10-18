@@ -68,7 +68,7 @@ func _apply() -> void:
 	if day < 0.0:
 		col = dusk_col.lerp(moon_col, clampf(-day * 4.0, 0.0, 1.0))
 	sun.light_color = col
-	sun.light_energy = lerpf(0.45, 1.35, light_amount)
+	sun.light_energy = lerpf(0.6, 1.35, light_amount)
 	sun.shadow_enabled = light_amount > 0.05 or day < -0.2
 	var top_day := Color(0.26, 0.42, 0.66)
 	var top_dusk := Color(0.3, 0.27, 0.45)
@@ -99,9 +99,9 @@ func _apply() -> void:
 		sky_mat.set_shader_parameter("cloud_color", cloud_col)
 	env.fog_light_color = hor.lerp(Color(0.5, 0.5, 0.5), 0.2)
 	sun.light_energy *= 1.0 - cloud_dark * 0.45
-	env.tonemap_exposure = lerpf(1.0, 1.4, night)
-	env.ambient_light_color = hor.lerp(top, 0.5).lerp(Color(0.3, 0.34, 0.5), night).lerp(Color(0.62, 0.62, 0.66), light_amount * 0.3)
-	env.ambient_light_energy = lerpf(1.25, 0.8, light_amount)
+	env.tonemap_exposure = lerpf(1.0, 1.55, night)
+	env.ambient_light_color = hor.lerp(top, 0.5).lerp(Color(0.36, 0.4, 0.55), night).lerp(Color(0.62, 0.62, 0.66), light_amount * 0.3)
+	env.ambient_light_energy = lerpf(1.4, 0.8, light_amount)
 	env.ambient_light_sky_contribution = lerpf(0.15, 0.55, light_amount)
 	env.background_energy_multiplier = lerpf(0.45, 1.0, light_amount)
 	if Game.city:

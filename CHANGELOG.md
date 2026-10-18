@@ -2,6 +2,25 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [0.7.1] — 2026-10-18 — Seamless vaults, brighter nights
+
+### Changed
+- **Vaults are seamless:** sprinting at a car, bench or low wall now spots it much earlier,
+  measures how tall it is and hops over in one smooth arc at full speed. You never clip the edge
+  and stop, low walls are vaulted instead of starting a wall run, and you land straight back into
+  the run (no roll or squash).
+- **Nights are a little brighter:** stronger moonlight, more ambient light and slightly higher
+  exposure, so the streets are readable without losing the night mood.
+- Release builds now carry the changelog as release notes, and older versions can be rebuilt
+  from the Actions tab.
+
+### Fixed
+- Close-range aim assist accepts targets beside the aim line; bone spikes fly past loose objects.
+- Respawning clears leftover air state (a jump right after respawn could glide instead of
+  double jump).
+- The automated tests no longer delete your save or reset your settings: they use their own
+  files (`test_save.json`, `test_settings.cfg`).
+
 ## [0.7.0] — 2026-10-18 — Body-part forms, parkour, 3D people
 
 ### New
