@@ -519,6 +519,7 @@ func _jump_boost(delta: float) -> void:
 		Game.fx.tendril_flash(from, global_position + Vector3.DOWN * 0.2, 0.1, lerpf(0.03, 0.07, charge))
 	if not _super_done and boost_held > jump_boost_time * 0.6:
 		_super_done = true
+		model.oneshot("NinjaJump_Start", 1.8)
 		Game.stat_add("super_jumps")
 		trauma = minf(1.0, trauma + 0.25)
 		parkour_timer = 2.0

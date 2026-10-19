@@ -17,7 +17,8 @@ All notable changes to BLACKVEIN. Newest first.
   (CC0), recoloured black and blood red with faint pulsing veins, worn over the base body's head.
   It moves with every animation like everyone else.
 - **More animation**: Quaternius's Universal Animation Library 2 (CC0) is in: sword combos, an
-  overhand throw and more, on the same skeleton as everyone else.
+  overhand throw and more, on the same skeleton as everyone else. BLACKVEIN gets a real superhero
+  landing, a ninja-jump take-off for super jumps and a streamlined pose for long falls and launches.
 
 ## [0.13.0] — 2026-10-19 — Ragdolls, new enemies, Bio-Bomb and time trials
 

@@ -399,8 +399,12 @@ func _apply_legs() -> void:
 ## Trick poses from player.gd mapped to the closest animation (the whole-body flips, leans and tilts
 ## are still done by player.gd on top).
 func _pose_anim(pose: Dictionary) -> String:
-	if pose == Player.POSE_TUCK or pose == Player.POSE_COIL or pose == Player.POSE_HERO:
-		return "Crouch_Idle"   # tucked for flips and rolls, coiled for a charge, crouched on a hero landing
+	if pose == Player.POSE_HERO:
+		return "NinjaJump_Land"   # the superhero landing, one hand down
+	if pose == Player.POSE_TUCK or pose == Player.POSE_COIL:
+		return "Crouch_Idle"   # tucked for flips and rolls, coiled for a charge
+	if pose == Player.POSE_ROCKET or pose == Player.POSE_LONGJUMP:
+		return "NinjaJump_Idle"   # streamlined in flight
 	if pose == Player.POSE_NINJA:
 		return "Sprint"
 	if pose == Player.POSE_SKYDIVE:
@@ -447,7 +451,8 @@ func _player_locomotion(delta: float, speed: float, mode: String) -> void:
 			else:
 				play("Sprint", 0.15, clampf(speed / 6.5, 1.0, 3.2))
 		"air":
-			play("Jump", 0.18)
+			# a long fall or a big launch gets the ninja-jump air pose
+			play("NinjaJump_Idle" if _air_time > 0.8 or vertical_speed > 16.0 else "Jump", 0.25)
 		"glide":
 			play("Swim_Idle", 0.3, 0.6)
 		_:
