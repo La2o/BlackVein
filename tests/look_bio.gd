@@ -28,11 +28,31 @@ func _ready() -> void:
 	for id in ["bio_blade", "bio_gun", "bone_javelin", "spore_launcher"]:
 		Game.skills[id] = 1
 	p.biomass = p.max_biomass
-	p.respawn(base)
+	seed(7)
+	p.respawn(Game.city.random_roof_point(base, 40.0, 160.0) + Vector3.UP * 0.3)   # in the sun, above the street
 	p.yaw = 0.0
 	var cam := Camera3D.new()
 	add_child(cam)
 	await _wait(0.5)
+	# hero shots from four sides (the sun picks the best one)
+	cam.make_current()
+	for k in 4:
+		var a := k * TAU / 4.0
+		var off := Vector3(sin(a), 0, cos(a)) * 2.3
+		cam.global_position = p.global_position + off + Vector3.UP * 0.9
+		cam.look_at(p.global_position + Vector3.UP * 0.5)
+		await _wait(0.3)
+		await _shot("hero_%d" % k)
+	# a portrait of the true form first
+	cam.make_current()
+	cam.global_position = p.global_position + p.facing * 2.4 + Vector3.UP * 1.0
+	cam.look_at(p.global_position + Vector3.UP * 0.45)
+	await _wait(0.6)
+	await _shot("player_front")
+	cam.global_position = p.global_position + p.facing * 1.1 + Vector3.UP * 1.25 + p.global_transform.basis.x * 0.4
+	cam.look_at(p.global_position + Vector3.UP * 0.75)
+	await _wait(0.2)
+	await _shot("player_face")
 	var shots := [["bio_blade", "Sword_Regular_A", 0.18], ["bio_blade", "Sword_Regular_C", 0.5], ["bio_gun", "", 0.0], ["javelin", "OverhandThrow", 0.35], ["spore", "", 0.0]]
 	var i := 0
 	for sh in shots:

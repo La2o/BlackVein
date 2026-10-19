@@ -24,6 +24,11 @@ const HAIR := {
 const ANIMS := "res://assets/characters/animations/UAL1_Standard.glb"
 const ANIMS_2 := "res://assets/characters/animations/UAL2_Standard.glb"   # parkour, sword combos, throws
 const SHADER := preload("res://shaders/person.gdshader")
+const OUTFIT_SHADER := preload("res://shaders/outfit.gdshader")
+## Full outfits (Quaternius Modular Character Outfits, CC0) worn over just the base body's head.
+const OUTFITS := {
+	"ranger": "res://assets/characters/outfits/Male_Ranger.gltf",
+}
 
 ## region per bone: shoes, trousers, shirt, short sleeve (upper arm), long sleeve (forearm)
 const BONE_REGION := {
@@ -83,6 +88,8 @@ func setup(new_look: Dictionary) -> void:
 		_add_hair(HAIR["beard"], look.get("hair_color", Color(0.2, 0.14, 0.09)))
 	# every body is scaled to 1.8 m (times its height), feet on foot_offset
 	var tall: float = body_mesh.mesh.get_aabb().size.y * skeleton.global_transform.basis.get_scale().y / maxf(root.scale.y, 0.0001)
+	if look.has("outfit"):
+		_wear_outfit(str(look["outfit"]), body, body_mesh)
 	var h: float = look.get("height", 1.0)
 	root.scale = Vector3.ONE * (1.8 / maxf(tall, 0.1)) * h
 	root.position.y = foot_offset
@@ -211,6 +218,88 @@ static func library() -> AnimationLibrary:
 				_library.add_animation(a, lib2.get_animation(a))
 		scene2.free()
 	return _library
+
+
+## Swaps the body for the head alone and puts the outfit's meshes on our skeleton (same rig, so they
+## follow every animation), recoloured by outfit.gdshader.
+func _wear_outfit(outfit_id: String, body: String, mi: MeshInstance3D) -> void:
+	mi.mesh = _head_mesh(body, mi)
+	var src: Node = _scene(OUTFITS[outfit_id]).instantiate()
+	var parts: Array[Node] = src.find_children("*", "MeshInstance3D", true, false)
+	for n in parts:
+		var part := n as MeshInstance3D
+		var mat := part.mesh.surface_get_material(0) as StandardMaterial3D
+		var skin_set := mat != null and mat.albedo_texture != null and mat.albedo_texture.resource_path.contains("Regular")
+		var sm := ShaderMaterial.new()
+		sm.shader = OUTFIT_SHADER
+		if mat:
+			sm.set_shader_parameter("albedo_tex", mat.albedo_texture)
+			sm.set_shader_parameter("normal_tex", mat.normal_texture)
+			sm.set_shader_parameter("orm_tex", mat.roughness_texture if skin_set else mat.metallic_texture)
+		sm.set_shader_parameter("roughness_only", skin_set)
+		if skin_set:
+			var skin: Color = look.get("skin", Color(1, 1, 1))
+			var skin_ref := Color(0.85, 0.66, 0.55)   # the base character's light skin, so hands match the face
+			sm.set_shader_parameter("cloth_tint", Color(skin_ref.r * skin.r, skin_ref.g * skin.g, skin_ref.b * skin.b) * 0.55)
+			sm.set_shader_parameter("leather_tint", Color(skin_ref.r * skin.r, skin_ref.g * skin.g, skin_ref.b * skin.b) * 0.55)
+		else:
+			sm.set_shader_parameter("cloth_tint", look.get("outfit_cloth", Color(0.16, 0.03, 0.035)))
+			sm.set_shader_parameter("leather_tint", look.get("outfit_leather", Color(0.13, 0.12, 0.13)))
+			var glow: Color = look.get("glow", Color(0, 0, 0))
+			sm.set_shader_parameter("glow_color", glow)
+			sm.set_shader_parameter("glow", 0.45 if glow.v > 0.01 else 0.0)
+		var skin_res := part.skin
+		part.owner = null
+		part.get_parent().remove_child(part)
+		skeleton.add_child(part)
+		part.skin = skin_res
+		part.skeleton = NodePath("..")
+		part.material_override = sm
+		part.transform = Transform3D.IDENTITY
+	src.free()
+
+
+## Only the head (and neck) of a base body: the rest is under the outfit.
+static func _head_mesh(body: String, mi: MeshInstance3D) -> ArrayMesh:
+	var key := body + "_head"
+	if _meshes.has(key):
+		return _meshes[key]
+	var full: ArrayMesh = mi.mesh
+	var arrays := full.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+	var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+	var per := bones.size() / maxi(verts.size(), 1)
+	var keep_bones := {}
+	for i in mi.skin.get_bind_count():
+		var bn := str(mi.skin.get_bind_name(i))
+		if bn == "":
+			bn = mi.get_node(mi.skeleton).get_bone_name(mi.skin.get_bind_bone(i))
+		if bn in ["Head", "neck_01"]:
+			keep_bones[i] = true
+	var keep := PackedByteArray()
+	keep.resize(verts.size())
+	for v in verts.size():
+		var best := 0
+		var best_w := -1.0
+		for k in per:
+			if weights[v * per + k] > best_w:
+				best_w = weights[v * per + k]
+				best = bones[v * per + k]
+		keep[v] = 1 if keep_bones.has(best) else 0
+	var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var out_idx := PackedInt32Array()
+	for t in range(0, idx.size(), 3):
+		if keep[idx[t]] == 1 and keep[idx[t + 1]] == 1 and keep[idx[t + 2]] == 1:
+			out_idx.append(idx[t])
+			out_idx.append(idx[t + 1])
+			out_idx.append(idx[t + 2])
+	arrays[Mesh.ARRAY_INDEX] = out_idx
+	var flags := Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS if per == 8 else 0
+	var out := ArrayMesh.new()
+	out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
+	_meshes[key] = out
+	return out
 
 
 ## The body mesh with every vertex coloured by the clothing region of its strongest bone.

@@ -13,6 +13,9 @@ All notable changes to BLACKVEIN. Newest first.
   - **Bone Javelin** (level 9): heavy spears that skewer through up to three people and stick in walls.
   - **Spore Launcher** (level 11): lobs spore pods that burst into a toxic cloud. Everyone inside is
     poisoned, and the dead rise as infected.
+- **A new look for BLACKVEIN**: the hooded Ranger outfit from Quaternius's Modular Character Outfits
+  (CC0), recoloured black and blood red with faint pulsing veins, worn over the base body's head.
+  It moves with every animation like everyone else.
 - **More animation**: Quaternius's Universal Animation Library 2 (CC0) is in: sword combos, an
   overhand throw and more, on the same skeleton as everyone else.
 

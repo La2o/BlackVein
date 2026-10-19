@@ -9,11 +9,13 @@ enum Defense { NONE, SHIELD, ARMOR, WINGS, LIGHT }   # same order as PlayerPower
 enum Legs { NORMAL, RUNNER, LEAPER, CRAWLER, CRUSHER }
 
 const FLESH := Color(0.42, 0.04, 0.05)
+## BLACKVEIN's own look: the hooded Ranger outfit (Quaternius, CC0) in black and blood red.
 const DEFAULT_OUTFIT := {
 	"shirt": Color(0.11, 0.115, 0.13), "pants": Color(0.17, 0.17, 0.19),
-	"skin": Color(0.62, 0.48, 0.4), "gear": "hood", "gear_color": Color(0.09, 0.09, 0.1),
-	"glow": Color(1, 0.16, 0.1), "coat": true, "coat_color": Color(0.1, 0.1, 0.115),
-	"veins": true, "top": "long", "boots": true, "gloves": false, "belt": true,
+	"skin": Color(0.62, 0.48, 0.4), "gear": "none", "gear_color": Color(0.09, 0.09, 0.1),
+	"glow": Color(1, 0.16, 0.1), "coat": false, "coat_color": Color(0.1, 0.1, 0.115),
+	"veins": true, "top": "long", "boots": false, "gloves": false, "belt": false, "hair": "bald",
+	"outfit": "ranger", "outfit_cloth": Color(0.22, 0.035, 0.04), "outfit_leather": Color(0.17, 0.16, 0.17),
 }
 
 var form: int = Form.FISTS

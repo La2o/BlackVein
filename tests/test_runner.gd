@@ -411,6 +411,9 @@ func _run_all() -> void:
 	check("the Wraith flies", pw.creature == PlayerPowers.Creature.WRAITH and player.max_flaps() > 100)
 	await _tap("creature_form")
 	check("and back to human", pw.creature == PlayerPowers.Creature.NONE and absf(player.max_health - human_hp) < 1.0)
+	var ranger_parts: Array = player.model.skeleton.get_children().filter(func(c): return str(c.name).begins_with("Male_Ranger"))
+	check("BLACKVEIN wears the hooded Ranger outfit again after a creature form", ranger_parts.size() >= 5,
+		"%d outfit parts" % ranger_parts.size())
 	pw.set_creature(PlayerPowers.Creature.BRUTE, true)
 	player.biomass = 0.5
 	await _wait(0.5)

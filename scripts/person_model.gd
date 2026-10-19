@@ -66,6 +66,12 @@ func setup(outfit: Dictionary) -> void:
 	}
 	if o.get("shirtless", false):
 		new_look["shirtless"] = true
+	if outfit.has("outfit"):
+		# a whole outfit model (person.gd OUTFITS) instead of the painted-on clothes
+		new_look["outfit"] = outfit["outfit"]
+		for k in ["outfit_cloth", "outfit_leather"]:
+			if outfit.has(k):
+				new_look[k] = outfit[k]
 	new_look["height"] = float(new_look["height"]) * float(o.get("scale_mult", 1.0))
 	if o["infected"] or o["veins"] or (o["has_glow"] and o["glow_style"] == "veins"):
 		new_look["glow"] = o["glow"]

@@ -27,7 +27,7 @@ people are rigged, animated CC0 characters by Quaternius (credits in [assets/CRE
 | **Hijack gunships** and tanks | **Tanks** that fire shells |
 | ![The Brute creature form: a hulking mass of flesh with glowing veins](docs/screenshots/brute.jpg) | ![The stealth meter eye with soldiers marked by exclamation points](docs/screenshots/stealth.jpg) |
 | **Creature forms**: the Brute | The **stealth meter** and soldiers who've spotted you |
-| ![A line of rigged, animated city people](docs/screenshots/people.jpg) | ![BLACKVEIN in a hood and long coat with faint red veins](docs/screenshots/player.jpg) |
+| ![A line of rigged, animated city people](docs/screenshots/people.jpg) | ![BLACKVEIN in his hooded black and red outfit on a rooftop](docs/screenshots/player.jpg) |
 | **Real, animated people** | **BLACKVEIN** himself |
 | ![Suburban streets with houses, lawns and gardens](docs/screenshots/suburbs.jpg) | ![Farmland with crop fields, barns and silos](docs/screenshots/farmland.jpg) |
 | **Suburbs** to the south and west | **Farmland** to the north |
@@ -37,6 +37,8 @@ people are rigged, animated CC0 characters by Quaternius (credits in [assets/CRE
 | **Outbreaks** with hives to destroy | **Day and night**, rain and fog |
 | ![A sniper, a brute infected, a soldier and a riot trooper with a shield](docs/screenshots/enemies.jpg) | ![Time trial rings leading across the rooftops toward the suburbs](docs/screenshots/trials.jpg) |
 | **New enemies**: snipers, brutes and riot troopers | **Time trials** across the rooftops |
+| ![BLACKVEIN hurling a bone javelin from a rooftop](docs/screenshots/bio-weapons.jpg) | ![BLACKVEIN on a rooftop looking out over the city](docs/screenshots/rooftop.jpg) |
+| **Bio weapons**: blade, spine gun, bone javelins, spores | Watching the city from above |
 
 ---
 
