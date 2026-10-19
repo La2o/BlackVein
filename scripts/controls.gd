@@ -37,6 +37,7 @@ func _ready() -> void:
 	_add("thermal", [_k(KEY_V), _jb(JOY_BUTTON_RIGHT_STICK)])
 	_add("decoy", [_k(KEY_B), _jb(JOY_BUTTON_DPAD_DOWN)])
 	_add("creature_form", [_k(KEY_N)])   # controller: hold LB + press D-pad Down
+	_add("bio_weapon", [_k(KEY_K)])   # controller: hold LB + press D-pad Right
 	_add("devastator_spikes", [_k(KEY_G)])
 	_add("devastator_tendrils", [_k(KEY_T)])
 	_add("artillery", [_k(KEY_R)])   # controller: hold LB + press RB

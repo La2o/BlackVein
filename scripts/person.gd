@@ -22,6 +22,7 @@ const HAIR := {
 	"buns": "Hair_Buns", "buzzed_f": "Hair_BuzzedFemale", "beard": "Hair_Beard",
 }
 const ANIMS := "res://assets/characters/animations/UAL1_Standard.glb"
+const ANIMS_2 := "res://assets/characters/animations/UAL2_Standard.glb"   # parkour, sword combos, throws
 const SHADER := preload("res://shaders/person.gdshader")
 
 ## region per bone: shoes, trousers, shirt, short sleeve (upper arm), long sleeve (forearm)
@@ -202,6 +203,13 @@ static func library() -> AnimationLibrary:
 		var ap := scene.get_node("AnimationPlayer") as AnimationPlayer
 		_library = ap.get_animation_library("")   # Godot already loops the "_Loop" ones and drops the suffix
 		scene.free()
+		# the second library rides on the same skeleton: add whatever the first one lacks
+		var scene2: Node = _scene(ANIMS_2).instantiate()
+		var lib2 := (scene2.get_node("AnimationPlayer") as AnimationPlayer).get_animation_library("")
+		for a in lib2.get_animation_list():
+			if not _library.has_animation(a) and a != "A_TPose":
+				_library.add_animation(a, lib2.get_animation(a))
+		scene2.free()
 	return _library
 
 

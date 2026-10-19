@@ -452,8 +452,11 @@ func _player_locomotion(delta: float, speed: float, mode: String) -> void:
 			super.animate(delta, speed, mode)
 
 
+var hold_anim := ""   # stance for a grown bio weapon (Sword_Idle, Pistol_Idle)
+
+
 func animate(delta: float, speed: float, mode: String) -> void:
-	var armed := hand_r != null and hand_r.get_children().any(func(c): return c.has_meta("weapon"))
+	var armed := hold_anim != "" or (hand_r != null and hand_r.get_children().any(func(c): return c.has_meta("weapon")))
 	if creature == 2 and pose_override.is_empty() and _oneshot_t <= 0.0 and mode in ["idle", "walk"]:
 		# the Stalker prowls low
 		play("Crouch_Fwd" if mode == "walk" else "Crouch_Idle", 0.2, clampf(speed / 1.6, 0.7, 2.0))
@@ -462,7 +465,7 @@ func animate(delta: float, speed: float, mode: String) -> void:
 		play(_pose_anim(pose_override), 0.12, 1.4 if pose_override == Player.POSE_NINJA else 1.0)
 		swing_timer = maxf(0.0, swing_timer - delta)
 	elif armed and mode in ["idle", "walk"] and _oneshot_t <= 0.0:
-		play("Pistol_Idle", 0.2)
+		play(hold_anim if hold_anim != "" else "Pistol_Idle", 0.2)
 	else:
 		_player_locomotion(delta, speed, mode)
 	pose_override = {}

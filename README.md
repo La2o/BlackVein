@@ -99,6 +99,7 @@ Press **F1** in the game to see them anytime. A controller works out of the box.
 | Biomass decoy | B | D-pad down |
 | Bio-bomb (while holding someone) | B | D-pad down |
 | Creature form (Brute / Stalker / Wraith) | N | Hold LB + D-pad down |
+| Bio weapon (Blade / Gun / Javelin / Spores) | K | Hold LB + D-pad right |
 | Artillery strike (in military disguise) | R | Hold LB + RB |
 | Groundspike devastator | G | Hold LB + X |
 | Tendril Barrage devastator | T | Hold LB + Y |
@@ -123,6 +124,9 @@ Full list: [docs/CONTROLS.md](docs/CONTROLS.md) · New player? Read [docs/HOW_TO
 - **Sculpted 3D people:** faces, hands, bending elbows and knees, and outfits for every kind of person.
 - **Creature forms:** turn your whole body into the hulking **Brute**, the wall-clinging **Stalker**
   or the flying **Wraith**, fuelled by biomass.
+- **Bio weapons** grown from biomass: a **Bio Blade** with sword combos and a dash-slash, a **Bio Gun**
+  firing bone spines, **Bone Javelins** that skewer a line of people, and a **Spore Launcher** whose
+  toxic clouds raise the dead as infected.
 - **Stealth meter:** an eye that opens as soldiers grow suspicious, with markers over whoever has
   noticed you.
 - **Consume & disguise:** eat anyone to heal and take their identity. Change disguise while unseen

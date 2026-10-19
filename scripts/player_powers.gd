@@ -42,7 +42,15 @@ const WEAPONS := {
 	"launcher": {"name": "Rocket launcher", "auto": false, "cooldown": 0.9, "drop": 6, "armory": 10},
 	"grenade": {"name": "Grenade launcher", "auto": false, "cooldown": 0.7, "drop": 8, "armory": 14},
 	"mg": {"name": "Heavy machine gun", "auto": true, "cooldown": 0.055, "drop": 150, "armory": 250},
+	# bio weapons: grown from biomass (K), paid for in biomass instead of ammo
+	"bio_blade": {"name": "Bio Blade", "auto": false, "cooldown": 0.3, "bio": true, "grow": 15.0, "drain": 0.8},
+	"bio_gun": {"name": "Bio Gun", "auto": true, "cooldown": 0.1, "bio": true, "grow": 10.0, "shot": 1.0},
+	"javelin": {"name": "Bone Javelin", "auto": false, "cooldown": 0.7, "bio": true, "grow": 5.0, "shot": 10.0},
+	"spore": {"name": "Spore Launcher", "auto": false, "cooldown": 0.9, "bio": true, "grow": 10.0, "shot": 12.0},
 }
+const BIO_ORDER := ["bio_blade", "bio_gun", "javelin", "spore"]
+const BIO_SKILLS := {"bio_blade": "bio_blade", "bio_gun": "bio_gun", "javelin": "bone_javelin", "spore": "spore_launcher"}
+const BLADE_COMBO := [["Sword_Regular_A", 38.0, 0.34], ["Sword_Regular_B", 44.0, 0.38], ["Sword_Regular_C", 85.0, 0.7]]
 const LOCK_TIME := 0.5     # seconds of aiming at a vehicle to lock on
 const LOCK_RANGE := 260.0
 
@@ -70,6 +78,9 @@ var held_kind := ""
 var creature: int = Creature.NONE
 var weapon := ""
 var ammo := 0
+var _bio_item: Node3D = null   # the grown weapon, fixed to the hand bone
+var _blade_step := 0
+var _blade_reset := 0.0
 var fire_cooldown := 0.0
 var lock_target: Node3D = null   # rocket launcher: the vehicle you've locked onto
 var _lock_on: Node3D = null      # what the lock is building on
@@ -171,7 +182,7 @@ func is_armored() -> bool:
 func camera_distance_override(d: float) -> float:
 	if held_kind == "car":
 		return d + 2.5
-	if weapon != "" and Input.is_action_pressed("special"):
+	if weapon != "" and weapon != "bio_blade" and Input.is_action_pressed("special"):
 		return 3.0
 	return d
 
@@ -237,7 +248,7 @@ func on_heavy_landing(feet: Vector3, strength: float, dive: bool) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if player.state in [player.State.PILOT, player.State.DEAD] or get_tree().paused:
 		return
-	if event.is_action_pressed("form_next"):
+	if event.is_action_pressed("form_next") and not Input.is_action_pressed("devastator_mod"):
 		_cycle_form(1)
 	elif event.is_action_pressed("form_prev"):
 		_cycle_form(-1)
@@ -446,6 +457,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			Game.locked_message("tether")
 
+	if Input.is_action_just_pressed("bio_weapon") or (mod and Input.is_action_just_pressed("form_next")):
+		_cycle_bio()
 	if weapon != "":
 		_update_weapon()
 		return
@@ -1454,7 +1467,14 @@ func _attach_weapon_mesh() -> void:
 	for c in hand.get_children():
 		if c.has_meta("weapon"):
 			c.queue_free()
+	if _bio_item and is_instance_valid(_bio_item):
+		_bio_item.queue_free()
+	_bio_item = null
+	player.model.hold_anim = ""
 	if weapon == "":
+		return
+	if WEAPONS[weapon].get("bio", false):
+		_attach_bio_mesh()
 		return
 	var mi := MeshInstance3D.new()
 	mi.set_meta("weapon", true)
@@ -1488,8 +1508,247 @@ func _drop_weapon() -> void:
 	_attach_weapon_mesh()
 
 
+# ------------------------------------------------------------------ bio weapons
+
+## K / LB + D-pad Right: grow the next bio weapon you've learned, then back to bare hands.
+func _cycle_bio() -> void:
+	var learned: Array = []
+	for k in BIO_ORDER:
+		if Game.has_skill(BIO_SKILLS[k]):
+			learned.append(k)
+	if learned.is_empty():
+		Game.locked_message("bio_blade")
+		return
+	var i := learned.find(weapon)
+	var next: String = learned[i + 1] if i + 1 < learned.size() else ""
+	if i < 0:
+		next = learned[0]
+	if next == "":
+		_drop_weapon()
+		Game.fx.sound("consume", player.global_position, -10.0, 0.4)
+		return
+	grow_bio(next)
+
+
+func grow_bio(kind: String) -> bool:
+	var cost: float = WEAPONS[kind]["grow"]
+	if player.biomass < cost:
+		Game.say("Growing a %s needs %d biomass" % [str(WEAPONS[kind]["name"]).to_lower(), int(cost)], Color(1, 0.6, 0.5))
+		return false
+	if held:
+		drop_held()
+	player.biomass -= cost
+	weapon = kind
+	ammo = 0
+	_blade_step = 0
+	_attach_weapon_mesh()
+	var hand: Vector3 = player.model.hand_r.global_position
+	for k in 5:
+		Game.fx.tendril_flash(player.global_position + Vector3.UP * 0.4, hand + Vector3(randf_range(-0.3, 0.3), randf_range(-0.2, 0.3), randf_range(-0.3, 0.3)), 0.4, 0.05)
+	Game.fx.sound("consume", player.global_position, -4.0, 0.25)
+	Game.say(str(WEAPONS[kind]["name"]).to_upper(), Color(1, 0.4, 0.3))
+	Game.stat_add("bio_weapons")
+	return true
+
+
+## Organic meshes for the bio weapons, built on the right hand like the guns.
+func _attach_bio_mesh() -> void:
+	var flesh: Material = player.model.mat(Color(0.16, 0.02, 0.02), 0.0, 0.2, 0.35)
+	var bone: Material = player.model.mat(Color(0.8, 0.74, 0.62), 0.0, 0.0, 0.5)
+	var vein: Material = player.model.mat(Color(1, 0.12, 0.05), 3.0)
+	var parts: Array = []   # [mesh, material, position, rotation]
+	match weapon:
+		"bio_blade":
+			parts.append([player.model.box(Vector3(0.05, 0.16, 1.25)), flesh, Vector3(0, 0, 0.72), Vector3.ZERO])
+			parts.append([player.model.box(Vector3(0.02, 0.04, 1.2)), vein, Vector3(0, 0.08, 0.72), Vector3.ZERO])
+			parts.append([player.model.box(Vector3(0.03, 0.05, 1.1)), bone, Vector3(0, -0.08, 0.74), Vector3.ZERO])
+			parts.append([player.model.box(Vector3(0.12, 0.2, 0.2)), flesh, Vector3(0, 0, 0.08), Vector3.ZERO])
+		"bio_gun":
+			parts.append([player.model.capsule(0.1, 0.9), flesh, Vector3(0, 0, 0.3), Vector3(PI * 0.5, 0, 0)])
+			parts.append([player.model.box(Vector3(0.03, 0.03, 0.8)), vein, Vector3(0, 0.1, 0.3), Vector3.ZERO])
+			for k in 3:
+				parts.append([player.model.box(Vector3(0.03, 0.14, 0.03)), bone, Vector3(0, 0.13, 0.1 + k * 0.2), Vector3(0.5, 0, 0)])
+		"javelin":
+			parts.append([player.model.capsule(0.04, 1.6), bone, Vector3(0, 0, 0.2), Vector3(PI * 0.5, 0, 0)])
+			parts.append([player.model.box(Vector3(0.02, 0.02, 1.2)), vein, Vector3(0, 0.04, 0.2), Vector3.ZERO])
+		"spore":
+			parts.append([player.model.capsule(0.15, 0.7), flesh, Vector3(0, 0, 0.22), Vector3(PI * 0.5, 0, 0)])
+			for k in 3:
+				parts.append([player.model.sphere(0.08), player.model.mat(Color(0.55, 0.9, 0.15), 2.5), Vector3(0.09 * (k - 1), 0.15, 0.15 + k * 0.12), Vector3.ZERO])
+	var item := Node3D.new()
+	for p in parts:
+		var mi := MeshInstance3D.new()
+		mi.mesh = p[0]
+		mi.material_override = p[1]
+		mi.position = p[2]
+		mi.rotation = p[3]
+		item.add_child(mi)
+	# a blade is held like a sword (tilted up), everything else like a gun
+	player.model.hold_anim = {"bio_blade": "Sword_Idle", "javelin": ""}.get(weapon, "Pistol_Aim_Neutral")
+	if weapon == "bio_blade":
+		_bio_item = player.model.hold_item(item, "Sword_Idle", Vector3(0, 0.02, 0.0), Vector3(-0.55, 0, 0))
+	else:
+		_bio_item = player.model.hold_item(item, "Pistol_Aim_Neutral" if weapon != "javelin" else "Idle", Vector3(0, 0.03, 0.05))
+
+
+func _update_bio(w: Dictionary) -> void:
+	var dt := get_physics_process_delta_time()
+	if w.has("drain"):
+		player.biomass -= float(w["drain"]) * dt
+	if player.biomass <= 0.5:
+		player.biomass = maxf(player.biomass, 0.0)
+		Game.say("Out of biomass: the %s withers" % str(w["name"]).to_lower(), Color(1, 0.6, 0.5))
+		_drop_weapon()
+		return
+	if weapon == "bio_blade":
+		_update_blade(dt)
+		return
+	var firing := Input.is_action_pressed("attack") if w["auto"] else Input.is_action_just_pressed("attack")
+	if not firing or fire_cooldown > 0.0:
+		return
+	var shot: float = w["shot"]
+	if player.biomass < shot:
+		Game.say("Not enough biomass", Color(1, 0.6, 0.5))
+		fire_cooldown = 0.5
+		return
+	player.biomass -= shot
+	fire_cooldown = w["cooldown"]
+	violence_timer = 3.0
+	player.conspicuous_timer = 3.0
+	var aim: Dictionary = player.aim_point(220.0)
+	var muzzle: Vector3 = player.global_position + Vector3.UP * 0.55 + player.facing * 0.9
+	var dir: Vector3 = (Vector3(aim["position"]) - muzzle).normalized()
+	player.face(dir, 0.5)
+	match weapon:
+		"bio_gun":
+			_fire_spine(muzzle, dir)
+		"javelin":
+			player.model.oneshot("OverhandThrow", 2.2)
+			var j := Node3D.new()
+			j.set_script(PROJECTILE_SCRIPT)
+			player.get_parent().add_child(j)
+			j.launch(muzzle + Vector3.UP * 0.4, (dir + Vector3.UP * 0.03).normalized() * 70.0, player, "javelin")
+			Game.fx.sound("whoosh", muzzle, 3.0)
+			player.add_trauma(0.1)
+		"spore":
+			var land: Vector3 = aim["position"]
+			var dist := muzzle.distance_to(land)
+			if dist > 60.0:
+				land = muzzle + dir * 60.0
+				dist = 60.0
+			var pod := Node3D.new()
+			pod.set_script(PROJECTILE_SCRIPT)
+			player.get_parent().add_child(pod)
+			pod.launch(muzzle, PROJECTILE_SCRIPT.lob_velocity(muzzle, land, clampf(dist / 28.0, 0.35, 1.5)), player, "spore")
+			Game.fx.sound("consume", muzzle, -2.0, 0.6)
+	rumble(0.12, 0.2, 0.06)
+
+
+## Bone spines: fast hitscan darts that cut (and bleed) instead of punching holes.
+func _fire_spine(muzzle: Vector3, dir: Vector3) -> void:
+	dir = (dir + Vector3(randf_range(-1, 1), randf_range(-1, 1), randf_range(-1, 1)) * 0.014).normalized()
+	var hit := Game.raycast(muzzle, muzzle + dir * 200.0, Game.LAYER_WORLD | Game.MASK_HITTABLE, [player.get_rid()])
+	var end := muzzle + dir * 200.0
+	if not hit.is_empty():
+		end = hit["position"]
+		var c := hit["collider"] as Node
+		if c and c.has_method("take_hit"):
+			c.take_hit(Game.hit_info(15.0 * player.damage_mult, dir * 3.0, player, "bullet"))
+			Game.fx.splat(end, -dir, Color(0.5, 0.02, 0.02), 5)
+		else:
+			Game.fx.debris(end, 2, Color(0.8, 0.75, 0.6))
+	Game.fx.tracer(muzzle, end, Color(0.95, 0.85, 0.7), 0.045)
+	Game.fx.sound("spike", muzzle, -8.0, 0.15)
+	player.add_trauma(0.03)
+
+
+## The Bio Blade: Attack strings a three-hit combo, Special dashes through everything in front of you.
+func _update_blade(dt: float) -> void:
+	_blade_reset -= dt
+	if _blade_reset <= 0.0:
+		_blade_step = 0
+	if Input.is_action_just_pressed("special") and special_cooldown <= 0.0:
+		_blade_dash()
+		return
+	if not Input.is_action_just_pressed("attack") or fire_cooldown > 0.0:
+		return
+	var step: Array = BLADE_COMBO[_blade_step]
+	var dir := _aim_flat()
+	player.face(dir, 0.6)
+	player.model.oneshot(step[0], 1.5)
+	fire_cooldown = step[2]
+	violence_timer = 3.0
+	player.conspicuous_timer = 3.0
+	var finisher := _blade_step == 2
+	var hits := _blade_arc(3.6 if not finisher else 4.4, 150.0 if not finisher else 260.0, float(step[1]),
+		dir * (8.0 if not finisher else 22.0) + Vector3.UP * (2.0 if not finisher else 7.0))
+	var tip: Vector3 = player.global_position + Vector3.UP * 0.6 + dir * 1.8
+	Game.fx.burst_ring(tip, Color(1, 0.15, 0.05, 0.5), 1.6 if not finisher else 3.2)
+	Game.fx.sound("slash", tip, 0.0 if hits == 0 else 3.0, 0.1)
+	if hits > 0:
+		player.add_trauma(0.12 if not finisher else 0.3)
+		rumble(0.3, 0.4, 0.1)
+	_blade_step = (_blade_step + 1) % BLADE_COMBO.size()
+	_blade_reset = 1.0
+
+
+func _blade_dash() -> void:
+	special_cooldown = 1.2
+	var dir := _aim_flat()
+	player.face(dir, 1.0)
+	player.model.oneshot("Sword_Dash", 1.6)
+	var from: Vector3 = player.global_position
+	player.velocity = dir * 30.0 + Vector3.UP * 2.0
+	violence_timer = 3.0
+	player.conspicuous_timer = 3.0
+	var hits := 0
+	for n in get_tree().get_nodes_in_group("npcs") + get_tree().get_nodes_in_group("military_vehicles"):
+		var t := n as Node3D
+		if t == null or not t.has_method("take_hit") or (t.has_method("is_alive") and not t.is_alive()):
+			continue
+		var to := t.global_position - from
+		var ahead := Vector3(to.x, 0, to.z).dot(dir)
+		var side := (Vector3(to.x, 0, to.z) - dir * ahead).length()
+		if ahead > -0.5 and ahead < 10.0 and side < 2.2 and absf(to.y) < 3.0:
+			t.take_hit(Game.hit_info(70.0 * player.damage_mult, dir * 14.0 + Vector3.UP * 5.0, player, "blade"))
+			Game.fx.splat(t.global_position, dir, Color(0.5, 0.02, 0.02), 12)
+			hits += 1
+	for k in 4:
+		Game.fx.tendril_flash(from + Vector3.UP * (0.3 + k * 0.25), from + dir * 9.0 + Vector3.UP * (0.3 + k * 0.25), 0.25, 0.08)
+	Game.fx.sound("dash", from, 2.0)
+	if hits > 0:
+		player.add_trauma(0.3)
+
+
+## Everyone in an arc in front of you takes the hit. Returns how many.
+func _blade_arc(reach: float, arc_deg: float, dmg: float, force: Vector3) -> int:
+	var dir := _aim_flat()
+	var cos_limit := cos(deg_to_rad(arc_deg * 0.5))
+	var hits := 0
+	for n in get_tree().get_nodes_in_group("npcs") + get_tree().get_nodes_in_group("military_vehicles") + get_tree().get_nodes_in_group("cars"):
+		var t := n as Node3D
+		if t == null or not t.has_method("take_hit") or t == held:
+			continue
+		if t.has_method("is_alive") and not t.is_alive():
+			continue
+		var to := t.global_position - player.global_position
+		var flat := Vector3(to.x, 0, to.z)
+		var d := flat.length()
+		if d > reach + (1.5 if not t.is_in_group("npcs") else 0.0) or absf(to.y) > 2.5:
+			continue
+		if d > 0.6 and flat.normalized().dot(dir) < cos_limit:
+			continue
+		t.take_hit(Game.hit_info(dmg * player.damage_mult, force, player, "blade"))
+		Game.fx.splat(t.global_position + Vector3.UP * 0.4, dir, Color(0.5, 0.02, 0.02), 8)
+		hits += 1
+	return hits
+
+
 func _update_weapon() -> void:
 	var w: Dictionary = WEAPONS[weapon]
+	if w.get("bio", false):
+		_update_bio(w)
+		return
 	var firing := Input.is_action_pressed("attack") if w["auto"] else Input.is_action_just_pressed("attack")
 	player.model.arm_r.rotation = Vector3(1.45, 0, 0)
 	player.model.arm_l.rotation = Vector3(1.3, 0, -0.45)

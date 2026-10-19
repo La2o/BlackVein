@@ -15,6 +15,7 @@ const KEYS := {
 	"spikes": ["G", "LB+X"], "tendrils": ["T", "LB+Y"], "artillery": ["R", "LB+RB"], "forms": ["1-7 / Wheel", "D-pad L/R"],
 	"evolve": ["Tab", "Back"], "pause": ["Esc", "Start"], "sprint": ["Shift", "RT"], "wardrobe": ["I", "LB+B"],
 	"creature": ["N", "LB+D-pad Down"],
+	"bio": ["K", "LB+D-pad Right"],
 }
 
 var player: Node
@@ -369,6 +370,7 @@ C Tether: zip to any surface, yank enemies, latch onto helicopters   |   [color=
 Z Focus: slow motion (drains biomass)   |   [color=#9fd0ff]L3[/color]
 B Biomass Decoy: a clone that draws fire, then explodes   |   [color=#9fd0ff]D-pad down[/color]
 B while holding someone: Bio-Bomb (throw them, they burst)   |   [color=#9fd0ff]D-pad down[/color]
+K Bio weapons: grow a blade, a spine gun, bone javelins or a spore launcher   |   [color=#9fd0ff]LB + D-pad right[/color]
 V Thermal vision   |   [color=#9fd0ff]R3[/color]
 
 [b]GETTING STRONGER[/b]
@@ -1229,7 +1231,7 @@ const KEY_ACTIONS := {
 	"attack": "attack", "special": "special", "grab": "grab", "consume": "consume", "jump": "jump", "dash": "dash",
 	"tether": "tether", "focus": "focus", "thermal": "thermal", "decoy": "decoy", "defense": "cycle_defense",
 	"spikes": "devastator_spikes", "tendrils": "devastator_tendrils", "artillery": "artillery",
-	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu", "creature": "creature_form",
+	"evolve": "evolve_menu", "sprint": "sprint", "wardrobe": "disguise_menu", "creature": "creature_form", "bio": "bio_weapon",
 }
 
 
@@ -1265,7 +1267,9 @@ func _update_powers_text() -> void:
 	form_label.text = "%s" % pw.FORM_NAMES[f].to_upper()
 	if pw.creature != 0:
 		form_label.text = "%s  ·  %s" % [pw.CREATURE_NAMES[pw.creature].to_upper(), form_label.text]
-	if pw.weapon != "":
+	if pw.weapon != "" and pw.WEAPONS[pw.weapon].get("bio", false):
+		form_label.text = "%s  (biomass)" % str(pw.WEAPONS[pw.weapon]["name"]).to_upper()
+	elif pw.weapon != "":
 		form_label.text = "%s  (%d)" % [str(pw.WEAPONS[pw.weapon]["name"]).to_upper(), pw.ammo]
 		if pw.weapon == "launcher":
 			if pw.lock_target:
@@ -1295,6 +1299,8 @@ func _update_powers_text() -> void:
 	parts.append("%s grab   %s consume   %s disguises" % [_k("grab"), _k("consume"), _k("wardrobe")])
 	if Game.has_skill("brute_form") or Game.has_skill("stalker_form") or Game.has_skill("wraith_form"):
 		parts.append("%s creature form" % _k("creature"))
+	if Game.has_skill("bio_blade") or Game.has_skill("bio_gun"):
+		parts.append("%s bio weapon" % _k("bio"))
 	var line2: Array[String] = []
 	if Game.has_skill("tether"):
 		line2.append("%s tether" % _k("tether"))

@@ -253,18 +253,25 @@ func _build_gear(o: Dictionary) -> void:
 ## Puts a gun in the right hand so it points straight ahead in the aiming animation: the hand's pose
 ## is read from that animation once, and the gun is fixed to the hand relative to it.
 func _hold(gun: Node3D, forward: float, rot := Vector3.ZERO) -> Node3D:
-	play("Pistol_Idle", 0.0)
-	anim.advance(0.0)
+	return hold_item(gun, "Pistol_Idle", Vector3(0, 0.02, forward), rot)
+
+
+## Fixes `item` to the right hand so that, in the pose `ref_anim` starts with, it sits at `offset`
+## from the hand (model space, metres, +Z forward) turned by `rot`. Then it follows the hand.
+func hold_item(gun: Node3D, ref_anim: String, offset: Vector3, rot := Vector3.ZERO) -> Node3D:
+	play(ref_anim, 0.0)
+	anim.seek(0.0, true)
 	var idx := skeleton.find_bone("hand_r")
 	var hand_pose := skeleton.get_bone_global_pose(idx)
 	var want := Transform3D(Basis.from_euler(rot).scaled(Vector3.ONE * _unit),
-		hand_pose.origin + Vector3(0, 0.02, forward) * _unit)
+		hand_pose.origin + offset * _unit)
 	var ba := bone_attach("hand_r")
 	ba.add_child(gun)
 	gun.transform = hand_pose.affine_inverse() * want
 	if gun is MeshInstance3D:
 		all_meshes.append(gun)
 	play("Idle", 0.0)
+	_oneshot_t = 0.0   # the reference pose cut off whatever was playing
 	return gun
 
 
@@ -279,6 +286,16 @@ func swing(right := true, style := 0, duration := 0.22) -> void:
 	play(anim_name, 0.05)
 	anim.seek(0.0, true)
 	_oneshot_t = minf(anim.current_animation_length, maxf(duration, 0.35))
+
+
+## Play a whole animation once (it holds off the locomotion until it ends).
+func oneshot(anim_name: String, speed := 1.0, blend := 0.06) -> void:
+	if anim == null or ragdolling or not anim.has_animation(anim_name):
+		return
+	_current = ""
+	play(anim_name, blend, speed)
+	anim.seek(0.0, true)
+	_oneshot_t = anim.current_animation_length / maxf(speed, 0.01)
 
 
 ## mode: idle, walk, run, aim, flail, dead, grabbed, air, glide, crouch, cower (as in humanoid.gd)

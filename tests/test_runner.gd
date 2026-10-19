@@ -583,6 +583,93 @@ func _run_all() -> void:
 	Game.set_alert(Game.Alert.HIDDEN)
 	player.health = player.max_health
 
+	# ---------------- bio weapons: grown from biomass with K
+	for bid in ["bio_blade", "bio_gun", "bone_javelin", "spore_launcher"]:
+		Game.skills.erase(bid)
+	await _tap("bio_weapon")
+	check("bio weapons are locked until learned", player.powers.weapon == "")
+	for bid in ["bio_blade", "bio_gun", "bone_javelin", "spore_launcher"]:
+		Game.skills[bid] = 1
+	check("the second animation library is loaded", player.model.anim.has_animation("Sword_Regular_A")
+		and player.model.anim.has_animation("OverhandThrow") and player.model.anim.has_animation("Sprint"))
+	player.biomass = player.max_biomass
+	player.yaw = 0.0
+	await _tap("bio_weapon")
+	check("K grows a Bio Blade from biomass", player.powers.weapon == "bio_blade" and player.biomass < player.max_biomass,
+		"weapon '%s'" % player.powers.weapon)
+	var slab: Node3D = Game.military.spawn_npc("heavy_gunner", player.global_position + player.facing * 2.2)
+	slab.set_physics_process(false)
+	await _wait(0.2)
+	var slab_hp: float = slab.hp
+	for k in 3:
+		player.powers.fire_cooldown = 0.0
+		await _tap("attack")
+		await _wait(0.15)
+	check("the blade's three-hit combo cuts deep", not is_instance_valid(slab) or slab.hp < slab_hp - 100.0,
+		"hp %.0f -> %.0f" % [slab_hp, slab.hp if is_instance_valid(slab) else -1.0])
+	await _clear_units()
+	await _tap("bio_weapon")
+	check("then a Bio Gun", player.powers.weapon == "bio_gun")
+	var target_g: Node3D = Game.military.spawn_npc("heavy_gunner", player.global_position + player.facing * 8.0)
+	target_g.set_physics_process(false)
+	await _wait(0.2)
+	var bm0 := player.biomass
+	var gun_hp: float = target_g.hp
+	player.aim_override = target_g.global_position + Vector3.UP * 0.4
+	Input.action_press("attack")
+	await _wait(0.8)
+	Input.action_release("attack")
+	player.aim_override = Vector3.INF
+	check("the Bio Gun fires bone spines and costs biomass", (not is_instance_valid(target_g) or target_g.hp < gun_hp)
+		and player.biomass < bm0, "hp %.0f, biomass %.0f -> %.0f" % [target_g.hp if is_instance_valid(target_g) else -1.0, bm0, player.biomass])
+	await _clear_units()
+	await _tap("bio_weapon")
+	check("then Bone Javelins", player.powers.weapon == "javelin")
+	var row: Array = []
+	for k in 3:
+		var r: Node3D = Game.military.spawn_npc("soldier", player.global_position + player.facing * (6.0 + k * 3.0))
+		r.set_physics_process(false)
+		row.append(r)
+	await _wait(0.2)
+	player.aim_override = row[2].global_position + Vector3.UP * 0.2
+	player.powers.fire_cooldown = 0.0
+	await _tap("attack")
+	await _wait(0.6)
+	player.aim_override = Vector3.INF
+	var skewered := 0
+	for r in row:
+		if not is_instance_valid(r) or r.hp < r.max_hp:
+			skewered += 1
+	check("a bone javelin skewers through a line of soldiers", skewered >= 2, "%d hit" % skewered)
+	await _clear_units()
+	await _tap("bio_weapon")
+	check("then the Spore Launcher", player.powers.weapon == "spore")
+	var crowd: Array = []
+	for k in 3:
+		var c: Node3D = Game.military.spawn_npc("civilian", player.global_position + player.facing * 14.0 + Vector3(k - 1.0, 0, 0))
+		c.set_physics_process(false)
+		crowd.append(c)
+	await _wait(0.2)
+	player.aim_override = crowd[1].global_position
+	player.powers.fire_cooldown = 0.0
+	await _tap("attack")
+	player.aim_override = Vector3.INF
+	await _wait(5.0)
+	var gassed := 0
+	for c in crowd:
+		if not is_instance_valid(c) or c.hp < c.max_hp:
+			gassed += 1
+	var risen := 0
+	for n in main.get_node("Units").get_children():
+		if n.get("kind") == "infected":
+			risen += 1
+	check("spore clouds poison everyone inside and the dead rise as infected", gassed >= 2 and risen >= 1,
+		"%d gassed, %d risen" % [gassed, risen])
+	await _tap("bio_weapon")
+	check("K again puts the bio weapons away", player.powers.weapon == "")
+	await _clear_units()
+	player.biomass = player.max_biomass
+
 	# ---------------- arm forms and specials
 	for f in PlayerPowers.FORM_NAMES.size():
 		player.powers.set_form(f)

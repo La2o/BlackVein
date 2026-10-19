@@ -1009,7 +1009,12 @@ func eye_position() -> Vector3:
 
 
 ## Where the center of the screen points (for throwing, tether and guns).
+var aim_override := Vector3.INF   # tests: aim at a fixed point instead of the screen centre
+
+
 func aim_point(max_dist := 200.0, mask := Game.LAYER_WORLD | Game.MASK_HITTABLE) -> Dictionary:
+	if aim_override != Vector3.INF:
+		return {"position": aim_override, "collider": null, "normal": Vector3.UP}
 	var from := camera.global_position
 	var dir := -camera.global_transform.basis.z
 	# start the ray at the player's depth so we don't hit things behind them

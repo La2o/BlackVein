@@ -2,6 +2,20 @@
 
 All notable changes to BLACKVEIN. Newest first.
 
+## [Unreleased]
+
+### New
+- **Bio weapons** (new Bio Weapons skills; K / hold LB + D-pad Right to cycle). They're grown from
+  biomass and paid for in biomass instead of ammo:
+  - **Bio Blade** (level 5): a sword of hardened flesh and bone. Attack strings a three-hit combo
+    (the last hit launches), Special dashes through everything in front of you. Drains biomass slowly.
+  - **Bio Gun** (level 7): an organic rifle firing bone spines, one biomass a shot.
+  - **Bone Javelin** (level 9): heavy spears that skewer through up to three people and stick in walls.
+  - **Spore Launcher** (level 11): lobs spore pods that burst into a toxic cloud. Everyone inside is
+    poisoned, and the dead rise as infected.
+- **More animation**: Quaternius's Universal Animation Library 2 (CC0) is in: sword combos, an
+  overhand throw and more, on the same skeleton as everyone else.
+
 ## [0.13.0] — 2026-10-19 — Ragdolls, new enemies, Bio-Bomb and time trials
 
 ### New

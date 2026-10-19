@@ -20,6 +20,7 @@ Everything here may be used in a commercial game. Add a line for every new asset
 | `characters/base/` (Universal Base Characters, Standard) | people: male and female bodies, skin, eyes | [Quaternius](https://quaternius.com/packs/universalbasecharacters.html) | CC0 |
 | `characters/hair/` (Universal Base Characters, Standard) | hairstyles, beard, eyebrows | [Quaternius](https://quaternius.com/packs/universalbasecharacters.html) | CC0 |
 | `characters/animations/UAL1_Standard.glb` (Universal Animation Library, Standard) | all people's animations | [Quaternius](https://quaternius.com/packs/universalanimationlibrary.html) | CC0 |
+| `characters/animations/UAL2_Standard.glb` (Universal Animation Library 2, Standard) | sword combos, throws, slides, climbs | [Quaternius](https://quaternius.itch.io/universal-animation-library-2) | CC0 |
 | `../music/ambient.mp3` ("Bleak Terminal" by ruskerdax) | music while exploring | [OpenGameArt](https://opengameart.org/content/bleak-terminal) | CC0 |
 | `../music/combat.ogg` ("AI Fight", T&T Free Cyberpunk Pack 2) | combat music | [OpenGameArt](https://opengameart.org/content/t-t-free-cyberpunk-pack-2) | CC0 |
 | `../music/boss.wav` ("Epic Boss Battle" by Juhani Junkala) | boss music | [OpenGameArt](https://opengameart.org/content/boss-battle-music) | CC0 |
