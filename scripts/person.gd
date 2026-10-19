@@ -43,6 +43,49 @@ static var _scenes := {}      # path -> PackedScene, held so Godot doesn't reloa
 static var _hair := {}        # hair file -> [{mesh, skin, material}] so each style is loaded once
 static var _library: AnimationLibrary = null
 
+## Walking and running cycles: the ground speed each covers at 1x (in body heights per second, so it
+## scales with the person) and its phase relative to Walk (the shift that lines the thighs up). Measured
+## with tests/anim_slip.gd -- calibrate. Playing a cycle at speed / (this * height) keeps the feet planted.
+const CYCLES := {
+	"Walk": [0.561, 0.0], "Walk_Formal": [0.561, 0.0], "Zombie_Walk_Fwd": [0.561, 0.12],
+	"Jog_Fwd": [3.451, 0.91], "Sprint": [5.433, 0.89], "Crouch_Fwd": [0.449, 0.0], "Walk_Carry": [0.401, 0.02],
+}
+## Stances that ship as one-shots but are held for as long as you stand in them.
+const LOOP_FIX := ["Sword_Idle", "Idle_Shield", "NinjaJump_Idle", "Slide"]
+## The arms (from the collarbones down to the fingertips): the upper-body layer poses these fully,
+## and straightens the upper spine most of the way (so a gun stays level while the legs sprint).
+const ARM_ROOTS := ["clavicle_l", "clavicle_r"]
+const UPPER_SPINE := {"spine_02": 0.5, "spine_03": 0.7}
+static var _arm_tracks := {}   # animation -> [[bone index, rotation track index, weight], ...]
+static var _all_tracks := {}   # animation -> [[bone index, track index, track type], ...]
+
+## Crossfades are done here, not by the AnimationPlayer (its one speed_scale would also speed up or
+## slow down the animation fading out, which jerks the legs when a walk turns into a run). The old
+## animation keeps playing at its own rate underneath the new one until it has faded out; a change
+## in the middle of a fade fades out from a still copy of the pose instead.
+var _fade_from := ""           # the animation fading out ("" = a still pose, _fade_pose)
+var _fade_pos := 0.0
+var _fade_rate := 1.0
+var _fade_time := 0.0
+var _fade_len := 0.0
+var _fade_pose: Array = []     # [rotation, position] per bone when fading out from a still pose
+
+var height_m := 1.8            # this person's height in metres (set in setup)
+var always_animate := false    # skip the distance level of detail (the player; animation tests)
+## Upper-body layer: the arms take their pose from another animation while the legs keep walking or
+## running (aiming a gun, carrying someone, holding a blade). Fades in and out.
+var upper_anim := ""
+var upper_time := -1.0         # a fixed moment of upper_anim, or -1 to play it through
+var _upper_w := 0.0
+var _upper_t := 0.0
+## Aiming: the chest turns (up to 60 degrees) so the held `aim_item` points along `aim_dir` (world
+## space; ZERO = off). The item is built pointing along its +Z.
+var aim_dir := Vector3.ZERO
+var aim_item: Node3D = null
+## Both arms straight up (lifting a car over your head), 0..1, eased.
+var arms_up := 0.0
+var _arms_up_w := 0.0
+
 var look := {}
 var skeleton: Skeleton3D
 var anim: AnimationPlayer
@@ -91,6 +134,7 @@ func setup(new_look: Dictionary) -> void:
 	if look.has("outfit"):
 		_wear_outfit(str(look["outfit"]), body, body_mesh)
 	var h: float = look.get("height", 1.0)
+	height_m = 1.8 * h
 	root.scale = Vector3.ONE * (1.8 / maxf(tall, 0.1)) * h
 	root.position.y = foot_offset
 	root.rotation.y = PI   # the models face +Z; the game's forward is -Z
@@ -126,14 +170,144 @@ func _process(delta: float) -> void:
 	_anim_acc += delta
 	var interval := 0.0
 	var cam := get_viewport().get_camera_3d()
-	if cam:
+	if cam and not always_animate:
 		var d := cam.global_position.distance_to(global_position)
 		if d > 220.0:
 			return
 		interval = 0.0 if d < 40.0 else (1.0 / 15.0 if d < 90.0 else 1.0 / 6.0)
 	if _anim_acc >= interval:
 		anim.advance(_anim_acc)
+		_post_pose(_anim_acc)
 		_anim_acc = 0.0
+
+
+## Plays a walking/running cycle at the rate that matches `ground_speed` (m/s), so the planted foot
+## doesn't slide. Switching from another cycle carries the stride over (same foot, same moment) so
+## the legs never scissor.
+func play_cycle(anim_name: String, ground_speed: float, blend := 0.2, max_rate := 3.0) -> void:
+	var c: Array = CYCLES[anim_name]
+	var rate := clampf(ground_speed / (float(c[0]) * height_m), 0.3, max_rate)
+	if anim_name == _current:
+		anim.speed_scale = rate
+		return
+	var phase := -1.0
+	if CYCLES.has(_current) and anim.current_animation != "" and anim.current_animation_length > 0.0:
+		var old: Array = CYCLES[_current]
+		phase = fposmod(anim.current_animation_position / anim.current_animation_length - float(old[1]), 1.0)
+	_start_fade(blend)
+	_current = anim_name
+	anim.play(anim_name, 0.0)
+	anim.speed_scale = rate
+	if phase >= 0.0:
+		anim.seek(fposmod(phase + float(c[1]), 1.0) * anim.current_animation_length)
+
+
+## After the animation has posed the body: the crossfade, the upper-body layer and the arms-up lift.
+func _post_pose(delta: float) -> void:
+	_apply_fade(delta)
+	var want := 1.0 if upper_anim != "" else 0.0
+	_upper_w = move_toward(_upper_w, want, delta * 6.0)
+	_arms_up_w = move_toward(_arms_up_w, arms_up, delta * 5.0)
+	if _upper_w > 0.001 and upper_anim != "" and anim.has_animation(upper_anim):
+		var a := anim.get_animation(upper_anim)
+		_upper_t += delta
+		var t := upper_time if upper_time >= 0.0 else (fposmod(_upper_t, a.length) if a.loop_mode != Animation.LOOP_NONE else minf(_upper_t, a.length))
+		var w := smoothstep(0.0, 1.0, _upper_w)
+		for tr in _arm_tracks_for(upper_anim, a):
+			var bone: int = tr[0]
+			var q := a.rotation_track_interpolate(tr[1], t)
+			skeleton.set_bone_pose_rotation(bone, skeleton.get_bone_pose_rotation(bone).slerp(q, w * float(tr[2])))
+	elif _upper_w <= 0.001:
+		_upper_t = 0.0
+	if aim_dir != Vector3.ZERO and aim_item != null and is_instance_valid(aim_item):
+		_aim_chest()
+	if _arms_up_w > 0.001:
+		var w2 := smoothstep(0.0, 1.0, _arms_up_w)
+		for side in [["upperarm_l", "lowerarm_l", "hand_l", 1.0], ["upperarm_r", "lowerarm_r", "hand_r", -1.0]]:
+			# skeleton space: +Y up, +Z the way the body faces, +X its left
+			var up := Vector3(0.22 * float(side[3]), 1.0, 0.12).normalized()
+			_aim_bone(side[0], side[1], up, w2)
+			_aim_bone(side[1], side[2], up, w2)
+
+
+## Turns the upper spine so the held item points along aim_dir, shared between two spine bones.
+func _aim_chest() -> void:
+	var hand := skeleton.find_bone("hand_r")
+	if hand < 0:
+		return
+	var f := (_global_pose(hand) * aim_item.transform).basis.z.normalized()
+	var want := (skeleton.global_transform.basis.inverse() * aim_dir).normalized()
+	var angle := f.angle_to(want)
+	if angle < 0.01:
+		return
+	var axis := f.cross(want).normalized()
+	if axis.length() < 0.5:
+		return
+	angle = minf(angle, deg_to_rad(60.0))
+	for part in [["spine_02", 0.4], ["spine_03", 0.6]]:
+		var b := skeleton.find_bone(part[0])
+		var parent := skeleton.get_bone_parent(b)
+		var pg := _global_pose(parent) if parent >= 0 else Transform3D.IDENTITY
+		var bg := pg * skeleton.get_bone_pose(b)
+		var new_global := Basis(Quaternion(axis, angle * float(part[1]))) * bg.basis
+		skeleton.set_bone_pose_rotation(b, (pg.basis.inverse() * new_global).get_rotation_quaternion())
+
+
+## Turns `bone` so the line from it to `child` points along `dir` (skeleton space), by `weight`.
+func _aim_bone(bone_name: String, child_name: String, dir: Vector3, weight: float) -> void:
+	var b := skeleton.find_bone(bone_name)
+	var c := skeleton.find_bone(child_name)
+	if b < 0 or c < 0:
+		return
+	var parent := skeleton.get_bone_parent(b)
+	var pg := _global_pose(parent) if parent >= 0 else Transform3D.IDENTITY
+	var bg := pg * skeleton.get_bone_pose(b)
+	var cg := bg * skeleton.get_bone_pose(c)
+	var cur := (cg.origin - bg.origin).normalized()
+	if cur.length() < 0.5:
+		return
+	var turn := Quaternion(cur, dir.normalized())
+	var new_global := Basis(turn) * bg.basis
+	var local := (pg.basis.inverse() * new_global).get_rotation_quaternion()
+	skeleton.set_bone_pose_rotation(b, skeleton.get_bone_pose_rotation(b).slerp(local, weight))
+
+
+## A bone's pose in skeleton space, from the local poses (fresh even mid-frame).
+func _global_pose(b: int) -> Transform3D:
+	var t := skeleton.get_bone_pose(b)
+	var p := skeleton.get_bone_parent(b)
+	while p >= 0:
+		t = skeleton.get_bone_pose(p) * t
+		p = skeleton.get_bone_parent(p)
+	return t
+
+
+## The rotation tracks of `a` that drive the arms, looked up once per animation.
+func _arm_tracks_for(anim_name: String, a: Animation) -> Array:
+	if _arm_tracks.has(anim_name):
+		return _arm_tracks[anim_name]
+	var arm_bones := {}
+	for root_name in ARM_ROOTS:
+		var r := skeleton.find_bone(root_name)
+		if r < 0:
+			continue
+		var stack := [r]
+		while not stack.is_empty():
+			var b: int = stack.pop_back()
+			arm_bones[skeleton.get_bone_name(b)] = b
+			for ch in skeleton.get_bone_children(b):
+				stack.append(ch)
+	var out := []
+	for i in a.get_track_count():
+		if a.track_get_type(i) != Animation.TYPE_ROTATION_3D:
+			continue
+		var bone_name := str(a.track_get_path(i).get_concatenated_subnames())
+		if arm_bones.has(bone_name):
+			out.append([arm_bones[bone_name], i, 1.0])
+		elif UPPER_SPINE.has(bone_name):
+			out.append([skeleton.find_bone(bone_name), i, UPPER_SPINE[bone_name]])
+	_arm_tracks[anim_name] = out
+	return out
 
 
 ## Crossfades to an animation from the library (no-op if it's already playing).
@@ -141,9 +315,76 @@ func play(anim_name: String, blend := 0.2, speed := 1.0) -> void:
 	if anim_name == _current:
 		anim.speed_scale = speed
 		return
+	_start_fade(blend)
 	_current = anim_name
-	anim.play(anim_name, blend)
+	anim.play(anim_name, 0.0)
 	anim.speed_scale = speed
+
+
+## Begins fading out of whatever the body is doing now, over `blend` seconds.
+func _start_fade(blend: float) -> void:
+	_fade_len = 0.0
+	if blend <= 0.0 or skeleton == null or anim.current_animation == "":
+		return
+	if _fade_time < _fade_len_prev:
+		# already mid-fade: fade from the pose as it is right now
+		_fade_from = ""
+		_fade_pose.clear()
+		for b in skeleton.get_bone_count():
+			_fade_pose.append([skeleton.get_bone_pose_rotation(b), skeleton.get_bone_pose_position(b)])
+	else:
+		_fade_from = anim.current_animation
+		_fade_pos = anim.current_animation_position
+		_fade_rate = anim.speed_scale
+	_fade_time = 0.0
+	_fade_len = blend
+	_fade_len_prev = blend
+
+
+var _fade_len_prev := 0.0
+
+
+## Mixes the fading-out animation (or still pose) over the pose the new animation just set.
+func _apply_fade(delta: float) -> void:
+	if _fade_len <= 0.0 or _fade_time >= _fade_len:
+		return
+	_fade_time += delta
+	var w := 1.0 - smoothstep(0.0, 1.0, clampf(_fade_time / _fade_len, 0.0, 1.0))
+	if w <= 0.0:
+		return
+	if _fade_from == "":
+		for b in mini(_fade_pose.size(), skeleton.get_bone_count()):
+			var p: Array = _fade_pose[b]
+			skeleton.set_bone_pose_rotation(b, skeleton.get_bone_pose_rotation(b).slerp(p[0], w))
+			skeleton.set_bone_pose_position(b, skeleton.get_bone_pose_position(b).lerp(p[1], w))
+		return
+	if not anim.has_animation(_fade_from):
+		return
+	var a := anim.get_animation(_fade_from)
+	_fade_pos += delta * _fade_rate
+	var t := fposmod(_fade_pos, a.length) if a.loop_mode != Animation.LOOP_NONE else minf(_fade_pos, a.length)
+	for tr in _tracks_for(_fade_from, a):
+		var bone: int = tr[0]
+		if tr[2] == Animation.TYPE_ROTATION_3D:
+			skeleton.set_bone_pose_rotation(bone, skeleton.get_bone_pose_rotation(bone).slerp(a.rotation_track_interpolate(tr[1], t), w))
+		else:
+			skeleton.set_bone_pose_position(bone, skeleton.get_bone_pose_position(bone).lerp(a.position_track_interpolate(tr[1], t), w))
+
+
+## Every bone rotation and position track of `a`, looked up once per animation.
+func _tracks_for(anim_name: String, a: Animation) -> Array:
+	if _all_tracks.has(anim_name):
+		return _all_tracks[anim_name]
+	var out := []
+	for i in a.get_track_count():
+		var ty := a.track_get_type(i)
+		if ty != Animation.TYPE_ROTATION_3D and ty != Animation.TYPE_POSITION_3D:
+			continue
+		var b := skeleton.find_bone(str(a.track_get_path(i).get_concatenated_subnames()))
+		if b >= 0:
+			out.append([b, i, ty])
+	_all_tracks[anim_name] = out
+	return out
 
 
 func bone_attach(bone: String) -> BoneAttachment3D:
@@ -217,6 +458,9 @@ static func library() -> AnimationLibrary:
 			if not _library.has_animation(a) and a != "A_TPose":
 				_library.add_animation(a, lib2.get_animation(a))
 		scene2.free()
+		for a in LOOP_FIX:
+			if _library.has_animation(a):
+				_library.get_animation(a).loop_mode = Animation.LOOP_LINEAR
 	return _library
 
 

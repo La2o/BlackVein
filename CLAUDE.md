@@ -60,6 +60,13 @@ xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_comp
   --resolution 1280x720 res://tests/test_runner.tscn -- shots=/some/folder
 ```
 
+Animation: walk/jog/sprint rates come from `Person.CYCLES` (natural stride speed per body height and
+phase relative to Walk). If you add or change a cycle, re-measure with
+`godot --headless --fixed-fps 60 --path . res://tests/anim_slip.tscn -- calibrate` and check foot slide
+and gait pops with the same scene without arguments. Arms are posed through the upper-body layer
+(`upper_anim`, `arms_up`, `aim_dir` in person.gd), never by rotating the `arm_l/arm_r/...` pivots: those
+only carry attached pieces. Crossfades are done by `Person.play()` itself, not the AnimationPlayer.
+
 When adding a feature, add a check to `tests/test_runner.gd`.
 Every test scene calls `Game.use_test_storage()` first so it never deletes the player's real save or
 settings (they share `user://` with the game). New test scenes must do the same.

@@ -88,6 +88,7 @@ func _build_body(look_outfit: Dictionary) -> void:
 	worn["item"] = "none"
 	foot_offset = -0.9
 	needs_pivots = true
+	always_animate = true   # the player is always on screen: every frame, whatever the camera does
 	setup(worn)
 	_wing_pivots.clear()
 	_crawler.clear()
@@ -406,7 +407,7 @@ func _pose_anim(pose: Dictionary) -> String:
 	if pose == Player.POSE_ROCKET or pose == Player.POSE_LONGJUMP:
 		return "NinjaJump_Idle"   # streamlined in flight
 	if pose == Player.POSE_NINJA:
-		return "Sprint"
+		return "Sprint"   # leaning hard into a flat-out run (player.gd tilts the body)
 	if pose == Player.POSE_SKYDIVE:
 		return "Swim_Idle"     # arms and legs spread
 	return "Jump"   # rocket, long jump, vault
@@ -443,13 +444,15 @@ func _player_locomotion(delta: float, speed: float, mode: String) -> void:
 	match mode:
 		"idle":
 			play("Idle", 0.25)
+			_gait = 0
 		"walk", "run":
-			if speed < 3.0:
-				play("Walk", 0.25, clampf(speed / 1.4, 0.7, 1.6))
-			elif speed < 9.5:
-				play("Jog_Fwd", 0.2, clampf(speed / 3.6, 0.8, 2.3))
-			else:
-				play("Sprint", 0.15, clampf(speed / 6.5, 1.0, 3.2))
+			_gait = _pick_gait(speed, _gait)
+			match _gait:
+				0: play_cycle("Walk", speed, 0.25)
+				1: play_cycle("Jog_Fwd", speed, 0.2)
+				_: play_cycle("Sprint", speed, 0.15, 3.2)
+		"slide":
+			play("Slide", 0.08)
 		"air":
 			# a long fall or a big launch gets the ninja-jump air pose
 			play("NinjaJump_Idle" if _air_time > 0.8 or vertical_speed > 16.0 else "Jump", 0.25)
@@ -460,19 +463,33 @@ func _player_locomotion(delta: float, speed: float, mode: String) -> void:
 
 
 var hold_anim := ""   # stance for a grown bio weapon (Sword_Idle, Pistol_Idle)
+var carrying := ""    # "npc" (held in front of you) or "car" (lifted over your head), set by player_powers
 
 
 func animate(delta: float, speed: float, mode: String) -> void:
 	var armed := hold_anim != "" or (hand_r != null and hand_r.get_children().any(func(c): return c.has_meta("weapon")))
-	if creature == 2 and pose_override.is_empty() and _oneshot_t <= 0.0 and mode in ["idle", "walk"]:
-		# the Stalker prowls low
-		play("Crouch_Fwd" if mode == "walk" else "Crouch_Idle", 0.2, clampf(speed / 1.6, 0.7, 2.0))
+	var stance := hold_anim if hold_anim != "" else ("Pistol_Aim_Neutral" if armed else "")
+	if carrying == "npc":
+		stance = "Walk_Carry"
+	# the arms hold the weapon or the person you carry while the legs do whatever they're doing
+	upper_anim = stance if stance != "" and mode not in ["idle", "dead"] and _oneshot_t <= 0.0 else ""
+	upper_time = -1.0
+	arms_up = 1.0 if carrying == "car" else 0.0
+	if creature == 2 and pose_override.is_empty() and _oneshot_t <= 0.0 and (mode == "idle" or (mode == "walk" and speed < 3.0)):
+		# the Stalker prowls low when it moves slowly (at a run it runs)
+		if mode == "walk":
+			play_cycle("Crouch_Fwd", speed, 0.2)
+		else:
+			play("Crouch_Idle", 0.2)
 		pose_override = {}
 	elif not pose_override.is_empty() and _oneshot_t <= 0.0:
-		play(_pose_anim(pose_override), 0.12, 1.4 if pose_override == Player.POSE_NINJA else 1.0)
+		if pose_override == Player.POSE_NINJA:
+			play_cycle("Sprint", speed, 0.12, 3.2)
+		else:
+			play(_pose_anim(pose_override), 0.12)
 		swing_timer = maxf(0.0, swing_timer - delta)
-	elif armed and mode in ["idle", "walk"] and _oneshot_t <= 0.0:
-		play(hold_anim if hold_anim != "" else "Pistol_Idle", 0.2)
+	elif stance != "" and carrying != "npc" and mode == "idle" and _oneshot_t <= 0.0:
+		play(stance, 0.2)
 	else:
 		_player_locomotion(delta, speed, mode)
 	pose_override = {}

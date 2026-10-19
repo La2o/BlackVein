@@ -40,6 +40,7 @@ var _thermal_on := false
 var _thermal_mat: StandardMaterial3D
 var _oneshot_t := 0.0
 var _dead := false
+var _gait := 0   # 0 walk, 1 jog, 2 sprint (with hysteresis, see _pick_gait)
 var _unit := 1.0      # skeleton units per metre
 
 
@@ -288,10 +289,13 @@ func swing(right := true, style := 0, duration := 0.22) -> void:
 	match style:
 		1, 3: anim_name = "Sword_Attack"
 		4: anim_name = "Pistol_Shoot"
+	# the whole move, sped up to fit the attack (never cut off mid-swing)
+	var length := anim.get_animation(anim_name).length
+	var rate := clampf(length / maxf(duration * 2.2, 0.4), 1.0, 3.0)
 	_current = ""
-	play(anim_name, 0.05)
+	play(anim_name, 0.05, rate)
 	anim.seek(0.0, true)
-	_oneshot_t = minf(anim.current_animation_length, maxf(duration, 0.35))
+	_oneshot_t = length / rate
 
 
 ## Play a whole animation once (it holds off the locomotion until it ends).
@@ -315,14 +319,14 @@ func animate(delta: float, speed: float, mode: String) -> void:
 		_oneshot_t -= delta
 		if mode in ["idle", "walk", "run", "aim"]:
 			return
+	# soldiers keep their gun up while they walk and run
+	upper_anim = "Pistol_Idle" if held_item != null and mode in ["walk", "run"] else ""
 	match mode:
 		"walk":
-			play("Walk", 0.25, clampf(speed / 1.4, 0.6, 2.2))
+			play_cycle("Walk", speed, 0.25)
 		"run":
-			if speed > 5.0:
-				play("Sprint", 0.2, clampf(speed / 6.5, 0.7, 2.0))
-			else:
-				play("Jog_Fwd", 0.2, clampf(speed / 3.5, 0.7, 2.0))
+			_gait = _pick_gait(speed, maxi(_gait, 1))
+			play_cycle("Sprint" if _gait == 2 else "Jog_Fwd", speed, 0.2)
 		"aim":
 			play("Pistol_Idle", 0.25)
 		"cower", "crouch":
@@ -337,6 +341,22 @@ func animate(delta: float, speed: float, mode: String) -> void:
 				play("Death01", 0.15)
 		_:
 			play("Idle", 0.3)
+
+
+## Walk, jog or sprint for a ground speed, sticking with the current gait near the edges so it
+## doesn't flicker between two cycles.
+func _pick_gait(speed: float, current: int) -> int:
+	var walk_jog := 1.4 * height_m      # ~2.5 m/s: where a fast walk and a slow jog look alike
+	var jog_sprint := 4.5 * height_m    # ~8.4 m/s
+	match current:
+		0:
+			return 1 if speed > walk_jog * 1.12 else 0
+		1:
+			if speed < walk_jog * 0.88:
+				return 0
+			return 2 if speed > jog_sprint * 1.06 else 1
+		_:
+			return 1 if speed < jog_sprint * 0.94 else 2
 
 
 func plays_death() -> bool:

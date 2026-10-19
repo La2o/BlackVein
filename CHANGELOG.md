@@ -4,6 +4,22 @@ All notable changes to BLACKVEIN. Newest first.
 
 ## [Unreleased]
 
+### Animation overhaul
+- **Feet stay planted.** Every walk, jog and sprint now plays at the rate its stride actually covers
+  (measured from the animations, scaled to each person's height). Before, feet slid 40-78% of the
+  movement speed; now it's 2-7%, for the player and everyone in the city.
+- **No more pops between gaits.** Walk, jog and sprint hand over mid-stride (same foot, same moment),
+  with a crossfade where the old cycle keeps its own pace while it fades out.
+- **Arms do what they should while the legs run**: an upper-body layer poses the real arm bones, so
+  guns are held up and aimed (the chest turns toward the crosshair, up at gunships too), people are
+  carried in front of you, cars are lifted overhead with both arms, and the bio blade is held ready.
+  The old code moved invisible pivots instead, which threw claws, guns and armour off the limbs.
+- Soldiers keep their rifles up while they walk and run.
+- Punches and kicks play through instead of being cut off halfway.
+- A dash along the ground is a slide now.
+- The player always animates at full rate, however far the camera pulls back.
+- New `tests/anim_slip.tscn` measures foot slide and gait pops; two new checks keep them in line.
+
 ### New
 - **Bio weapons** (new Bio Weapons skills; K / hold LB + D-pad Right to cycle). They're grown from
   biomass and paid for in biomass instead of ammo:

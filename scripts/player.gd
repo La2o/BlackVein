@@ -1187,8 +1187,12 @@ func _update_visual(delta: float) -> void:
 				target_basis = target_basis.rotated(target_basis.x, -1.25)
 				mode = "glide"
 			State.DASH:
-				target_basis = target_basis.rotated(target_basis.x, -0.6 if is_on_floor() else -1.3)
-				mode = "run" if is_on_floor() else "glide"
+				# on the ground a dash is a slide (the animation gets low by itself); in the air, a dive
+				if is_on_floor():
+					mode = "slide"
+				else:
+					target_basis = target_basis.rotated(target_basis.x, -1.3)
+					mode = "glide"
 			State.DIVE:
 				target_basis = target_basis.rotated(target_basis.x, -0.4)
 				mode = "crouch"
@@ -1219,6 +1223,8 @@ func _update_visual(delta: float) -> void:
 					mode = "run"
 					# the faster you go, the harder you lean in
 					var lean := lerpf(0.28, 0.5, clampf((hspeed - 14.0) / 14.0, 0.0, 1.0))
+					if model.hold_anim != "" or model.carrying != "":
+						lean *= 0.35   # stay upright with a gun, a blade or someone in your arms
 					target_basis = target_basis.rotated(target_basis.x, -lean)
 					if hspeed > 23.0:
 						pose = POSE_NINJA

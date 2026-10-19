@@ -982,7 +982,8 @@ func _run_all() -> void:
 		player.powers._wardrobe_cd = 0.0
 		var rebuilt := player.powers.wear_disguise(0)
 		await get_tree().process_frame
-		var gun_shown: bool = player.model.hand_r.get_children().any(func(c): return c.has_meta("weapon") and not c.is_queued_for_deletion())
+		var gun_item: Node3D = player.powers._bio_item
+		var gun_shown: bool = gun_item != null and is_instance_valid(gun_item) and not gun_item.is_queued_for_deletion() 			and gun_item.is_inside_tree() and player.model.skeleton.is_ancestor_of(gun_item)
 		check("a picked-up gun stays visible after changing body", rebuilt and gun_shown, "rebuilt %s" % rebuilt)
 		player.powers._drop_weapon()
 	await _wait(5.0)
@@ -1357,6 +1358,38 @@ func _run_all() -> void:
 	check("goals complete and advance", Game.goal_index >= 1, "goal %d" % Game.goal_index)
 	Game.goal_index = maxi(gi, Game.goal_index)
 
+	# ---------------- animation quality: planted feet don't slide, gait changes don't pop
+	var slip_meter: Node = preload("res://tests/anim_slip.gd").new()
+	add_child(slip_meter)
+	var lab_npc := PersonModel.new()
+	lab_npc.foot_offset = -0.9
+	add_child(lab_npc)
+	lab_npc.always_animate = true
+	lab_npc.setup({"body": "m"})
+	var worst_slide := 0.0
+	var slide_at := ""
+	for v in [1.2, 3.0, 5.0]:
+		var r: Dictionary = await slip_meter.measure(lab_npc, v, "walk" if v < 2.0 else "run")
+		if r["slip"] / v > worst_slide:
+			worst_slide = r["slip"] / v
+			slide_at = "npc %.1f m/s %s" % [v, r["anim"]]
+	var lab_pm: Node3D = Node3D.new()
+	lab_pm.set_script(load("res://scripts/player_model.gd"))
+	lab_pm.always_animate = true
+	add_child(lab_pm)
+	lab_pm.build()
+	for v in [2.0, 7.5, 14.0, 26.0]:
+		var r: Dictionary = await slip_meter.measure(lab_pm, v, "walk" if v < 8.0 else "run")
+		if r["slip"] / v > worst_slide:
+			worst_slide = r["slip"] / v
+			slide_at = "player %.1f m/s %s" % [v, r["anim"]]
+	check("planted feet don't slide (under 10% at any speed)", worst_slide < 0.1, "worst %.0f%% (%s)" % [worst_slide * 100.0, slide_at])
+	var pop: Dictionary = await slip_meter.ramp(lab_pm)
+	check("walk, jog and sprint blend into each other without a pop", pop["ratio"] < 2.8, "worst x%.2f (%s)" % [pop["ratio"], pop["at"]])
+	lab_npc.queue_free()
+	lab_pm.queue_free()
+	slip_meter.queue_free()
+
 	# ---------------- ragdolls: people go limp when they die
 	var victim: Node3D = Game.military.spawn_npc("civilian", player.global_position + Vector3(0, 0, -5))
 	await _wait(0.2)
@@ -1373,7 +1406,8 @@ func _run_all() -> void:
 	player.velocity = Vector3.ZERO
 	player.global_position = races.starts[0] + Vector3.UP * 1.0
 	await _wait(0.3)
-	check("walking into a beacon starts a time trial", races.active == 0)
+	check("walking into a beacon starts a time trial", races.active == 0, "active %d, %.1f m from the beacon, dead %s, vehicle %s, cooldown %.1f" % [races.active,
+		Vector2(player.global_position.x - races.starts[0].x, player.global_position.z - races.starts[0].z).length(), player.is_dead(), player.vehicle, races._cooldown])
 	await _wait(3.2)
 	for ring in races.courses[0]:
 		player.global_position = ring

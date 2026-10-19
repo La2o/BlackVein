@@ -927,22 +927,19 @@ func _grab(target: Node3D) -> void:
 
 
 func _update_held(_delta: float) -> void:
-	if held == null:
-		return
-	if not is_instance_valid(held):
+	if held != null and not is_instance_valid(held):
 		held = null
 		held_kind = ""
+	player.model.carrying = held_kind if held != null else ""   # the arms carry it (player_model.gd)
+	if held == null:
 		return
 	var f: Vector3 = player.facing
 	if held_kind == "car":
 		var t := Transform3D(Basis.looking_at(f.cross(Vector3.UP), Vector3.UP), player.global_position + held.hold_offset())
 		held.global_transform = t
-		player.model.arm_l.rotation = Vector3(3.0, 0, -0.3)
-		player.model.arm_r.rotation = Vector3(3.0, 0, 0.3)
 	else:
-		held.global_position = player.global_position + f * 0.85 + Vector3.UP * 0.25
+		held.global_position = player.global_position + f * 0.8 + Vector3.UP * 0.55   # lifted off their feet
 		held.global_basis = Basis.looking_at(-f, Vector3.UP)
-		player.model.arm_r.rotation = Vector3(1.4, 0, 0.1)
 
 
 func _throw_held() -> void:
@@ -1471,31 +1468,38 @@ func _attach_weapon_mesh() -> void:
 		_bio_item.queue_free()
 	_bio_item = null
 	player.model.hold_anim = ""
+	player.model.aim_item = null
+	player.model.aim_dir = Vector3.ZERO
 	if weapon == "":
 		return
 	if WEAPONS[weapon].get("bio", false):
 		_attach_bio_mesh()
 		return
+	# built pointing forward (+Z) from the grip, then fixed to the hand as it is in the aiming pose
 	var mi := MeshInstance3D.new()
-	mi.set_meta("weapon", true)
 	if weapon == "rifle":
 		mi.mesh = player.model.box(Vector3(0.07, 0.12, 0.85))
 		mi.material_override = player.model.mat(Color(0.08, 0.08, 0.08), 0.0, 0.6, 0.4)
-		mi.position = Vector3(0, -0.05, -0.3)
+		mi.position = Vector3(0, 0.0, 0.25)
 	elif weapon == "mg":
 		mi.mesh = player.model.box(Vector3(0.14, 0.2, 1.25))
 		mi.material_override = player.model.mat(Color(0.1, 0.1, 0.09), 0.0, 0.7, 0.35)
-		mi.position = Vector3(0, -0.06, -0.4)
+		mi.position = Vector3(0, -0.02, 0.35)
 	elif weapon == "grenade":
 		mi.mesh = player.model.capsule(0.12, 0.75)
 		mi.material_override = player.model.mat(Color(0.28, 0.3, 0.2), 0.0, 0.4, 0.5)
 		mi.rotation.x = PI * 0.5
-		mi.position = Vector3(0, -0.05, -0.2)
+		mi.position = Vector3(0, 0.0, 0.2)
 	else:
 		mi.mesh = player.model.capsule(0.09, 1.1)
 		mi.material_override = player.model.mat(Color(0.2, 0.25, 0.15))
 		mi.rotation.x = PI * 0.5
-	hand.add_child(mi)
+		mi.position = Vector3(0, 0.05, 0.1)
+	var item := Node3D.new()
+	item.add_child(mi)
+	player.model.hold_anim = "Pistol_Aim_Neutral"
+	_bio_item = player.model.hold_item(item, "Pistol_Aim_Neutral", Vector3(0, 0.03, 0.05))
+	player.model.aim_item = _bio_item
 
 
 func _drop_weapon() -> void:
@@ -1589,6 +1593,8 @@ func _attach_bio_mesh() -> void:
 		_bio_item = player.model.hold_item(item, "Sword_Idle", Vector3(0, 0.02, 0.0), Vector3(-0.55, 0, 0))
 	else:
 		_bio_item = player.model.hold_item(item, "Pistol_Aim_Neutral" if weapon != "javelin" else "Idle", Vector3(0, 0.03, 0.05))
+		if weapon != "javelin":
+			player.model.aim_item = _bio_item   # the bio gun and spore launcher point where you aim
 
 
 func _update_bio(w: Dictionary) -> void:
@@ -1746,12 +1752,11 @@ func _blade_arc(reach: float, arc_deg: float, dmg: float, force: Vector3) -> int
 
 func _update_weapon() -> void:
 	var w: Dictionary = WEAPONS[weapon]
+	player.model.aim_dir = player.aim_direction()   # the chest turns the gun toward the crosshair
 	if w.get("bio", false):
 		_update_bio(w)
 		return
 	var firing := Input.is_action_pressed("attack") if w["auto"] else Input.is_action_just_pressed("attack")
-	player.model.arm_r.rotation = Vector3(1.45, 0, 0)
-	player.model.arm_l.rotation = Vector3(1.3, 0, -0.45)
 	if weapon == "launcher":
 		_update_lock()
 	if not firing or fire_cooldown > 0.0:
