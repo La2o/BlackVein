@@ -417,6 +417,9 @@ func _try_vault(delta: float) -> bool:
 	coyote = 0.0
 	double_jump_ready = true
 	start_trick("vault", 2.0 * vy / gravity, 1.0 if randf() < 0.5 else -1.0)
+	# the hands-on-the-obstacle climb-over (Universal Animation Library 2), timed to the hop
+	var hop := 2.0 * vy / gravity
+	model.oneshot("ClimbUp_1m", clampf(0.67 / maxf(hop, 0.05), 0.9, 2.6), 0.06)
 	Game.fx.sound("whoosh", global_position, -8.0)
 	Game.stat_add("vaults")
 	parkour_timer = maxf(parkour_timer, 1.0)
@@ -1155,8 +1158,6 @@ const POSE_SKYDIVE := {"la": Vector3(0.5, 0, -1.5), "ra": Vector3(0.5, 0, 1.5), 
 const POSE_LONGJUMP := {"ll": Vector3(1.1, 0, 0), "lk": -0.4, "rl": Vector3(-0.7, 0, 0), "rk": -1.3,
 	"la": Vector3(-1.0, 0, -0.45), "ra": Vector3(1.1, 0, 0.3), "lf": 0.4, "rf": 0.6}
 const POSE_NINJA := {"la": Vector3(-1.05, 0, -0.3), "ra": Vector3(-1.05, 0, 0.3), "lf": 0.25, "rf": 0.25}
-const POSE_VAULT := {"la": Vector3(0.3, 0, -0.5), "lf": 0.0, "ra": Vector3(-0.4, 0, 1.2), "rf": 0.5,
-	"ll": Vector3(1.3, 0, 0.5), "rl": Vector3(0.9, 0, 0.6), "lk": -1.6, "rk": -1.0, "speed": 24.0}
 
 
 func _update_visual(delta: float) -> void:
@@ -1264,8 +1265,7 @@ func _update_visual(delta: float) -> void:
 				target_offset += Vector3.DOWN * 0.45 * sin(PI * t)
 				pose = POSE_TUCK
 			"vault":
-				extra = Basis(Vector3.BACK, 1.15 * sin(PI * t) * _trick_dir)
-				pose = POSE_VAULT
+				pass   # the climb-over animation does the whole move (see _try_vault)
 		if t >= 1.0 or (trick != "roll" and state in [State.WALL, State.DEAD, State.PILOT]):
 			trick = ""
 		elif trick != "roll" and trick != "vault" and is_on_floor() and _trick_t > 0.12:

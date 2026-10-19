@@ -99,6 +99,8 @@ func _pose(name: String, st: int, vel: Vector3, trick_name: String, trick_time: 
 	p._super_done = false
 	if trick_name != "":
 		p.start_trick(trick_name, 0.52, 1.0)
+	if trick_name == "vault":
+		p.model.oneshot("ClimbUp_1m", 1.3, 0.0)
 	var dt := 1.0 / 60.0
 	var t := 0.0
 	var until := maxf(run_for, trick_time)

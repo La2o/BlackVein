@@ -17,6 +17,8 @@ All notable changes to BLACKVEIN. Newest first.
 - Soldiers keep their rifles up while they walk and run.
 - Punches and kicks play through instead of being cut off halfway.
 - A dash along the ground is a slide now.
+- **Vaults** use the climb-over animation from Universal Animation Library 2 (hands on the
+  obstacle, a knee up and over), timed to the hop, instead of the jump pose with a sideways tilt.
 - The player always animates at full rate, however far the camera pulls back.
 - New `tests/anim_slip.tscn` measures foot slide and gait pops; two new checks keep them in line.
 

@@ -231,18 +231,21 @@ func _run_all() -> void:
 	var vaults0 := int(Game.stats.get("vaults", 0))
 	var min_speed := INF
 	var went_wall := false
+	var climbed := false
 	t = 0.0
 	while t < 1.6:
 		await get_tree().physics_frame
 		t += get_physics_process_delta_time()
 		min_speed = minf(min_speed, Vector3(player.velocity.x, 0, player.velocity.z).length())
 		went_wall = went_wall or player.state == Player.State.WALL
+		climbed = climbed or player.model._current == "ClimbUp_1m"
 	var past := (player.global_position - block.global_position).dot(run_dir)
 	_release_all()
 	block.queue_free()
 	check("sprinting at a low wall vaults it", int(Game.stats.get("vaults", 0)) > vaults0 and past > 2.0 and not went_wall,
 		"%.1f m past, wall %s" % [past, went_wall])
 	check("vaulting never slows the run", min_speed > player.sprint_speed * 0.85, "slowest %.1f m/s" % min_speed)
+	check("a vault plays the climb-over animation", climbed)
 	await _wait(1.0)
 
 	# ---------------- running onto a curb (side streets) never stops you

@@ -42,6 +42,43 @@ func _ready() -> void:
 	p.powers.grow_bio("bio_blade")
 	await _run_shot(start, "", "anim_4_blade_run", 0.0)
 	p.powers._drop_weapon()
+	# a vault over a low wall: frames through the climb-over
+	p.respawn(start)
+	p.yaw = 0.0
+	await _wait(0.3)
+	Input.action_press("move_forward")
+	Input.action_press("sprint")
+	await _wait(0.6)
+	var run_dir := Vector3(p.velocity.x, 0, p.velocity.z).normalized()
+	var wall := StaticBody3D.new()
+	wall.collision_layer = Game.LAYER_WORLD
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 1.2, 1.0)
+	shape.shape = box
+	wall.add_child(shape)
+	var mesh := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = box.size
+	mesh.mesh = bm
+	wall.add_child(mesh)
+	add_child(wall)
+	wall.global_position = p.global_position + run_dir * 14.0 + Vector3(0, -0.9 + 0.6, 0)
+	wall.look_at(wall.global_position + run_dir, Vector3.UP)
+	var frame := 0
+	var guard := 0.0
+	while frame < 5 and guard < 3.0:
+		await get_tree().process_frame
+		guard += get_process_delta_time()
+		_side_cam()
+		if p.model._current == "ClimbUp_1m" or frame > 0:
+			await _shot("anim_6_vault_%d" % frame)
+			frame += 1
+			await _wait(0.07)
+	Input.action_release("move_forward")
+	Input.action_release("sprint")
+	wall.queue_free()
+	await _wait(0.4)
 	# a jump: frames from take-off to landing
 	p.respawn(start)
 	p.yaw = 0.0
