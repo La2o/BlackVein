@@ -18,3 +18,6 @@ desktop.ini
 
 # Original Quaternius downloads (unpacked into assets/characters)
 assets/quaternius/
+
+# Local backup of tools and the owner's save (see docs/PC_SETUP.md)
+_pc_backup/

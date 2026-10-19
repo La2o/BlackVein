@@ -1036,7 +1036,10 @@ func _run_all() -> void:
 		player.conspicuous_timer = 1.0
 		await get_tree().physics_frame
 		t += get_physics_process_delta_time()
-		watched = watched or (watcher2.noticing and watcher2._marker != null and watcher2._marker.visible)
+		# whichever soldier spots you first (there can be more than one nearby)
+		for sol in get_tree().get_nodes_in_group("military"):
+			if sol.get("noticing") == true and sol.get("_marker") != null and sol._marker.visible:
+				watched = true
 	player.state = Player.State.GROUND
 	var meter: Control = Game.hud.stealth_meter
 	check("stealth meter: soldiers who notice you get a marker and the eye fills",

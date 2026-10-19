@@ -4,8 +4,27 @@ Read this first in every new session. It's the fastest way to get back up to spe
 
 ## Where the project lives
 
+- On the owner's Windows PC: `E:\BLACKVEIN` (moved from `C:\Users\ygsna\BLACKVEIN` on 2026-10-19).
+  New PC / reinstalled Windows: follow `docs/PC_SETUP.md` (Godot, export templates and the owner's
+  save are backed up in `_pc_backup/`, which is not in git).
 - GitHub: https://github.com/La2o/BlackVein (branch `main`). This is the source of truth.
-- Pushing tags through the session proxy is refused; push `main` with `git -c push.negotiate=false push`.
+- Push with `git -c push.negotiate=false push`.
+
+## Working with the owner (standing preferences)
+
+- **Test locally with the fast loop only** (`--fixed-fps 60`, below). Normal-speed runs and the
+  300 s soak are only for a GitHub release.
+- **Never tag or publish a GitHub release unless the owner asks.** Push commits to `main` as you go;
+  keep CHANGELOG.md (an `[Unreleased]` section) and the version numbers ready so a release is quick.
+- **Keep the local build current**: after each tested batch, export
+  `export/windows/BLACKVEIN.exe` (they play it directly or through `PLAY.bat` next to it). Check the
+  game isn't running first (`tasklist | findstr BLACKVEIN`).
+- **Never run that exe yourself**: it shares `%APPDATA%\Godot\app_userdata\BLACKVEIN\` with the
+  owner's real save and could autosave over it. Tests use `Game.use_test_storage()`.
+- Assets: CC0 only (see below). Downloads from itch.io work through the built-in browser: open the
+  page, "No thanks, just take me to the downloads", then POST to the page's
+  `/file/<upload id>?source=game_download&after_download_lightbox=1&as_props=1` from the page and fetch
+  the signed URL it returns with curl within 60 seconds.
 
 ## Engine & rules
 
@@ -29,8 +48,9 @@ Read this first in every new session. It's the fastest way to get back up to spe
 
 ## How to verify changes (do this every time)
 
-Godot binary isn't installed system-wide in the cloud workspace; download the Linux build
-(4.5-stable from the godotengine/godot GitHub releases) into the scratchpad.
+Godot 4.5 lives in `%LOCALAPPDATA%\Programs\Godot\`; use the console build so output reaches the
+terminal. In Git Bash: `G="$LOCALAPPDATA/Programs/Godot/Godot_v4.5-stable_win64_console.exe"`, then
+`"$G"` wherever `godot` appears below. (In a cloud/Linux workspace, download the Linux 4.5-stable build.)
 
 ```
 godot --headless --path . --import                       # re-import after adding files
@@ -54,11 +74,14 @@ godot --path . --resolution 1920x1080 res://tests/profile.tscn -- seconds=40
 Tests must drive input like a player (e.g. hold `forms_wheel` while the wheel is open), not lean on
 real-time gaps between frames.
 
-Screenshots (slow, software rendering):
+Screenshots: run a look scene in a window (on Linux without a display, wrap it in
+`xvfb-run -a -s "-screen 0 1600x900x24"` and add `--rendering-method gl_compatibility`):
 ```
-xvfb-run -a -s "-screen 0 1600x900x24" godot --path . --rendering-method gl_compatibility \
-  --resolution 1280x720 res://tests/test_runner.tscn -- shots=/some/folder
+godot --path . --resolution 1280x720 res://tests/look_anim.tscn -- shots=/some/folder
 ```
+Look scenes: `look_anim` (moving, carrying, aiming, vault, jump), `look_bio` (bio weapons, hero shots),
+`look_moves`, `look_creatures`, `look_districts`, `look_enemies`, `look_trials`, `look_people`,
+`look_ragdoll`. Convert PNGs to JPG for the README with Godot's `Image.save_jpg` (no PIL here).
 
 Animation: walk/jog/sprint rates come from `Person.CYCLES` (natural stride speed per body height and
 phase relative to Walk). If you add or change a cycle, re-measure with
@@ -105,7 +128,8 @@ See `docs/ARCHITECTURE.md` for the full map. Short version:
 
 ## Exporting
 
-Templates live in `~/.local/share/godot/export_templates/4.5.stable/` (only
+Templates live in `%APPDATA%\Godot\export_templates\4.5.stable\` on Windows
+(`~/.local/share/godot/export_templates/4.5.stable/` on Linux; only
 `windows_release_x86_64.exe`, `linux_release.x86_64`, `version.txt` are needed; extract them from
 `Godot_v4.5-stable_export_templates.tpz` on the godotengine/godot GitHub release).
 ```
